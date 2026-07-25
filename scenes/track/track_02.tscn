@@ -1,13 +1,15 @@
 [gd_scene format=4]
 
-[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadStart.glb" id="1_0jl50"]
-[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadStartPositions.glb" id="2_3p0yi"]
-[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadStraightLong.glb" id="3_nxcw6"]
-[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadCornerLarger.glb" id="4_n8pf3"]
-[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadCornerLarge.glb" id="5_1x10v"]
-[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadStraight.glb" id="6_ju8ck"]
-[ext_resource type="Script" path="res://scripts/track/checkpoint.gd" id="7_o4v4v"]
-[ext_resource type="Shader" path="res://assets/shaders/ground_grid.gdshader" id="8_8k7ot"]
+[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadStart.glb" id="1_nxcw6"]
+[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadStartPositions.glb" id="2_n8pf3"]
+[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadStraightLong.glb" id="3_1x10v"]
+[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadCornerLarger.glb" id="4_ju8ck"]
+[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadCornerLarge.glb" id="5_o4v4v"]
+[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadRampLong.glb" id="6_8k7ot"]
+[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadStraightBridge.glb" id="7_ehipa"]
+[ext_resource type="PackedScene" path="res://assets/kenney/racing_kit/roadStraight.glb" id="8_pr1aq"]
+[ext_resource type="Script" path="res://scripts/track/checkpoint.gd" id="9_pim4f"]
+[ext_resource type="Shader" path="res://assets/shaders/ground_grid.gdshader" id="10_8l4x2"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_leyo4"]
 resource_name = "grey"
@@ -475,6 +477,214 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_x1ejr")
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_p3v1d"]
+resource_name = "grass"
+albedo_color = Color(0.5855679, 0.7740564, 0.6882034, 1)
+emission_enabled = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_f7k40"]
+resource_name = "grey"
+albedo_color = Color(0.9754679, 0.9772474, 0.98432255, 1)
+emission_enabled = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_f4jx3"]
+resource_name = "road"
+albedo_color = Color(0.5532369, 0.5532369, 0.5532369, 1)
+emission_enabled = true
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_g3f7e"]
+_surfaces = [{
+"aabb": AABB(0, 0, -2, 1, 0.5, 2),
+"format": 34896613377,
+"index_count": 12,
+"index_data": PackedByteArray("AAABAAIAAgADAAAABAAFAAYABgAHAAQA"),
+"name": "grass",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 8,
+"vertex_data": PackedByteArray("//8AAP//AAAX6wAA//8AABfr//8AAAAA/////wAAAADnFAAA//8AAAAAAAD//wAAAAD//wAAAADnFP//AAAAAA==")
+}, {
+"aabb": AABB(0.08165262, 0, -2, 0.83669466, 0.52, 2),
+"format": 34896613377,
+"index_count": 36,
+"index_data": PackedByteArray("AAABAAIAAgABAAMAAwAEAAIAAgAFAAAAAAAFAAYABgAHAAAACAAJAAoACgALAAgADAAJAAgACAANAAwADAANAA4ADgAPAAwA"),
+"name": "grey",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 16,
+"vertex_data": PackedByteArray("///YCf//AACY6dgJ//8AAJjp//8AAAAAmOnsBP//AACY6RL7AAAAAP////8AAAAA//8m9gAAAAD//wAA//8AAAAA//8AAAAAAADYCf//AAAAAAAA//8AAAAAJvYAAAAAZhbYCf//AABmFv//AAAAAGYWEvsAAAAAZhbsBP//AAA=")
+}, {
+"aabb": AABB(0.1548649, 0.01, -2, 0.69027025, 0.5, 2),
+"format": 34896613377,
+"index_count": 6,
+"index_data": PackedByteArray("AAABAAIAAgADAAAA"),
+"name": "road",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray("//8AAP//AAAAAAAA//8AAAAA//8AAAAA/////wAAAAA=")
+}]
+blend_shape_mode = 0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_nlfpq"]
+resource_name = "roadRampLong_Mesh roadRampLong"
+_surfaces = [{
+"aabb": AABB(0, 0, -2, 1, 0.5, 2),
+"attribute_data": PackedByteArray("//+YgYv1mIGL9QAA//8AAHOKmIH/f5iB/38AAHOKAAA="),
+"format": 34896613399,
+"index_count": 12,
+"index_data": PackedByteArray("AAABAAIAAgADAAAABAAFAAYABgAHAAQA"),
+"material": SubResource("StandardMaterial3D_p3v1d"),
+"name": "grass",
+"primitive": 3,
+"uv_scale": Vector4(78.74016, 160.327, 0, 0),
+"vertex_count": 8,
+"vertex_data": PackedByteArray("//8AAP//BLYX6wAA//8Ethfr//8AAAS2/////wAABLbnFAAA//8EtgAAAAD//wS2AAD//wAABLbnFP//AAAEtv///3////9/////f////3////9/////f////3////9/")
+}, {
+"aabb": AABB(0.08165262, 0, -2, 0.83669466, 0.52, 2),
+"attribute_data": PackedByteArray("xbpJgRW2SYEVtgAAxboAAAAA+mD/f1aA/3/2gAAAm2H//zti/3+Xgf9/VoD///pgAAD6YP9/VoD/f5eBAAA7YuiJSYE5hUmBOYUAAOiJAAD//5th/3/2gP9/VoD///pg"),
+"format": 34896613399,
+"index_count": 36,
+"index_data": PackedByteArray("AAABAAIAAgADAAAABAAFAAYABgAHAAQACAAJAAoACgALAAgADAANAA4ADgAPAAwAEAARABIAEgATABAAFAAVABYAFgAXABQA"),
+"material": SubResource("StandardMaterial3D_f7k40"),
+"name": "grey",
+"primitive": 3,
+"uv_scale": Vector4(157.48032, 160.70894, 0, 0),
+"vertex_count": 24,
+"vertex_data": PackedByteArray("///YCf//BLaY6dgJ//8Etpjp//8AAAS2/////wAABLaY6f//AAD/v5jp2An///+/mOnsBP///7+Y6RL7AAD/v///JvYAAP+///8AAP///7///9gJ////v/////8AAP+/AAD//wAA/78AANgJ////vwAAAAD///+/AAAm9gAA/79mFtgJ//8EtgAA2An//wS2AAD//wAABLZmFv//AAAEtmYWEvsAAP+/ZhbsBP///79mFtgJ////v2YW//8AAP+/////f////3////9/////f/9/////f/7//3/+//9/////fwAA/38AAP9/AAD/fwAA/3////9//v//f/7//3///////3////9/////f////3//fwAA/38AAP9/AAD/fwAA")
+}, {
+"aabb": AABB(0.1548649, 0.01, -2, 0.69027025, 0.5, 2),
+"attribute_data": PackedByteArray("//9wgXOXcIFzlwAA//8AAA=="),
+"format": 34896613399,
+"index_count": 6,
+"index_data": PackedByteArray("AAABAAIAAgADAAAA"),
+"material": SubResource("StandardMaterial3D_f4jx3"),
+"name": "road",
+"primitive": 3,
+"uv_scale": Vector4(66.546074, 160.51796, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray("//8AAP//BLYAAAAA//8EtgAA//8AAAS2/////wAABLb///9/////f////3////9/")
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_g3f7e")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3ug0v"]
+resource_name = "wall"
+albedo_color = Color(1, 0.9772474, 0.9408054, 1)
+emission_enabled = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8h8wt"]
+resource_name = "grey"
+albedo_color = Color(0.9754679, 0.9772474, 0.98432255, 1)
+emission_enabled = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_nqjk8"]
+resource_name = "road"
+albedo_color = Color(0.5532369, 0.5532369, 0.5532369, 1)
+emission_enabled = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_e6ld4"]
+resource_name = "_defaultMat"
+emission_enabled = true
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_4dhu4"]
+_surfaces = [{
+"aabb": AABB(0, 0, -1, 1, 0.52, 1),
+"format": 34896613377,
+"index_count": 84,
+"index_data": PackedByteArray("AAABAAIAAwAEAAEAAwAFAAQAAQAGAAMABwADAAYABgAIAAcACAAJAAcACgAGAAEACgABAAAABgAKAAsADAAKAAAACwAKAAwAAAANAAwADAAOAAsADwANAAAACwAOAA8ACwAQAAYAAAARAA8ADwARAAsAEQAQAAsAAgARAAAAEQACABAAEAACABIAEgATABAAEgAUABMAFQASAAIAAgAWABUAFgAXABUA"),
+"name": "wall",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 24,
+"vertex_data": PackedByteArray("//8m9v//AAAX6yb2//8AABfrJvYAAAAAWdgS+///AAAX6/////8AAFnY/////wAA5xQm9v//AAClJxL7//8AAOcU/////wAApSf/////AAAAACb2//8AAAAAJvYAAAAAAAAAAP//AAD//wAA//8AAAAAAAAAAAAA//8AAAAAAADnFCb2AAAAAP//JvYAAAAApScS+wAAAADnFP//AAAAAKUn//8AAAAAWdgS+wAAAAAX6///AAAAAFnY//8AAAAA")
+}, {
+"aabb": AABB(0.08165262, 0.5, -1, 0.83669466, 0.01999998, 1),
+"format": 34896613377,
+"index_count": 36,
+"index_data": PackedByteArray("AAABAAIAAgABAAMAAwAEAAIAAgAFAAAAAAAFAAYABgAHAAAACAAJAAoACgALAAgADAAJAAgACAANAAwADAANAA4ADgAPAAwA"),
+"name": "grey",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 16,
+"vertex_data": PackedByteArray("////////AACY6f////8AAJjp//8AAAAAmOn/f///AACY6f9/AAAAAP////8AAAAA//8AAAAAAAD//wAA//8AAAAA//8AAAAAAAD/////AAAAAAAA//8AAAAAAAAAAAAAZhb/////AABmFv//AAAAAGYW/38AAAAAZhb/f///AAA=")
+}, {
+"aabb": AABB(0.1548649, 0.51, -1, 0.69027025, 1e-05, 1),
+"format": 34896613377,
+"index_count": 6,
+"index_data": PackedByteArray("AAABAAIAAgADAAAA"),
+"name": "road",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray("//8AAP//AAAAAAAA//8AAAAAAAAAAAAA//8AAAAAAAA=")
+}, {
+"aabb": AABB(0, 0, -1, 1, 1e-05, 1),
+"format": 34896613377,
+"index_count": 6,
+"index_data": PackedByteArray("AAABAAIAAgADAAAA"),
+"name": "_defaultMat",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray("//8AAAAAAAAAAAAAAAAAAAAAAAD//wAA//8AAP//AAA=")
+}]
+blend_shape_mode = 0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_h8aa2"]
+resource_name = "roadStraightBridge_Mesh noExport"
+_surfaces = [{
+"aabb": AABB(0, 0, -1, 1, 0.52, 1),
+"attribute_data": PackedByteArray("//9Vg4v1VYOL9QAA//8AAHOKVYP/f1WD/38AAHOKAAD//1WD/39Vg/9/qkH//6pB/3+qQf9/VYMAAFWDAACqQYt1qkFzCqpBLGxaQIt1Cj8sbAo/0hNaQHMKCj/SEwo/AACqQf9/qkH/f1WDAABVg///qkH//1WD/39Vg/9/qkGL9apBc4qqQSzsWkCL9Qo/LOwKP9KTWkBzigo/0pMKPw=="),
+"format": 34896613399,
+"index_count": 84,
+"index_data": PackedByteArray("AAABAAIAAgADAAAABAAFAAYABgAHAAQACAAJAAoACgALAAgADAANAA4ADgAPAAwADwAQAAwADwARABAAEAARABIAEgATABAAEgAUABMAFQASABEAEQAWABUAFgAXABUAGAAZABoAGgAbABgAHAAdAB4AHgAfABwAHwAgABwAHwAhACAAIAAhACIAIgAjACAAIgAkACMAJQAiACEAIQAmACUAJgAnACUA"),
+"material": SubResource("StandardMaterial3D_3ug0v"),
+"name": "wall",
+"primitive": 3,
+"uv_scale": Vector4(78.74016, 76.74016, 0, 0),
+"vertex_count": 40,
+"vertex_data": PackedByteArray("//8m9v///78X6yb2////vxfrJvYAAP+///8m9gAA/7/nFCb2////vwAAJvb///+/AAAm9gAA/7/nFCb2AAD/v///AAAAAP+///8AAP///7///yb2////v///JvYAAP+/AAAm9gAA//8AAAAAAAD/////AAAAAP////8m9gAA///nFCb2AAD//xfrJvYAAP//pScS+wAA///nFP//AAD//6Un//8AAP//WdgS+wAA//8X6///AAD//1nY//8AAP//AAAm9gAA/78AACb2////vwAAAAD///+/AAAAAAAA/7///yb2//8AgP//AAD//wCAAAAAAP//AIAAACb2//8AgBfrJvb//wCA5xQm9v//AIBZ2BL7//8AgBfr/////wCAWdj/////AIClJxL7//8AgOcU/////wCApSf/////AID///9/////f////3////9/////f////3////9/////f/9/AAD/fwAA/38AAP9/AAD/f////3////9/////f////3/+//9//v//f////3/+//9/////f////3/+//9/////f////3////9/////f////3////9/////f////3////9/////f////3////9/////f////3////9/////f///")
+}, {
+"aabb": AABB(0.08165262, 0.5, -1, 0.83669466, 0.01999998, 1),
+"attribute_data": PackedByteArray("i/VVgyzsVYMs7AAAi/UAAAAACj//fwo//39aQAAAWkD//6pB/3+qQf9/Cj///wo/AAAKP/9/Cj//f6pBAACqQdKTVYNzilWDc4oAANKTAAD//1pA/39aQP9/Cj///wo/"),
+"format": 34896613399,
+"index_count": 36,
+"index_data": PackedByteArray("AAABAAIAAgADAAAABAAFAAYABgAHAAQACAAJAAoACgALAAgADAANAA4ADgAPAAwAEAARABIAEgATABAAFAAVABYAFgAXABQA"),
+"material": SubResource("StandardMaterial3D_8h8wt"),
+"name": "grey",
+"primitive": 3,
+"uv_scale": Vector4(78.74016, 76.74016, 0, 0),
+"vertex_count": 24,
+"vertex_data": PackedByteArray("/////////7+Y6f//////v5jp//8AAP+//////wAA/7+Y6f//AAD/v5jp//////+/mOn/f////7+Y6f9/AAD/v///AAAAAP+///8AAP///7//////////v/////8AAP+/AAD//wAA/78AAP//////vwAAAAD///+/AAAAAAAA/79mFv//////vwAA//////+/AAD//wAA/79mFv//AAD/v2YW/38AAP+/Zhb/f////79mFv//////v2YW//8AAP+/////f////3////9/////f/9/////f////3////9/////fwAA/38AAP9/AAD/fwAA/3////9/////f////3///////3////9/////f////3//fwAA/38AAP9/AAD/fwAA")
+}, {
+"aabb": AABB(0.1548649, 0.51, -1, 0.69027025, 1e-05, 1),
+"attribute_data": PackedByteArray("//9Vg3OXVYNzlwAA//8AAA=="),
+"format": 34896613399,
+"index_count": 6,
+"index_data": PackedByteArray("AAABAAIAAgADAAAA"),
+"material": SubResource("StandardMaterial3D_nqjk8"),
+"name": "road",
+"primitive": 3,
+"uv_scale": Vector4(66.546074, 76.74016, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray("//8AAP///78AAAAA////vwAAAAAAAP+///8AAAAA/7////9/////f////3////9/")
+}, {
+"aabb": AABB(0, 0, -1, 1, 1e-05, 1),
+"attribute_data": PackedByteArray("fMMAAP//AAD//5YCfMMAAP//AAD//5YC"),
+"format": 34896613399,
+"index_count": 6,
+"index_data": PackedByteArray("AAABAAIAAwAEAAUA"),
+"material": SubResource("StandardMaterial3D_e6ld4"),
+"name": "_defaultMat",
+"primitive": 3,
+"uv_scale": Vector4(12.194087, 38.94488, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("//8AAAAA//8AAAAAAAD//wAAAAD/////AAAAAP///7///wAA////v///AAAAAP+//3//P/9//z//f/8/AAD/fwAA/38AAP9/")
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_4dhu4")
+
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_xkage"]
 resource_name = "grass"
 albedo_color = Color(0.5855679, 0.7740564, 0.6882034, 1)
@@ -566,669 +776,698 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_t1rxo")
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_ehipa"]
-size = Vector3(56, 8, 4)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_pr1aq"]
-size = Vector3(56, 8, 4)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_pim4f"]
-size = Vector3(56, 8, 4)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_8l4x2"]
-size = Vector3(56, 8, 4)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_obfdh"]
-size = Vector3(56, 8, 4)
+[sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_obfdh"]
+data = PackedVector3Array(-8.4, 0, 0, -8.4, 0, 28, 8.4, 0, 28, -8.4, 0, 0, 8.4, 0, 28, 8.4, 0, 0, -8.4, 0, 28, -8.4, 0, 56, 8.4, 0, 56, -8.4, 0, 28, 8.4, 0, 56, 8.4, 0, 28, -8.4, 0, 56, -8.4, 0, 84, 8.4, 0, 84, -8.4, 0, 56, 8.4, 0, 84, 8.4, 0, 56, -8.4, 0, 84, -8.4, 0, 112, 8.4, 0, 112, -8.4, 0, 84, 8.4, 0, 112, 8.4, 0, 84, -8.4, 0, 112, -8.4, 0, 140, 8.4, 0, 140, -8.4, 0, 112, 8.4, 0, 140, 8.4, 0, 112, -8.4, 0, 140, -8.4, 0, 168, 8.4, 0, 168, -8.4, 0, 140, 8.4, 0, 168, 8.4, 0, 140, -8.4, 0, 168, -8.4, 0, 196, 8.4, 0, 196, -8.4, 0, 168, 8.4, 0, 196, 8.4, 0, 168, -8.4, 0, 196, -8.4, 0, 224, 8.4, 0, 224, -8.4, 0, 196, 8.4, 0, 224, 8.4, 0, 196, -0.82334477, 0, 215.64044, -7.651506, 0, 216.31296, -6.0048165, 0, 233.03207, -0.82334477, 0, 215.64044, -6.0048165, 0, 233.03207, 0.82334477, 0, 232.35956, -9.266567, 0, 216.63422, -15.832326, 0, 218.62593, -10.955514, 0, 234.70253, -9.266567, 0, 216.63422, -10.955514, 0, 234.70253, -4.3897552, 0, 232.71082, -17.353636, 0, 219.25609, -23.404673, 0, 222.49042, -15.485243, 0, 237.3067, -17.353636, 0, 219.25609, -15.485243, 0, 237.3067, -9.434204, 0, 234.07237, -24.773867, 0, 223.40527, -30.077646, 0, 227.75798, -19.419828, 0, 240.74455, -24.773867, 0, 223.40527, -19.419828, 0, 240.74455, -14.116049, 0, 236.39185, -31.242022, 0, 228.92236, -35.59472, 0, 234.22614, -22.608152, 0, 244.88394, -31.242022, 0, 228.92236, -22.608152, 0, 244.88394, -18.255453, 0, 239.58017, -36.509575, 0, 235.5953, -39.743923, 0, 241.64635, -24.927647, 0, 249.56581, -36.509575, 0, 235.5953, -24.927647, 0, 249.56581, -21.693298, 0, 243.51477, -40.374084, 0, 243.1677, -42.365784, 0, 249.73344, -26.289186, 0, 254.61021, -40.374084, 0, 243.1677, -26.289186, 0, 254.61021, -24.297487, 0, 248.04446, -42.687035, 0, 251.34848, -43.35955, 0, 258.17667, -26.64045, 0, 259.82333, -42.687035, 0, 251.34848, -26.64045, 0, 259.82333, -25.967934, 0, 252.99518, -35, 0, 250.6, -63, 0, 250.6, -63, 0, 267.4, -35, 0, 250.6, -63, 0, 267.4, -35, 0, 267.4, -63, 0, 250.6, -91, 0, 250.6, -91, 0, 267.4, -63, 0, 250.6, -91, 0, 267.4, -63, 0, 267.4, -91, 0, 250.6, -119, 0, 250.6, -119, 0, 267.4, -91, 0, 250.6, -119, 0, 267.4, -91, 0, 267.4, -119, 0, 250.6, -147, 0, 250.6, -147, 0, 267.4, -119, 0, 250.6, -147, 0, 267.4, -119, 0, 267.4, -138.64044, 0, 258.17667, -139.04395, 0, 254.07977, -155.76306, 0, 255.72644, -138.64044, 0, 258.17667, -155.76306, 0, 255.72644, -155.35956, 0, 259.82333, -139.3652, 0, 252.4647, -140.56023, 0, 248.52525, -156.63683, 0, 253.40205, -139.3652, 0, 252.4647, -156.63683, 0, 253.40205, -155.4418, 0, 257.3415, -141.1904, 0, 247.0039, -143.13101, 0, 243.37329, -157.94727, 0, 251.29279, -141.1904, 0, 247.0039, -157.94727, 0, 251.29279, -156.00665, 0, 254.9234, -144.04585, 0, 242.00414, -146.65747, 0, 238.82187, -159.64404, 0, 249.47968, -144.04585, 0, 242.00414, -159.64404, 0, 249.47968, -157.03242, 0, 252.66194, -147.82187, 0, 237.65747, -151.00415, 0, 235.04585, -161.66193, 0, 248.03246, -147.82187, 0, 237.65747, -161.66193, 0, 248.03246, -158.47964, 0, 250.64407, -152.37329, 0, 234.13103, -156.0039, 0, 232.19041, -163.9234, 0, 247.00667, -152.37329, 0, 234.13103, -163.9234, 0, 247.00667, -160.29279, 0, 248.94728, -157.52522, 0, 231.56026, -161.46466, 0, 230.36522, -166.34152, 0, 246.44179, -157.52522, 0, 231.56026, -166.34152, 0, 246.44179, -162.40208, 0, 247.63683, -163.07976, 0, 230.04395, -167.17667, 0, 229.64044, -168.82333, 0, 246.35956, -163.07976, 0, 230.04395, -168.82333, 0, 246.35956, -164.72643, 0, 246.76306, -159.6, 0, 238, -159.6, 0, 210, -176.4, 0, 210, -159.6, 0, 238, -176.4, 0, 210, -176.4, 0, 238, -159.6, 0, 210, -159.6, 0, 182, -176.4, 0, 182, -159.6, 0, 210, -176.4, 0, 182, -176.4, 0, 210, -159.6, 0, 182, -159.6, 0, 154, -176.4, 0, 154, -159.6, 0, 182, -176.4, 0, 154, -176.4, 0, 182, -167.17667, 0, 145.64044, -171.27357, 0, 145.23694, -172.92024, 0, 161.95605, -167.17667, 0, 145.64044, -172.92024, 0, 161.95605, -168.82333, 0, 162.35956, -169.65851, 0, 145.5582, -173.59795, 0, 144.36317, -178.47475, 0, 160.43977, -169.65851, 0, 145.5582, -178.47475, 0, 160.43977, -174.53531, 0, 161.6348, -172.0766, 0, 144.99335, -175.70721, 0, 143.05273, -183.62671, 0, 157.86899, -172.0766, 0, 144.99335, -183.62671, 0, 157.86899, -179.9961, 0, 159.8096, -174.33807, 0, 143.96756, -177.52036, 0, 141.35594, -188.17813, 0, 154.34254, -174.33807, 0, 143.96756, -188.17813, 0, 154.34254, -184.99585, 0, 156.95416, -176.35594, 0, 142.52036, -178.96756, 0, 139.33807, -191.95416, 0, 149.99585, -176.35594, 0, 142.52036, -191.95416, 0, 149.99585, -189.34254, 0, 153.17813, -178.05273, 0, 140.70721, -179.99335, 0, 137.0766, -194.8096, 0, 144.9961, -178.05273, 0, 140.70721, -194.8096, 0, 144.9961, -192.86899, 0, 148.62671, -179.36317, 0, 138.59795, -180.5582, 0, 134.65851, -196.6348, 0, 139.53531, -179.36317, 0, 138.59795, -196.6348, 0, 139.53531, -195.43977, 0, 143.47475, -180.23694, 0, 136.27357, -180.64044, 0, 132.17667, -197.35956, 0, 133.82333, -180.23694, 0, 136.27357, -197.35956, 0, 133.82333, -196.95605, 0, 137.92024, -189, 0, 124.6, -217, 0, 124.6, -217, 0, 141.4, -189, 0, 124.6, -217, 0, 141.4, -189, 0, 141.4, -217, 0, 124.6, -245, 0, 124.6, -245, 0, 141.4, -217, 0, 124.6, -245, 0, 141.4, -217, 0, 141.4, -236.64044, 0, 132.17667, -237.04395, 0, 128.07976, -253.76306, 0, 129.72643, -236.64044, 0, 132.17667, -253.76306, 0, 129.72643, -253.35956, 0, 133.82333, -237.36522, 0, 126.46466, -238.56026, 0, 122.525215, -254.63683, 0, 127.40208, -237.36522, 0, 126.46466, -254.63683, 0, 127.40208, -253.44179, 0, 131.34152, -239.19041, 0, 121.0039, -241.13103, 0, 117.37328, -255.94728, 0, 125.29278, -239.19041, 0, 121.0039, -255.94728, 0, 125.29278, -254.00667, 0, 128.92339, -242.04587, 0, 116.004135, -244.65747, 0, 112.82186, -257.64407, 0, 123.47965, -242.04587, 0, 116.004135, -257.64407, 0, 123.47965, -255.03244, 0, 126.66193, -245.82185, 0, 111.65748, -249.00412, 0, 109.04585, -259.66196, 0, 122.03241, -245.82185, 0, 111.65748, -259.66196, 0, 122.03241, -256.47968, 0, 124.644035, -250.3733, 0, 108.131, -254.00392, 0, 106.19039, -261.9234, 0, 121.00666, -250.3733, 0, 108.131, -261.9234, 0, 121.00666, -258.2928, 0, 122.947266, -255.52525, 0, 105.56023, -259.46472, 0, 104.365204, -264.3415, 0, 120.4418, -255.52525, 0, 105.56023, -264.3415, 0, 120.4418, -260.40204, 0, 121.636826, -261.07977, 0, 104.04395, -265.17667, 0, 103.64045, -266.82333, 0, 120.35955, -261.07977, 0, 104.04395, -266.82333, 0, 120.35955, -262.72644, 0, 120.763054, -257.6, 0, 112, -257.6, 0, 84, -274.4, 0, 84, -257.6, 0, 112, -274.4, 0, 84, -274.4, 0, 112, -257.6, 0, 84, -257.6, 0, 56, -274.4, 0, 56, -257.6, 0, 84, -274.4, 0, 56, -274.4, 0, 84, -257.6, 0, 56, -257.6, 0, 28, -274.4, 0, 28, -257.6, 0, 56, -274.4, 0, 28, -274.4, 0, 56, -257.6, 0, 28, -257.6, 3.5, 0, -274.4, 3.5, 0, -257.6, 0, 28, -274.4, 3.5, 0, -274.4, 0, 28, -257.6, 3.5, 0, -257.6, 3.5, -14, -274.4, 3.5, -14, -257.6, 3.5, 0, -274.4, 3.5, -14, -274.4, 3.5, 0, -257.6, 3.5, -14, -257.6, 3.5, -28, -274.4, 3.5, -28, -257.6, 3.5, -14, -274.4, 3.5, -28, -274.4, 3.5, -14, -257.6, 3.5, -28, -257.6, 0, -56, -274.4, 0, -56, -257.6, 3.5, -28, -274.4, 0, -56, -274.4, 3.5, -28, -257.6, 0, -56, -257.6, 0, -84, -274.4, 0, -84, -257.6, 0, -56, -274.4, 0, -84, -274.4, 0, -56, -257.6, 0, -84, -257.6, 0, -112, -274.4, 0, -112, -257.6, 0, -84, -274.4, 0, -112, -274.4, 0, -84, -265.17667, 0, -103.64045, -258.3485, 0, -104.312965, -259.99518, 0, -121.03207, -265.17667, 0, -103.64045, -259.99518, 0, -121.03207, -266.82333, 0, -120.35955, -256.73346, 0, -104.63422, -250.1677, 0, -106.625916, -255.04446, 0, -122.702515, -256.73346, 0, -104.63422, -255.04446, 0, -122.702515, -261.61023, 0, -120.710815, -248.64635, 0, -107.25607, -242.5953, 0, -110.49042, -250.51477, 0, -125.3067, -248.64635, 0, -107.25607, -250.51477, 0, -125.3067, -256.5658, 0, -122.07236, -241.22612, 0, -111.40528, -235.92235, 0, -115.75799, -246.58018, 0, -128.74455, -241.22612, 0, -111.40528, -246.58018, 0, -128.74455, -251.88396, 0, -124.39184, -234.75798, 0, -116.922356, -230.40527, 0, -122.22613, -243.39185, 0, -132.88396, -234.75798, 0, -116.922356, -243.39185, 0, -132.88396, -247.74455, 0, -127.58018, -229.49042, 0, -123.59532, -226.25609, 0, -129.64636, -241.07237, 0, -137.5658, -229.49042, 0, -123.59532, -241.07237, 0, -137.5658, -244.3067, 0, -131.51476, -225.62593, 0, -131.16766, -223.63422, 0, -137.73341, -239.71082, 0, -142.61024, -225.62593, 0, -131.16766, -239.71082, 0, -142.61024, -241.70253, 0, -136.0445, -223.31296, 0, -139.34848, -222.64044, 0, -146.17665, -239.35956, 0, -147.82335, -223.31296, 0, -139.34848, -239.35956, 0, -147.82335, -240.03207, 0, -140.99518, -231, 0, -138.6, -203, 0, -138.6, -203, 0, -155.4, -231, 0, -138.6, -203, 0, -155.4, -231, 0, -155.4, -203, 0, -138.6, -175, 0, -138.6, -175, 0, -155.4, -203, 0, -138.6, -175, 0, -155.4, -203, 0, -155.4, -175, 0, -138.6, -147, 0, -138.6, -147, 0, -155.4, -175, 0, -138.6, -147, 0, -155.4, -175, 0, -155.4, -147, 0, -138.6, -119, 3.5, -138.6, -119, 3.5, -155.4, -147, 0, -138.6, -119, 3.5, -155.4, -147, 0, -155.4, -119, 3.5, -138.6, -105, 3.5, -138.6, -105, 3.5, -155.4, -119, 3.5, -138.6, -105, 3.5, -155.4, -119, 3.5, -155.4, -105, 3.5, -138.6, -91, 3.5, -138.6, -91, 3.5, -155.4, -105, 3.5, -138.6, -91, 3.5, -155.4, -105, 3.5, -155.4, -91, 3.5, -138.6, -63, 0, -138.6, -63, 0, -155.4, -91, 3.5, -138.6, -63, 0, -155.4, -91, 3.5, -155.4, -63, 0, -138.6, -35, 0, -138.6, -35, 0, -155.4, -63, 0, -138.6, -35, 0, -155.4, -63, 0, -155.4, -35, 0, -138.6, -21, 0, -138.6, -21, 0, -155.4, -35, 0, -138.6, -21, 0, -155.4, -35, 0, -155.4, -29.35955, 0, -146.17665, -28.95604, 0, -142.07974, -12.2369375, 0, -143.72644, -29.35955, 0, -146.17665, -12.2369375, 0, -143.72644, -12.640449, 0, -147.82335, -28.634785, 0, -140.46469, -27.439764, 0, -136.52525, -11.363173, 0, -141.40205, -28.634785, 0, -140.46469, -11.363173, 0, -141.40205, -12.558193, 0, -145.34149, -26.809605, 0, -135.00392, -24.868998, 0, -131.3733, -10.052725, 0, -139.29277, -26.809605, 0, -135.00392, -10.052725, 0, -139.29277, -11.993332, 0, -142.92339, -23.954159, 0, -130.00415, -21.34254, 0, -126.82187, -8.355943, 0, -137.47964, -23.954159, 0, -130.00415, -8.355943, 0, -137.47964, -10.967563, 0, -140.66193, -20.178144, 0, -125.65747, -16.995878, 0, -123.04585, -6.3380723, 0, -136.03242, -20.178144, 0, -125.65747, -6.3380723, 0, -136.03242, -9.520338, 0, -138.64404, -15.626715, 0, -122.131004, -11.996092, 0, -120.19039, -4.0766125, 0, -135.00665, -15.626715, 0, -122.131004, -4.0766125, 0, -135.00665, -7.7072353, 0, -136.94727, -10.474747, 0, -119.56023, -6.5352917, 0, -118.365204, -1.6585023, 0, -134.4418, -10.474747, 0, -119.56023, -1.6585023, 0, -134.4418, -5.5979576, 0, -135.63683, -4.9202294, 0, -118.04395, -0.82333237, 0, -117.64045, 0.82333237, 0, -134.35956, -4.9202294, 0, -118.04395, 0.82333237, 0, -134.35956, -3.2735648, 0, -134.76306, -8.4, 0, -126, -8.4, 0, -98, 8.4, 0, -98, -8.4, 0, -126, 8.4, 0, -98, 8.4, 0, -126, -8.4, 0, -98, -8.4, 0, -70, 8.4, 0, -70, -8.4, 0, -98, 8.4, 0, -70, 8.4, 0, -98, -8.4, 0, -70, -8.4, 0, -42, 8.4, 0, -42, -8.4, 0, -70, 8.4, 0, -42, 8.4, 0, -70, -8.4, 0, -42, -8.4, 0, -14, 8.4, 0, -14, -8.4, 0, -42, 8.4, 0, -14, 8.4, 0, -42, -8.4, 0, -14, -8.4, 0, 0, 8.4, 0, 0, -8.4, 0, -14, 8.4, 0, 0, 8.4, 0, -14)
+backface_collision = true
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_22dru"]
-size = Vector3(56, 8, 4)
+size = Vector3(56, 12, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_jdcka"]
-size = Vector3(56, 8, 4)
+size = Vector3(56, 12, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_3icot"]
-size = Vector3(56, 8, 4)
+size = Vector3(56, 12, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_wo811"]
-size = Vector3(56, 8, 4)
+size = Vector3(56, 12, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_dxmxc"]
-size = Vector3(56, 8, 4)
+size = Vector3(56, 12, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_vwwk2"]
-size = Vector3(56, 8, 4)
+size = Vector3(56, 12, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_vnpgv"]
-size = Vector3(56, 8, 4)
+size = Vector3(56, 12, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_msw5c"]
-size = Vector3(56, 8, 4)
+size = Vector3(56, 12, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_uwb7x"]
-size = Vector3(56, 8, 4)
+size = Vector3(56, 12, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_uuo22"]
-size = Vector3(56, 8, 4)
+size = Vector3(56, 12, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_owmfs"]
-size = Vector3(56, 8, 4)
+size = Vector3(56, 12, 4)
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_oj8xq"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_oj8xq"]
+size = Vector3(56, 12, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5sj28"]
+size = Vector3(56, 12, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_xqig6"]
+size = Vector3(56, 12, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hwp4l"]
+size = Vector3(56, 12, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_u8m4j"]
+size = Vector3(56, 12, 4)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_q38dn"]
 render_priority = 0
-shader = ExtResource("8_8k7ot")
+shader = ExtResource("10_8l4x2")
 shader_parameter/grid_size = 10.0
 shader_parameter/line_width = 0.08
 shader_parameter/base_color = Color(0.24, 0.3, 0.24, 1)
 shader_parameter/line_color = Color(0.3, 0.36, 0.3, 1)
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_5sj28"]
-material = SubResource("ShaderMaterial_oj8xq")
+[sub_resource type="PlaneMesh" id="PlaneMesh_81wdd"]
+material = SubResource("ShaderMaterial_q38dn")
 size = Vector2(4000, 4000)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_xqig6"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_y6b0w"]
 size = Vector3(4000, 1, 4000)
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_hwp4l"]
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_kknv6"]
 
-[sub_resource type="Sky" id="Sky_u8m4j"]
-sky_material = SubResource("ProceduralSkyMaterial_hwp4l")
+[sub_resource type="Sky" id="Sky_5ki1o"]
+sky_material = SubResource("ProceduralSkyMaterial_kknv6")
 
-[sub_resource type="Environment" id="Environment_q38dn"]
+[sub_resource type="Environment" id="Environment_tdg3u"]
 background_mode = 2
-sky = SubResource("Sky_u8m4j")
+sky = SubResource("Sky_5ki1o")
 ambient_light_source = 3
 
-[node name="Track02" type="Node3D" unique_id=1002517985]
+[node name="Track02" type="Node3D" unique_id=630080293]
 
-[node name="RoadVisuals" type="Node3D" parent="." unique_id=1781886603]
-transform = Transform3D(14, 0, 0, 0, 14, 0, 0, 0, 14, 0, 0, 0)
+[node name="RoadVisuals" type="Node3D" parent="." unique_id=1245621827]
+transform = Transform3D(14, 0, 0, 0, 7, 0, 0, 0, 14, 0, 0, 0)
 
-[node name="@Node3D@2" type="Node3D" parent="RoadVisuals" unique_id=2051991081]
+[node name="@Node3D@2" type="Node3D" parent="RoadVisuals" unique_id=2012318678]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.63, 0, 0)
 
-[node name="roadStart" type="Node3D" parent="RoadVisuals/@Node3D@2" unique_id=1371435172 instance=ExtResource("1_0jl50")]
+[node name="roadStart" type="Node3D" parent="RoadVisuals/@Node3D@2" unique_id=1371435172 instance=ExtResource("1_nxcw6")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
 [node name="roadStart(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@2/roadStart" unique_id=189098085]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_v278l")
 
-[node name="@Node3D@3" type="Node3D" parent="RoadVisuals" unique_id=172008277]
+[node name="@Node3D@3" type="Node3D" parent="RoadVisuals" unique_id=381092246]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 2)
 
-[node name="roadStartPositions" type="Node3D" parent="RoadVisuals/@Node3D@3" unique_id=1830863120 instance=ExtResource("2_3p0yi")]
+[node name="roadStartPositions" type="Node3D" parent="RoadVisuals/@Node3D@3" unique_id=1830863120 instance=ExtResource("2_n8pf3")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
 [node name="roadStartPositions(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@3/roadStartPositions" unique_id=1735765849]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_d70nn")
 
-[node name="@Node3D@4" type="Node3D" parent="RoadVisuals" unique_id=1584166790]
+[node name="@Node3D@4" type="Node3D" parent="RoadVisuals" unique_id=2116079920]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 4)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@4" unique_id=28910591 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@4" unique_id=28910591 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
 [node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@4/roadStraightLong" unique_id=329651281]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@5" type="Node3D" parent="RoadVisuals" unique_id=1302056298]
+[node name="@Node3D@5" type="Node3D" parent="RoadVisuals" unique_id=938616006]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 6)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@5" unique_id=91032921 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@5" unique_id=1022167848 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@5/roadStraightLong" unique_id=328413618]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@5/roadStraightLong" unique_id=1543654790]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@6" type="Node3D" parent="RoadVisuals" unique_id=1213107220]
+[node name="@Node3D@6" type="Node3D" parent="RoadVisuals" unique_id=762239070]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 8)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@6" unique_id=127373810 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@6" unique_id=2008062485 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@6/roadStraightLong" unique_id=538367675]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@6/roadStraightLong" unique_id=675700714]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@7" type="Node3D" parent="RoadVisuals" unique_id=252008818]
+[node name="@Node3D@7" type="Node3D" parent="RoadVisuals" unique_id=334585000]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 10)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@7" unique_id=1557131390 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@7" unique_id=1970524694 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@7/roadStraightLong" unique_id=1107187124]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@7/roadStraightLong" unique_id=931542754]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@8" type="Node3D" parent="RoadVisuals" unique_id=791790037]
+[node name="@Node3D@8" type="Node3D" parent="RoadVisuals" unique_id=582781816]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 12)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@8" unique_id=1467086380 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@8" unique_id=1934714170 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@8/roadStraightLong" unique_id=1536011559]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@8/roadStraightLong" unique_id=2077894719]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@9" type="Node3D" parent="RoadVisuals" unique_id=2029962340]
+[node name="@Node3D@9" type="Node3D" parent="RoadVisuals" unique_id=1835854568]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 14)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@9" unique_id=655916820 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@9" unique_id=1301324884 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@9/roadStraightLong" unique_id=698231308]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@9/roadStraightLong" unique_id=1713679876]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@10" type="Node3D" parent="RoadVisuals" unique_id=1423718537]
+[node name="@Node3D@10" type="Node3D" parent="RoadVisuals" unique_id=954199067]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.5, 0, 19)
 
-[node name="roadCornerLarger" type="Node3D" parent="RoadVisuals/@Node3D@10" unique_id=707149870 instance=ExtResource("4_n8pf3")]
+[node name="roadCornerLarger" type="Node3D" parent="RoadVisuals/@Node3D@10" unique_id=707149870 instance=ExtResource("4_ju8ck")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 3.65)
 
 [node name="roadCornerLarger(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@10/roadCornerLarger" unique_id=1931346016]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_boni0")
 
-[node name="@Node3D@11" type="Node3D" parent="RoadVisuals" unique_id=1326434669]
+[node name="@Node3D@11" type="Node3D" parent="RoadVisuals" unique_id=1641180585]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -4.5, 0, 19)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@11" unique_id=2145023292 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@11" unique_id=65834523 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@11/roadStraightLong" unique_id=1587405370]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@11/roadStraightLong" unique_id=1341615984]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@12" type="Node3D" parent="RoadVisuals" unique_id=1033479988]
+[node name="@Node3D@12" type="Node3D" parent="RoadVisuals" unique_id=1683172025]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6.5, 0, 19)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@12" unique_id=1087162520 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@12" unique_id=1360500128 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@12/roadStraightLong" unique_id=578429019]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@12/roadStraightLong" unique_id=130371272]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@13" type="Node3D" parent="RoadVisuals" unique_id=1709987685]
+[node name="@Node3D@13" type="Node3D" parent="RoadVisuals" unique_id=615135081]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -8.5, 0, 19)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@13" unique_id=296277649 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@13" unique_id=1599139777 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@13/roadStraightLong" unique_id=971018705]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@13/roadStraightLong" unique_id=1334927414]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@14" type="Node3D" parent="RoadVisuals" unique_id=1850303898]
+[node name="@Node3D@14" type="Node3D" parent="RoadVisuals" unique_id=369084453]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -10.5, 0, 19)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@14" unique_id=2106931518 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@14" unique_id=1782870238 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@14/roadStraightLong" unique_id=343505582]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@14/roadStraightLong" unique_id=1997682717]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@15" type="Node3D" parent="RoadVisuals" unique_id=14199609]
+[node name="@Node3D@15" type="Node3D" parent="RoadVisuals" unique_id=1005251852]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -12.5, 0, 19)
 
-[node name="roadCornerLarge" type="Node3D" parent="RoadVisuals/@Node3D@15" unique_id=933051858 instance=ExtResource("5_1x10v")]
+[node name="roadCornerLarge" type="Node3D" parent="RoadVisuals/@Node3D@15" unique_id=933051858 instance=ExtResource("5_o4v4v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
 [node name="roadCornerLarge(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@15/roadCornerLarge" unique_id=1586067842]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_ur4ls")
 
-[node name="@Node3D@16" type="Node3D" parent="RoadVisuals" unique_id=803192126]
+[node name="@Node3D@16" type="Node3D" parent="RoadVisuals" unique_id=269709471]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.5, 0, 15)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@16" unique_id=223472225 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@16" unique_id=853042464 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@16/roadStraightLong" unique_id=1181544729]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@16/roadStraightLong" unique_id=381379340]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@17" type="Node3D" parent="RoadVisuals" unique_id=506864772]
+[node name="@Node3D@17" type="Node3D" parent="RoadVisuals" unique_id=114446313]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.5, 0, 13)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@17" unique_id=784785378 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@17" unique_id=1272781340 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@17/roadStraightLong" unique_id=101102614]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@17/roadStraightLong" unique_id=1669095324]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@18" type="Node3D" parent="RoadVisuals" unique_id=1636953756]
+[node name="@Node3D@18" type="Node3D" parent="RoadVisuals" unique_id=424767548]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.5, 0, 11)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@18" unique_id=1128725547 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@18" unique_id=998998354 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@18/roadStraightLong" unique_id=1417708133]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@18/roadStraightLong" unique_id=1488542702]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@19" type="Node3D" parent="RoadVisuals" unique_id=1382437739]
+[node name="@Node3D@19" type="Node3D" parent="RoadVisuals" unique_id=426257831]
 transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, -11.5, 0, 9)
 
-[node name="roadCornerLarge" type="Node3D" parent="RoadVisuals/@Node3D@19" unique_id=1091146693 instance=ExtResource("5_1x10v")]
+[node name="roadCornerLarge" type="Node3D" parent="RoadVisuals/@Node3D@19" unique_id=437991813 instance=ExtResource("5_o4v4v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadCornerLarge(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@19/roadCornerLarge" unique_id=448671275]
+[node name="roadCornerLarge(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@19/roadCornerLarge" unique_id=733484487]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_ur4ls")
 
-[node name="@Node3D@20" type="Node3D" parent="RoadVisuals" unique_id=595708588]
+[node name="@Node3D@20" type="Node3D" parent="RoadVisuals" unique_id=1606898368]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -15.5, 0, 10)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@20" unique_id=1460372047 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@20" unique_id=1215997130 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@20/roadStraightLong" unique_id=201976952]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@20/roadStraightLong" unique_id=28986707]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@21" type="Node3D" parent="RoadVisuals" unique_id=1008008946]
+[node name="@Node3D@21" type="Node3D" parent="RoadVisuals" unique_id=584689992]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -17.5, 0, 10)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@21" unique_id=2031120874 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@21" unique_id=230087569 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@21/roadStraightLong" unique_id=1720991678]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@21/roadStraightLong" unique_id=317335018]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@22" type="Node3D" parent="RoadVisuals" unique_id=155734283]
+[node name="@Node3D@22" type="Node3D" parent="RoadVisuals" unique_id=1774672934]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -19.5, 0, 10)
 
-[node name="roadCornerLarge" type="Node3D" parent="RoadVisuals/@Node3D@22" unique_id=637028610 instance=ExtResource("5_1x10v")]
+[node name="roadCornerLarge" type="Node3D" parent="RoadVisuals/@Node3D@22" unique_id=1911024953 instance=ExtResource("5_o4v4v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadCornerLarge(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@22/roadCornerLarge" unique_id=917073864]
+[node name="roadCornerLarge(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@22/roadCornerLarge" unique_id=1828259508]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_ur4ls")
 
-[node name="@Node3D@23" type="Node3D" parent="RoadVisuals" unique_id=759795490]
+[node name="@Node3D@23" type="Node3D" parent="RoadVisuals" unique_id=868496855]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.5, 0, 6)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@23" unique_id=87205908 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@23" unique_id=164854949 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@23/roadStraightLong" unique_id=1352986889]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@23/roadStraightLong" unique_id=630331613]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@24" type="Node3D" parent="RoadVisuals" unique_id=458947207]
+[node name="@Node3D@24" type="Node3D" parent="RoadVisuals" unique_id=2140133752]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.5, 0, 4)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@24" unique_id=404251881 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@24" unique_id=1668253912 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@24/roadStraightLong" unique_id=1965163572]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@24/roadStraightLong" unique_id=716802194]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@25" type="Node3D" parent="RoadVisuals" unique_id=1648536548]
+[node name="@Node3D@25" type="Node3D" parent="RoadVisuals" unique_id=1686499847]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.5, 0, 2)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@25" unique_id=1058111773 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@25" unique_id=1651406975 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@25/roadStraightLong" unique_id=679394142]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@25/roadStraightLong" unique_id=1052410773]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@26" type="Node3D" parent="RoadVisuals" unique_id=189393427]
+[node name="@Node3D@26" type="Node3D" parent="RoadVisuals" unique_id=311276040]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.5, 0, 0)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@26" unique_id=1866607043 instance=ExtResource("3_nxcw6")]
+[node name="roadRampLong" type="Node3D" parent="RoadVisuals/@Node3D@26" unique_id=126951519 instance=ExtResource("6_8k7ot")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@26/roadStraightLong" unique_id=148766257]
+[node name="roadRampLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@26/roadRampLong" unique_id=889691256]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
-mesh = SubResource("ArrayMesh_kgfs7")
+mesh = SubResource("ArrayMesh_nlfpq")
 
-[node name="@Node3D@27" type="Node3D" parent="RoadVisuals" unique_id=88538073]
+[node name="@Node3D@27" type="Node3D" parent="RoadVisuals" unique_id=679193336]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.5, 0, -1)
+
+[node name="roadStraightBridge" type="Node3D" parent="RoadVisuals/@Node3D@27" unique_id=2111763416 instance=ExtResource("7_ehipa")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
+
+[node name="roadStraightBridge(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@27/roadStraightBridge" unique_id=571389766]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
+mesh = SubResource("ArrayMesh_h8aa2")
+
+[node name="@Node3D@28" type="Node3D" parent="RoadVisuals" unique_id=1401474150]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.5, 0, -2)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@27" unique_id=1379070493 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightBridge" type="Node3D" parent="RoadVisuals/@Node3D@28" unique_id=883760911 instance=ExtResource("7_ehipa")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
+
+[node name="roadStraightBridge(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@28/roadStraightBridge" unique_id=1649532864]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
+mesh = SubResource("ArrayMesh_h8aa2")
+
+[node name="@Node3D@29" type="Node3D" parent="RoadVisuals" unique_id=1788513611]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -18.5, 0, -2)
+
+[node name="roadRampLong" type="Node3D" parent="RoadVisuals/@Node3D@29" unique_id=1497874288 instance=ExtResource("6_8k7ot")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@27/roadStraightLong" unique_id=398591679]
+[node name="roadRampLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@29/roadRampLong" unique_id=753675722]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
-mesh = SubResource("ArrayMesh_kgfs7")
+mesh = SubResource("ArrayMesh_nlfpq")
 
-[node name="@Node3D@28" type="Node3D" parent="RoadVisuals" unique_id=354217763]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.5, 0, -4)
-
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@28" unique_id=551043852 instance=ExtResource("3_nxcw6")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
-
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@28/roadStraightLong" unique_id=1236188215]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
-mesh = SubResource("ArrayMesh_kgfs7")
-
-[node name="@Node3D@29" type="Node3D" parent="RoadVisuals" unique_id=1347995457]
+[node name="@Node3D@30" type="Node3D" parent="RoadVisuals" unique_id=2059562482]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.5, 0, -6)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@29" unique_id=1978853286 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@30" unique_id=106075176 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@29/roadStraightLong" unique_id=2047835867]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@30/roadStraightLong" unique_id=1261842132]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@30" type="Node3D" parent="RoadVisuals" unique_id=1942841670]
+[node name="@Node3D@31" type="Node3D" parent="RoadVisuals" unique_id=1340819952]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.5, 0, -8)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@30" unique_id=565729212 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@31" unique_id=799795722 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@30/roadStraightLong" unique_id=1002711939]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@31/roadStraightLong" unique_id=1062472491]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@31" type="Node3D" parent="RoadVisuals" unique_id=1284501556]
+[node name="@Node3D@32" type="Node3D" parent="RoadVisuals" unique_id=1932358376]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.5, 0, -11)
 
-[node name="roadCornerLarger" type="Node3D" parent="RoadVisuals/@Node3D@31" unique_id=1605441340 instance=ExtResource("4_n8pf3")]
+[node name="roadCornerLarger" type="Node3D" parent="RoadVisuals/@Node3D@32" unique_id=1879549045 instance=ExtResource("4_ju8ck")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 3.65)
 
-[node name="roadCornerLarger(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@31/roadCornerLarger" unique_id=250822074]
+[node name="roadCornerLarger(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@32/roadCornerLarger" unique_id=1607075060]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_boni0")
 
-[node name="@Node3D@32" type="Node3D" parent="RoadVisuals" unique_id=1902241315]
+[node name="@Node3D@33" type="Node3D" parent="RoadVisuals" unique_id=1204667540]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -16.5, 0, -10)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@32" unique_id=1970766366 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@33" unique_id=504098096 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@32/roadStraightLong" unique_id=1946804407]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@33/roadStraightLong" unique_id=1226558599]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@33" type="Node3D" parent="RoadVisuals" unique_id=471787311]
+[node name="@Node3D@34" type="Node3D" parent="RoadVisuals" unique_id=1204908211]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -14.5, 0, -10)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@33" unique_id=652704361 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@34" unique_id=1783174433 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@33/roadStraightLong" unique_id=378442020]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@34/roadStraightLong" unique_id=1154923122]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@34" type="Node3D" parent="RoadVisuals" unique_id=824540250]
+[node name="@Node3D@35" type="Node3D" parent="RoadVisuals" unique_id=1387670900]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -12.5, 0, -10)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@34" unique_id=335012159 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@35" unique_id=1134569347 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@34/roadStraightLong" unique_id=1055608941]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@35/roadStraightLong" unique_id=364008588]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@35" type="Node3D" parent="RoadVisuals" unique_id=362431580]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -10.5, 0, -10)
+[node name="@Node3D@36" type="Node3D" parent="RoadVisuals" unique_id=634203731]
+transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, -8.5, 0, -11)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@35" unique_id=1474834645 instance=ExtResource("3_nxcw6")]
+[node name="roadRampLong" type="Node3D" parent="RoadVisuals/@Node3D@36" unique_id=399212848 instance=ExtResource("6_8k7ot")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@35/roadStraightLong" unique_id=1545982925]
+[node name="roadRampLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@36/roadRampLong" unique_id=1687943627]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
-mesh = SubResource("ArrayMesh_kgfs7")
+mesh = SubResource("ArrayMesh_nlfpq")
 
-[node name="@Node3D@36" type="Node3D" parent="RoadVisuals" unique_id=1892407892]
+[node name="@Node3D@37" type="Node3D" parent="RoadVisuals" unique_id=1206745646]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -8.5, 0, -10)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@36" unique_id=313370685 instance=ExtResource("3_nxcw6")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
-
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@36/roadStraightLong" unique_id=650963194]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
-mesh = SubResource("ArrayMesh_kgfs7")
-
-[node name="@Node3D@37" type="Node3D" parent="RoadVisuals" unique_id=643161238]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6.5, 0, -10)
-
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@37" unique_id=1078887483 instance=ExtResource("3_nxcw6")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
-
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@37/roadStraightLong" unique_id=1769093517]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
-mesh = SubResource("ArrayMesh_kgfs7")
-
-[node name="@Node3D@38" type="Node3D" parent="RoadVisuals" unique_id=888805213]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -4.5, 0, -10)
-
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@38" unique_id=1302284492 instance=ExtResource("3_nxcw6")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
-
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@38/roadStraightLong" unique_id=250589861]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
-mesh = SubResource("ArrayMesh_kgfs7")
-
-[node name="@Node3D@39" type="Node3D" parent="RoadVisuals" unique_id=1213286087]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -2.5, 0, -10)
-
-[node name="roadStraight" type="Node3D" parent="RoadVisuals/@Node3D@39" unique_id=1994647957 instance=ExtResource("6_ju8ck")]
+[node name="roadStraightBridge" type="Node3D" parent="RoadVisuals/@Node3D@37" unique_id=1806665057 instance=ExtResource("7_ehipa")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="roadStraight(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@39/roadStraight" unique_id=778794257]
+[node name="roadStraightBridge(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@37/roadStraightBridge" unique_id=130904161]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
+mesh = SubResource("ArrayMesh_h8aa2")
+
+[node name="@Node3D@38" type="Node3D" parent="RoadVisuals" unique_id=498977195]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -7.5, 0, -10)
+
+[node name="roadStraightBridge" type="Node3D" parent="RoadVisuals/@Node3D@38" unique_id=2125014122 instance=ExtResource("7_ehipa")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
+
+[node name="roadStraightBridge(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@38/roadStraightBridge" unique_id=875350887]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
+mesh = SubResource("ArrayMesh_h8aa2")
+
+[node name="@Node3D@39" type="Node3D" parent="RoadVisuals" unique_id=734593860]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6.5, 0, -10)
+
+[node name="roadRampLong" type="Node3D" parent="RoadVisuals/@Node3D@39" unique_id=2049586321 instance=ExtResource("6_8k7ot")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
+
+[node name="roadRampLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@39/roadRampLong" unique_id=2113891141]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
+mesh = SubResource("ArrayMesh_nlfpq")
+
+[node name="@Node3D@40" type="Node3D" parent="RoadVisuals" unique_id=219097617]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -4.5, 0, -10)
+
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@40" unique_id=1417335771 instance=ExtResource("3_1x10v")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
+
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@40/roadStraightLong" unique_id=1653128241]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
+mesh = SubResource("ArrayMesh_kgfs7")
+
+[node name="@Node3D@41" type="Node3D" parent="RoadVisuals" unique_id=1082809471]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -2.5, 0, -10)
+
+[node name="roadStraight" type="Node3D" parent="RoadVisuals/@Node3D@41" unique_id=1994647957 instance=ExtResource("8_pr1aq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
+
+[node name="roadStraight(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@41/roadStraight" unique_id=778794257]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_5kchl")
 
-[node name="@Node3D@40" type="Node3D" parent="RoadVisuals" unique_id=1657905639]
+[node name="@Node3D@42" type="Node3D" parent="RoadVisuals" unique_id=427647876]
 transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 0.5, 0, -11)
 
-[node name="roadCornerLarge" type="Node3D" parent="RoadVisuals/@Node3D@40" unique_id=526038063 instance=ExtResource("5_1x10v")]
+[node name="roadCornerLarge" type="Node3D" parent="RoadVisuals/@Node3D@42" unique_id=259463046 instance=ExtResource("5_o4v4v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadCornerLarge(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@40/roadCornerLarge" unique_id=1092884417]
+[node name="roadCornerLarge(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@42/roadCornerLarge" unique_id=71344008]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_ur4ls")
 
-[node name="@Node3D@41" type="Node3D" parent="RoadVisuals" unique_id=1176126421]
+[node name="@Node3D@43" type="Node3D" parent="RoadVisuals" unique_id=1470693201]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -9)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@41" unique_id=1220115884 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@43" unique_id=1069039459 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@41/roadStraightLong" unique_id=525301282]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@43/roadStraightLong" unique_id=506329880]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@42" type="Node3D" parent="RoadVisuals" unique_id=1115306480]
+[node name="@Node3D@44" type="Node3D" parent="RoadVisuals" unique_id=437292782]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -7)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@42" unique_id=200376036 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@44" unique_id=1629252893 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@42/roadStraightLong" unique_id=1191773815]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@44/roadStraightLong" unique_id=1032359772]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@43" type="Node3D" parent="RoadVisuals" unique_id=1909701786]
+[node name="@Node3D@45" type="Node3D" parent="RoadVisuals" unique_id=327602598]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -5)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@43" unique_id=1825029237 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@45" unique_id=1833187275 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@43/roadStraightLong" unique_id=916319761]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@45/roadStraightLong" unique_id=1298395050]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@44" type="Node3D" parent="RoadVisuals" unique_id=1484244077]
+[node name="@Node3D@46" type="Node3D" parent="RoadVisuals" unique_id=72232134]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -3)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@44" unique_id=1492001561 instance=ExtResource("3_nxcw6")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@46" unique_id=122339644 instance=ExtResource("3_1x10v")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@44/roadStraightLong" unique_id=1340755124]
+[node name="roadStraightLong(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@46/roadStraightLong" unique_id=554967332]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_kgfs7")
 
-[node name="@Node3D@45" type="Node3D" parent="RoadVisuals" unique_id=1977610549]
+[node name="@Node3D@47" type="Node3D" parent="RoadVisuals" unique_id=1488571172]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -1)
 
-[node name="roadStraight" type="Node3D" parent="RoadVisuals/@Node3D@45" unique_id=1814472806 instance=ExtResource("6_ju8ck")]
+[node name="roadStraight" type="Node3D" parent="RoadVisuals/@Node3D@47" unique_id=806826284 instance=ExtResource("8_pr1aq")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="roadStraight(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@45/roadStraight" unique_id=852129566]
+[node name="roadStraight(Clone)" type="MeshInstance3D" parent="RoadVisuals/@Node3D@47/roadStraight" unique_id=1686895276]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.01, -0.65)
 mesh = SubResource("ArrayMesh_5kchl")
 
-[node name="Checkpoints" type="Node3D" parent="." unique_id=1080655455]
+[node name="RoadSurface" type="StaticBody3D" parent="." unique_id=1244472679]
 
-[node name="Checkpoint00" type="Area3D" parent="Checkpoints" unique_id=1123089599]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
-script = ExtResource("7_o4v4v")
+[node name="RoadCollision" type="CollisionShape3D" parent="RoadSurface" unique_id=1837484307]
+shape = SubResource("ConcavePolygonShape3D_obfdh")
 
-[node name="@CollisionShape3D@46" type="CollisionShape3D" parent="Checkpoints/Checkpoint00" unique_id=162605667]
-shape = SubResource("BoxShape3D_ehipa")
+[node name="Checkpoints" type="Node3D" parent="." unique_id=1967565627]
 
-[node name="Checkpoint01" type="Area3D" parent="Checkpoints" unique_id=1739577601]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 79.844635)
-script = ExtResource("7_o4v4v")
-index = 1
+[node name="Checkpoint00" type="Area3D" parent="Checkpoints" unique_id=971972936]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+script = ExtResource("9_pim4f")
 
-[node name="@CollisionShape3D@47" type="CollisionShape3D" parent="Checkpoints/Checkpoint01" unique_id=1103680109]
-shape = SubResource("BoxShape3D_pr1aq")
-
-[node name="Checkpoint02" type="Area3D" parent="Checkpoints" unique_id=497979977]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 159.68927)
-script = ExtResource("7_o4v4v")
-index = 2
-
-[node name="@CollisionShape3D@48" type="CollisionShape3D" parent="Checkpoints/Checkpoint02" unique_id=374124294]
-shape = SubResource("BoxShape3D_pim4f")
-
-[node name="Checkpoint03" type="Area3D" parent="Checkpoints" unique_id=1351469555]
-transform = Transform3D(0.47139478, 0, -0.8819223, 0, 1, 0, 0.8819223, 0, 0.47139478, -14.991533, 4, 227.51817)
-script = ExtResource("7_o4v4v")
-index = 3
-
-[node name="@CollisionShape3D@49" type="CollisionShape3D" parent="Checkpoints/Checkpoint03" unique_id=1886309759]
-shape = SubResource("BoxShape3D_8l4x2")
-
-[node name="Checkpoint04" type="Area3D" parent="Checkpoints" unique_id=773595749]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -75.48896, 4, 259)
-script = ExtResource("7_o4v4v")
-index = 4
-
-[node name="@CollisionShape3D@50" type="CollisionShape3D" parent="Checkpoints/Checkpoint04" unique_id=1328172509]
-shape = SubResource("BoxShape3D_obfdh")
-
-[node name="Checkpoint05" type="Area3D" parent="Checkpoints" unique_id=999276319]
-transform = Transform3D(-0.8819204, 0, -0.4713983, 0, 1, 0, 0.4713983, 0, -0.8819204, -148.64574, 4, 250.87532)
-script = ExtResource("7_o4v4v")
-index = 5
-
-[node name="@CollisionShape3D@51" type="CollisionShape3D" parent="Checkpoints/Checkpoint05" unique_id=502366875]
+[node name="@CollisionShape3D@48" type="CollisionShape3D" parent="Checkpoints/Checkpoint00" unique_id=1851122482]
 shape = SubResource("BoxShape3D_22dru")
 
-[node name="Checkpoint06" type="Area3D" parent="Checkpoints" unique_id=1504564548]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -168, 4, 182.75552)
-script = ExtResource("7_o4v4v")
-index = 6
+[node name="Checkpoint01" type="Area3D" parent="Checkpoints" unique_id=1688096507]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 79.89912)
+script = ExtResource("9_pim4f")
+index = 1
 
-[node name="@CollisionShape3D@52" type="CollisionShape3D" parent="Checkpoints/Checkpoint06" unique_id=1690016235]
+[node name="@CollisionShape3D@49" type="CollisionShape3D" parent="Checkpoints/Checkpoint01" unique_id=851906911]
 shape = SubResource("BoxShape3D_jdcka")
 
-[node name="Checkpoint07" type="Area3D" parent="Checkpoints" unique_id=65897754]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -207.15536, 4, 133)
-script = ExtResource("7_o4v4v")
-index = 7
+[node name="Checkpoint02" type="Area3D" parent="Checkpoints" unique_id=356796251]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 159.79823)
+script = ExtResource("9_pim4f")
+index = 2
 
-[node name="@CollisionShape3D@53" type="CollisionShape3D" parent="Checkpoints/Checkpoint07" unique_id=624143499]
+[node name="@CollisionShape3D@50" type="CollisionShape3D" parent="Checkpoints/Checkpoint02" unique_id=1827355503]
 shape = SubResource("BoxShape3D_3icot")
 
-[node name="Checkpoint08" type="Area3D" parent="Checkpoints" unique_id=233648474]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -266, 4, 102.933754)
-script = ExtResource("7_o4v4v")
-index = 8
+[node name="Checkpoint03" type="Area3D" parent="Checkpoints" unique_id=1626267983]
+transform = Transform3D(0.47139478, 0, -0.8819223, 0, 1, 0, 0.8819223, 0, 0.47139478, -15.135662, 6, 227.5952)
+script = ExtResource("9_pim4f")
+index = 3
 
-[node name="@CollisionShape3D@54" type="CollisionShape3D" parent="Checkpoints/Checkpoint08" unique_id=1893166155]
+[node name="@CollisionShape3D@51" type="CollisionShape3D" parent="Checkpoints/Checkpoint03" unique_id=865207524]
 shape = SubResource("BoxShape3D_wo811")
 
-[node name="Checkpoint09" type="Area3D" parent="Checkpoints" unique_id=1234079394]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -266, 4, 23.089115)
-script = ExtResource("7_o4v4v")
-index = 9
+[node name="Checkpoint04" type="Area3D" parent="Checkpoints" unique_id=1091813232]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -75.70686, 6, 259)
+script = ExtResource("9_pim4f")
+index = 4
 
-[node name="@CollisionShape3D@55" type="CollisionShape3D" parent="Checkpoints/Checkpoint09" unique_id=864111563]
+[node name="@CollisionShape3D@52" type="CollisionShape3D" parent="Checkpoints/Checkpoint04" unique_id=721619670]
 shape = SubResource("BoxShape3D_dxmxc")
 
-[node name="Checkpoint10" type="Area3D" parent="Checkpoints" unique_id=14426293]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -266, 4, -56.755524)
-script = ExtResource("7_o4v4v")
-index = 10
+[node name="Checkpoint05" type="Area3D" parent="Checkpoints" unique_id=36906983]
+transform = Transform3D(-0.8819204, 0, -0.4713983, 0, 1, 0, 0.4713983, 0, -0.8819204, -148.77414, 6, 250.6351)
+script = ExtResource("9_pim4f")
+index = 5
 
-[node name="@CollisionShape3D@56" type="CollisionShape3D" parent="Checkpoints/Checkpoint10" unique_id=1918275176]
+[node name="@CollisionShape3D@53" type="CollisionShape3D" parent="Checkpoints/Checkpoint05" unique_id=177769284]
 shape = SubResource("BoxShape3D_vwwk2")
 
-[node name="Checkpoint11" type="Area3D" parent="Checkpoints" unique_id=159144878]
-transform = Transform3D(-0.6343945, 0, 0.7730094, 0, 1, 0, -0.7730094, 0, -0.6343945, -243.4502, 4, -120.44665)
-script = ExtResource("7_o4v4v")
-index = 11
+[node name="Checkpoint06" type="Area3D" parent="Checkpoints" unique_id=321556619]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -168, 6, 182.42867)
+script = ExtResource("9_pim4f")
+index = 6
 
-[node name="@CollisionShape3D@57" type="CollisionShape3D" parent="Checkpoints/Checkpoint11" unique_id=1549383516]
+[node name="@CollisionShape3D@54" type="CollisionShape3D" parent="Checkpoints/Checkpoint06" unique_id=1594472382]
 shape = SubResource("BoxShape3D_vnpgv")
 
-[node name="Checkpoint12" type="Area3D" parent="Checkpoints" unique_id=961688943]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -181.4448, 4, -147)
-script = ExtResource("7_o4v4v")
-index = 12
+[node name="Checkpoint07" type="Area3D" parent="Checkpoints" unique_id=676578879]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -207.53668, 6, 133)
+script = ExtResource("9_pim4f")
+index = 7
 
-[node name="@CollisionShape3D@58" type="CollisionShape3D" parent="Checkpoints/Checkpoint12" unique_id=2003781595]
+[node name="@CollisionShape3D@55" type="CollisionShape3D" parent="Checkpoints/Checkpoint07" unique_id=8356610]
 shape = SubResource("BoxShape3D_msw5c")
 
-[node name="Checkpoint13" type="Area3D" parent="Checkpoints" unique_id=375697222]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -101.60016, 4, -147)
-script = ExtResource("7_o4v4v")
-index = 13
+[node name="Checkpoint08" type="Area3D" parent="Checkpoints" unique_id=1587570463]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -266, 6, 102.497955)
+script = ExtResource("9_pim4f")
+index = 8
 
-[node name="@CollisionShape3D@59" type="CollisionShape3D" parent="Checkpoints/Checkpoint13" unique_id=769914831]
+[node name="@CollisionShape3D@56" type="CollisionShape3D" parent="Checkpoints/Checkpoint08" unique_id=148899333]
 shape = SubResource("BoxShape3D_uwb7x")
 
-[node name="Checkpoint14" type="Area3D" parent="Checkpoints" unique_id=1552907692]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -21.75552, 4, -147)
-script = ExtResource("7_o4v4v")
-index = 14
+[node name="Checkpoint09" type="Area3D" parent="Checkpoints" unique_id=1746002250]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -266, 6.669932, 22.640545)
+script = ExtResource("9_pim4f")
+index = 9
 
-[node name="@CollisionShape3D@60" type="CollisionShape3D" parent="Checkpoints/Checkpoint14" unique_id=1117046942]
+[node name="@CollisionShape3D@57" type="CollisionShape3D" parent="Checkpoints/Checkpoint09" unique_id=332492708]
 shape = SubResource("BoxShape3D_uuo22")
 
-[node name="Checkpoint15" type="Area3D" parent="Checkpoints" unique_id=398623528]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, -79.844635)
-script = ExtResource("7_o4v4v")
-index = 15
+[node name="Checkpoint10" type="Area3D" parent="Checkpoints" unique_id=1888365935]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -266, 6, -56.864475)
+script = ExtResource("9_pim4f")
+index = 10
 
-[node name="@CollisionShape3D@61" type="CollisionShape3D" parent="Checkpoints/Checkpoint15" unique_id=1870314346]
+[node name="@CollisionShape3D@58" type="CollisionShape3D" parent="Checkpoints/Checkpoint10" unique_id=468216158]
 shape = SubResource("BoxShape3D_owmfs")
 
-[node name="Ground" type="StaticBody3D" parent="." unique_id=1432060712]
+[node name="Checkpoint11" type="Area3D" parent="Checkpoints" unique_id=1533832884]
+transform = Transform3D(-0.6343945, 0, 0.7730094, 0, 1, 0, -0.7730094, 0, -0.6343945, -243.32387, 6, -120.55032)
+script = ExtResource("9_pim4f")
+index = 11
 
-[node name="GroundMesh" type="MeshInstance3D" parent="Ground" unique_id=1983127933]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.02, 0)
-mesh = SubResource("PlaneMesh_5sj28")
+[node name="@CollisionShape3D@59" type="CollisionShape3D" parent="Checkpoints/Checkpoint11" unique_id=1810897275]
+shape = SubResource("BoxShape3D_oj8xq")
 
-[node name="@CollisionShape3D@62" type="CollisionShape3D" parent="Ground" unique_id=1703145510]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+[node name="Checkpoint12" type="Area3D" parent="Checkpoints" unique_id=677040224]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -181.2269, 6, -147)
+script = ExtResource("9_pim4f")
+index = 12
+
+[node name="@CollisionShape3D@60" type="CollisionShape3D" parent="Checkpoints/Checkpoint12" unique_id=803856851]
+shape = SubResource("BoxShape3D_5sj28")
+
+[node name="Checkpoint13" type="Area3D" parent="Checkpoints" unique_id=143139951]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -101.545685, 9.5, -147)
+script = ExtResource("9_pim4f")
+index = 13
+
+[node name="@CollisionShape3D@61" type="CollisionShape3D" parent="Checkpoints/Checkpoint13" unique_id=1176485721]
 shape = SubResource("BoxShape3D_xqig6")
 
-[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1372616454]
+[node name="Checkpoint14" type="Area3D" parent="Checkpoints" unique_id=853385160]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -21.86447, 6, -147)
+script = ExtResource("9_pim4f")
+index = 14
+
+[node name="@CollisionShape3D@62" type="CollisionShape3D" parent="Checkpoints/Checkpoint14" unique_id=1903125513]
+shape = SubResource("BoxShape3D_hwp4l")
+
+[node name="Checkpoint15" type="Area3D" parent="Checkpoints" unique_id=697936913]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, -79.89912)
+script = ExtResource("9_pim4f")
+index = 15
+
+[node name="@CollisionShape3D@63" type="CollisionShape3D" parent="Checkpoints/Checkpoint15" unique_id=1677308647]
+shape = SubResource("BoxShape3D_u8m4j")
+
+[node name="Ground" type="StaticBody3D" parent="." unique_id=251121927]
+
+[node name="GroundMesh" type="MeshInstance3D" parent="Ground" unique_id=1816782912]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.02, 0)
+mesh = SubResource("PlaneMesh_81wdd")
+
+[node name="@CollisionShape3D@64" type="CollisionShape3D" parent="Ground" unique_id=774939270]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+shape = SubResource("BoxShape3D_y6b0w")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=349339496]
 transform = Transform3D(0.81915206, -0.43938506, 0.36868784, 0, 0.64278764, 0.76604444, -0.57357645, -0.62750685, 0.5265408, 0, 0, 0)
 shadow_enabled = true
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=194766543]
-environment = SubResource("Environment_q38dn")
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=980482568]
+environment = SubResource("Environment_tdg3u")
 
-[node name="SpawnPoint" type="Marker3D" parent="." unique_id=655557172]
+[node name="SpawnPoint" type="Marker3D" parent="." unique_id=316534811]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 28)

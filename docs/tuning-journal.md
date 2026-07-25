@@ -357,6 +357,43 @@ An autonomous pure-pursuit driver was written to attempt a full timed lap but
 did not complete one in reasonable time and was abandoned; it is worth revisiting
 alongside AI opponents rather than as a test harness.
 
+## M5 — verticality
+
+Two elevated sections: ramp up, a short plateau, ramp back down. Peak 3.5 m,
+gradient ~12%, and the car goes properly light over each crest at ~100 km/h.
+
+Height is carried the same way headings are. Each connection gets a `conn_y`, a
+piece's rise is `conn_y[exit] - conn_y[entry]`, and the walker carries a running
+height. That means one ramp mesh climbs *or* descends depending only on which
+end is entered — the layout just says which it wanted (`rise_sign`), and the
+placement search finds the matching rotation. Each climb replaces exactly 6
+units of straight (ramp 2 + bridge 2 + ramp 2), so the loop still closes with no
+re-solving.
+
+Kenney's ramp is 0.5 units over 2, a 25% grade — very steep for a circuit, and
+with no barriers a fall off an elevated section hurts. `VERT` scales height on
+top of `SCALE`, at 0.5, giving ~12% and a 3.5 m plateau. It is the one knob for
+how dramatic the hills are.
+
+**The flat ground plane could no longer be the driving surface.** It was only
+ever viable because every tile sat at y=0. The road surface is now a generated
+ribbon of quads along the centreline, used as a `ConcavePolygonShape3D`: still
+seamless for the raycast wheels, but it follows elevation. The ground plane
+underneath is just grass now.
+
+> The bug that mattered: `ConcavePolygonShape3D` is **one-sided by default**, so
+> whether the ribbon collides at all depends on triangle winding — and getting
+> it wrong means the car silently falls through every elevated section. Setting
+> `backface_collision = true` makes it collide from both faces. This was found
+> by raycasting down at each checkpoint and comparing the surface height to the
+> expected road height: the two elevated gates reported a surface at y=0 while
+> the saved collision data clearly contained vertices up to y=3.5.
+
+That probe is the useful technique here. Driving tests kept failing for
+unrelated reasons — a car with no steering leaves the circuit long before it
+reaches a hill — whereas casting a ray at each gate tests the surface itself,
+independently of anyone's ability to drive to it.
+
 ### Still open
 
 - Steering is still linear with a speed-based falloff; no countersteer assist.

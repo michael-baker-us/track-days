@@ -31,7 +31,9 @@ See [`docs/plan.md`](docs/plan.md) for the full milestone plan and architecture 
 
 ## Status
 
-M3 — a 1278 m closed circuit (14 m wide) built from Kenney Racing Kit tiles.
+M3 — a 1278 m closed circuit (14 m wide) built from Kenney Racing Kit tiles,
+with two elevated sections (ramp up, plateau, ramp down) that get the car light
+over the crest.
 Guardrails exist behind a flag but are off by default; they clipped the racing
 line at corners. Handling is tuned to a grippy-arcade target: 165 km/h top speed,
 0–100 in 3.4 s, 100–0 in 24 m (1.6 g), and corners held at 98–127 km/h. All feel

@@ -12,9 +12,9 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/debug_overlay.tscn" id="10_gqmmt"]
 [ext_resource type="Script" path="res://scripts/ui/debug_overlay.gd" id="11_yc10j"]
 
-[node name="Main" type="Node3D" unique_id=1116412323]
+[node name="Main" type="Node3D" unique_id=1713989374]
 
-[node name="Track02" type="Node3D" parent="." unique_id=1002517985 instance=ExtResource("1_ya4ey")]
+[node name="Track02" type="Node3D" parent="." unique_id=630080293 instance=ExtResource("1_ya4ey")]
 
 [node name="Car" type="VehicleBody3D" parent="." unique_id=1573721948 instance=ExtResource("2_eb6dy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 28)
@@ -27,7 +27,7 @@ tuning = ExtResource("4_a8y0u")
 current = true
 script = ExtResource("6_jbj1t")
 
-[node name="LapTracker" type="Node" parent="." unique_id=1929002074]
+[node name="LapTracker" type="Node" parent="." unique_id=802026390]
 script = ExtResource("7_muem4")
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=2021212989 instance=ExtResource("8_dp3eg")]
