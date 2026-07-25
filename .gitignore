@@ -1,0 +1,10 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Export artifacts
+export/
+export_presets.cfg
+
+# macOS
+.DS_Store
