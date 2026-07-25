@@ -247,9 +247,53 @@ Three things worth keeping:
 > only a drive test that measured distance travelled revealed the car was
 > stopping. Visual checks and behavioural checks catch different bugs.
 
+### M3b — making it drivable
+
+Feedback: hard to stay on track, and gas/brake/turning did not flow.
+
+**Corner speeds were the problem, not the driver.** At grip 1.4/1.7 the car
+managed 1.29 g lateral, so the circuit's corners could only be held at 50 km/h
+(r=15 m) and 64 km/h (r=25 m) — against a 165 km/h top speed. That gap is what
+made it feel like fighting the car.
+
+The fix was cheap because of how braking was set up in M2b: **grip only limits
+cornering here, not braking**, since `brake_force` sits below its saturation
+point and braking is brake-limited. Measured stopping distance is byte-identical
+(1.75 s / 24.1 m / 1.62 g) at grip 1.4, 2.5 and 4.0. So grip could be raised
+purely for turning, with no cost to braking progressiveness.
+
+| grip f/r | Lateral | Max on r=15 m | Max on r=25 m |
+|---|---|---|---|
+| 1.4 / 1.7 | 1.29 g | 50 km/h | 64 km/h |
+| 2.5 / 2.9 | 2.29 g | 66 km/h | 85 km/h |
+| 4.0 / 4.5 | 3.65 g | 83 km/h | 108 km/h |
+| 6.0 / 6.6 | 5.43 g | 102 km/h | 131 km/h |
+
+Took 4.0/4.5. `handbrake_rear_friction` rescaled 0.5 → 1.2 to keep roughly the
+same ratio below rear grip. Slalom re-checked at the new grip: still 0/600
+frames with any wheel off the ground at 162 km/h.
+
+**Barriers.** Track edges are now Kenney `railDouble` guardrails (2.8 m) placed
+along the same offset polyline the collision boxes follow, so what you see is
+where you actually get stopped. Wall offset tightened from 8 m to 7 m — 2 m of
+runoff past the 5 m road edge — so going off nudges you back rather than letting
+you wander into open grass.
+
+> Two dead ends worth recording. `barrierWall` at 1.3 m was too low to read as a
+> boundary from the chase camera — from above it looked like a road marking.
+> More importantly, the barriers were first built as a **MultiMesh, whose
+> instance transforms live in its `buffer` property, and that is not serialised
+> by `ResourceSaver` into a packed scene.** The saved scene kept
+> `instance_count = 192` but every transform collapsed to identity, stacking all
+> the barriers invisibly at the origin. Plain `MeshInstance3D` nodes serialise
+> correctly. If a generator's output must be saved as a scene, check the saved
+> `.tscn`, not just the in-memory result.
+
 ### Still open
 
 - Steering is still linear with a speed-based falloff; no countersteer assist.
+- Grass has the same friction as tarmac — going off-track costs nothing but
+  time, since collision is one flat plane under both.
 - Suspension squat/roll under load is not yet visible enough to read as weight
   transfer.
 - Rear wheels sit at skid 0.66 under full throttle at 100 km/h — the car is

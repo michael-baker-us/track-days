@@ -9,9 +9,9 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/debug_overlay.tscn" id="7_a8y0u"]
 [ext_resource type="Script" path="res://scripts/ui/debug_overlay.gd" id="8_jkv2x"]
 
-[node name="Main" type="Node3D" unique_id=1442013128]
+[node name="Main" type="Node3D" unique_id=523089279]
 
-[node name="Track02" type="Node3D" parent="." unique_id=1966541476 instance=ExtResource("1_tipki")]
+[node name="Track02" type="Node3D" parent="." unique_id=351819336 instance=ExtResource("1_tipki")]
 
 [node name="Car" type="VehicleBody3D" parent="." unique_id=1573721948 instance=ExtResource("2_85g3d")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 20)

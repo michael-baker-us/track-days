@@ -17,8 +17,16 @@ const ROAD_HALF := 0.5 * SCALE
 # Distance from centreline to wall. Must stay below the smallest corner's
 # centreline radius or the inner offset polyline inverts and the walls cross
 # themselves. Smallest corner in use is roadCornerLarge at 1.5 units (15 m).
-const WALL_GAP := 0.8 * SCALE
-const WALL_H := 1.6
+# Kept close to the 5 m road edge so the barrier reads as the track boundary
+# and nudges you back on rather than letting you wander into open grass.
+const WALL_GAP := 0.7 * SCALE
+# railDouble is a 0.28-unit guardrail (2.8 m once scaled) - tall enough to read
+# as the track edge from the chase camera, unlike the 1.3 m barrierWall which
+# looked like a road marking. Its length runs along local +Z, not +X.
+const BARRIER_PIECE := "railDouble"
+const BARRIER_LENGTH_AXIS := "z"
+const BARRIER_STEP := 1.0 * SCALE  # the barrier mesh is 1 tile unit long
+const WALL_H := 2.8  # matches the guardrail height so you cannot see over it
 const WALL_T := 0.6
 const ARC_STEPS := 8
 
@@ -226,18 +234,53 @@ func _build_walls(root_node: Node3D) -> void:
 	walls.name = "Walls"
 	root_node.add_child(walls)
 
-	var mesh_holder := MultiMeshInstance3D.new()
-	mesh_holder.name = "WallMesh"
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	var box := BoxMesh.new()
-	box.size = Vector3(WALL_T, WALL_H, 1.0)
-	mm.mesh = box
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.85, 0.85, 0.88)
-	box.material = mat
+	# Visual barriers are Kenney meshes laid along the same offset polyline the
+	# collision boxes follow, so what you see is where you actually get stopped.
+	var barrier_src: Node3D = load(
+		"res://assets/kenney/racing_kit/%s.glb" % BARRIER_PIECE
+	).instantiate()
+	var barrier_mesh: Mesh = _first_mesh(barrier_src).mesh
+	var barrier_aabb := barrier_mesh.get_aabb()
+	var barrier_centre := barrier_aabb.position + barrier_aabb.size * 0.5
+	# Sit it on the ground rather than centred vertically on the path point.
+	barrier_centre.y = barrier_aabb.position.y
 
-	var transforms: Array[Transform3D] = []
+	# Deliberately plain MeshInstance3D nodes rather than a MultiMesh: a
+	# MultiMesh's instance transforms live in its `buffer` property, which is
+	# NOT serialised by ResourceSaver into a packed scene. The instance count
+	# survives but every transform collapses to identity, so all the barriers
+	# end up stacked invisibly at the origin.
+	var barrier_root := Node3D.new()
+	barrier_root.name = "Barriers"
+	root_node.add_child(barrier_root)
+
+	var barrier_xforms: Array[Transform3D] = []
+	for side in [-1.0, 1.0]:
+		var line := _offset_line(side)
+		for p in _resample(line, BARRIER_STEP):
+			var pt: Vector2 = p[0]
+			var tan: Vector2 = p[1]
+			# Align the mesh's length axis with the path tangent.
+			var yaw := (
+				atan2(tan.x, tan.y) if BARRIER_LENGTH_AXIS == "z"
+				else atan2(-tan.y, tan.x)
+			)
+			var basis := Basis(Vector3.UP, yaw).scaled(Vector3(SCALE, SCALE, SCALE))
+			var origin := Vector3(pt.x, 0.0, pt.y) - basis * barrier_centre
+			barrier_xforms.append(Transform3D(basis, origin))
+
+	for i in barrier_xforms.size():
+		var mi := MeshInstance3D.new()
+		mi.name = "Barrier%03d" % i
+		mi.mesh = barrier_mesh
+		mi.transform = barrier_xforms[i]
+		barrier_root.add_child(mi)
+	print("barriers: %d nodes | first origin=%s" % [
+		barrier_xforms.size(),
+		barrier_xforms[0].origin if barrier_xforms.size() > 0 else Vector3.ZERO
+	])
+	barrier_src.free()
+
 	for side in [-1.0, 1.0]:
 		for i in centreline.size() - 1:
 			var a := centreline[i]
@@ -251,14 +294,6 @@ func _build_walls(root_node: Node3D) -> void:
 			var mid: Vector2 = (wa + wb) * 0.5
 			var seg_len: float = (wb - wa).length()
 			var angle := atan2(-(wb - wa).y, (wb - wa).x)
-
-			# The MultiMesh draws a unit-depth box, so its transform carries the
-			# segment length as scale.
-			var t := Transform3D()
-			t = t.scaled(Vector3(1.0, 1.0, seg_len))
-			t = t.rotated(Vector3.UP, angle - PI * 0.5)
-			t.origin = Vector3(mid.x, WALL_H * 0.5, mid.y)
-			transforms.append(t)
 
 			# The collision box carries the length in its own size, so its
 			# transform must NOT also be scaled - doing both makes each wall
@@ -274,11 +309,49 @@ func _build_walls(root_node: Node3D) -> void:
 			col.transform = col_xform
 			walls.add_child(col)
 
-	mm.instance_count = transforms.size()
-	for i in transforms.size():
-		mm.set_instance_transform(i, transforms[i])
-	mesh_holder.multimesh = mm
-	root_node.add_child(mesh_holder)
+func _first_mesh(n: Node) -> MeshInstance3D:
+	if n is MeshInstance3D:
+		return n
+	for c in n.get_children():
+		var m := _first_mesh(c)
+		if m != null:
+			return m
+	return null
+
+func _offset_line(side: float) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	for i in centreline.size() - 1:
+		var a := centreline[i]
+		var b := centreline[i + 1]
+		var d := b - a
+		if d.length() < 0.01:
+			continue
+		var n := Vector2(-d.y, d.x).normalized() * WALL_GAP * side
+		if out.is_empty():
+			out.append(a + n)
+		out.append(b + n)
+	return out
+
+# Walks a polyline at fixed arc-length intervals, returning [point, tangent].
+func _resample(line: Array[Vector2], step: float) -> Array:
+	var out := []
+	if line.size() < 2:
+		return out
+	var carry := 0.0
+	for i in line.size() - 1:
+		var a := line[i]
+		var b := line[i + 1]
+		var seg := b - a
+		var seg_len := seg.length()
+		if seg_len < 0.001:
+			continue
+		var dir := seg / seg_len
+		var t := carry
+		while t < seg_len:
+			out.append([a + dir * t, dir])
+			t += step
+		carry = t - seg_len
+	return out
 
 func _build_ground(root_node: Node3D) -> void:
 	var ground := StaticBody3D.new()

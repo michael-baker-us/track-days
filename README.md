@@ -31,10 +31,11 @@ See [`docs/plan.md`](docs/plan.md) for the full milestone plan and architecture 
 
 ## Status
 
-M3 — a 913 m closed circuit built from Kenney Racing Kit tiles, with walls and a
-start line. Handling is tuned to a grippy-arcade target (top speed 165 km/h,
-0–100 in 3.5 s, 100–0 in 24 m); all feel parameters live in a swappable
-`CarTuning` resource. Next: lap timing and checkpoints.
+M3 — a 913 m closed circuit built from Kenney Racing Kit tiles, lined with
+guardrails. Handling is tuned to a grippy-arcade target: 165 km/h top speed,
+0–100 in 3.4 s, 100–0 in 24 m (1.6 g), and corners held at 83–108 km/h. All feel
+parameters live in a swappable `CarTuning` resource. Next: lap timing and
+checkpoints.
 
 See [`docs/tuning-journal.md`](docs/tuning-journal.md) for how the handling
 numbers were arrived at and what is still open.

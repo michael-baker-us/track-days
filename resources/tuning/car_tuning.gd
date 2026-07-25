@@ -26,14 +26,20 @@ extends Resource
 @export var drag_coefficient: float = 5.0
 
 @export_group("Grip")
-## Godot's default wheel_friction_slip of 10.5 is far beyond anything physical
-## - it braked at ~20 g and cornered at ~9 g. These sit near 1.6 g / 1.3 g.
-## Rear above front so the car washes into mild understeer at the limit
-## rather than snapping into oversteer.
-@export var friction_front: float = 1.4
-@export var friction_rear: float = 1.7
+## Grip only limits cornering here, not braking: brake_force sits below its
+## saturation point so stopping is brake-limited, and measured braking is
+## identical (1.62 g) at every grip level tested. That decoupling is what lets
+## grip be set purely for how the car turns.
+##
+## At 1.4/1.7 the car managed 1.3 g and could only hold the circuit's corners at
+## 50-64 km/h against a 165 km/h top speed, which made it hard to stay on track.
+## These give ~3.6 g, so corners go at 83-108 km/h and the pace flows.
+## Rear above front so it washes into mild understeer rather than snapping into
+## oversteer.
+@export var friction_front: float = 4.0
+@export var friction_rear: float = 4.5
 ## Must stay well below friction_rear, or the handbrake would *add* grip.
-@export var handbrake_rear_friction: float = 0.5
+@export var handbrake_rear_friction: float = 1.2
 @export var handbrake_force: float = 40.0
 
 @export_group("Steering")
