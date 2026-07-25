@@ -25,6 +25,18 @@ func _initialize() -> void:
 	root_node.add_child(cam)
 	cam.owner = root_node
 
+	# Tracker before the HUD so the HUD can find it; both look each other up by
+	# group at runtime, so order only affects the first frame.
+	var tracker := Node.new()
+	tracker.name = "LapTracker"
+	tracker.set_script(load("res://scripts/track/lap_tracker.gd"))
+	root_node.add_child(tracker)
+	tracker.owner = root_node
+
+	var hud: CanvasLayer = load("res://scenes/ui/hud.tscn").instantiate()
+	root_node.add_child(hud)
+	hud.owner = root_node
+
 	var overlay: CanvasLayer = load("res://scenes/ui/debug_overlay.tscn").instantiate()
 	root_node.add_child(overlay)
 	overlay.owner = root_node

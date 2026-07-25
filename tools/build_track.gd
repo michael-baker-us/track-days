@@ -48,6 +48,13 @@ const WALL_H := 2.8  # matches the guardrail height so you cannot see over it
 const WALL_T := 0.6
 const ARC_STEPS := 8
 
+# Lap checkpoints. Index 0 sits on the start line; a lap only counts if all of
+# them are crossed in order.
+const CHECKPOINT_COUNT := 16
+const CHECKPOINT_W := 4.0 * SCALE  # wider than the road, to catch off-track runs
+const CHECKPOINT_H := 8.0
+const CHECKPOINT_T := 4.0  # thick enough not to be tunnelled through at speed
+
 const DIRS := {
 	"N": Vector2(0, -1), "S": Vector2(0, 1),
 	"E": Vector2(1, 0), "W": Vector2(-1, 0),
@@ -149,6 +156,7 @@ func _initialize() -> void:
 
 	if BARRIERS_ENABLED:
 		_build_walls(root_node)
+	_build_checkpoints(root_node)
 	_build_ground(root_node)
 	_build_lighting(root_node)
 
@@ -329,6 +337,44 @@ func _build_walls(root_node: Node3D) -> void:
 			col.shape = shape
 			col.transform = col_xform
 			walls.add_child(col)
+
+func _build_checkpoints(root_node: Node3D) -> void:
+	# Gates across the track, index 0 on the start line. Wider than the road so
+	# they still catch a car that has run wide onto the grass - the point is to
+	# prove the lap was driven, not to punish a bad line.
+	var holder := Node3D.new()
+	holder.name = "Checkpoints"
+	root_node.add_child(holder)
+
+	var total := 0.0
+	for i in centreline.size() - 1:
+		total += centreline[i].distance_to(centreline[i + 1])
+	var step := total / float(CHECKPOINT_COUNT)
+
+	var script: Script = load("res://scripts/track/checkpoint.gd")
+	var samples := _resample(centreline, step)
+	for i in mini(CHECKPOINT_COUNT, samples.size()):
+		var pt: Vector2 = samples[i][0]
+		var tan: Vector2 = samples[i][1]
+
+		var area := Area3D.new()
+		area.name = "Checkpoint%02d" % i
+		area.set_script(script)
+		area.set("index", i)
+		area.position = Vector3(pt.x, CHECKPOINT_H * 0.5, pt.y)
+		# Thin axis along travel, so the gate spans the track.
+		area.rotation.y = atan2(tan.x, tan.y)
+		holder.add_child(area)
+
+		var col := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(CHECKPOINT_W, CHECKPOINT_H, CHECKPOINT_T)
+		col.shape = box
+		area.add_child(col)
+
+	print("checkpoints: %d spaced %.0f m apart" % [
+		mini(CHECKPOINT_COUNT, samples.size()), step
+	])
 
 func _first_mesh(n: Node) -> MeshInstance3D:
 	if n is MeshInstance3D:

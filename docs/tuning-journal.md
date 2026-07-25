@@ -322,6 +322,41 @@ Nothing is lost by having them off: collision is a single flat ground plane, so
 the car simply drives on grass off-track and can rejoin. What is lost is any
 penalty for leaving the circuit, which lap timing (M4) will need to care about.
 
+## M4 — checkpoints and lap timing
+
+16 gates generated along the centreline, index 0 on the start line, spaced 80 m
+apart on the 1278 m lap. They are `Area3D` triggers that never block the car.
+
+Ordering is the whole point. Collision is a single flat ground plane and the
+guardrails are off, so nothing physically stops a corner being cut — a lap only
+counts if every gate is taken in sequence, and an out-of-order gate is ignored
+(the driver has to go back for it). Gates are 4 tile units wide, deliberately
+wider than the road, so running wide onto the grass still counts: the point is
+to prove the lap was driven, not to punish a bad line.
+
+The first crossing of the start line begins timing, so lap 1 is preceded by an
+out lap. Best lap persists to `user://records.cfg`.
+
+> Lap time accumulates in `_physics_process`, not `_process`. The physics delta
+> is fixed, so times track the simulation rather than the render framerate —
+> which also means headless runs, which are not framerate-locked, produce the
+> same times as the game.
+
+Verified in two parts, because they fail differently:
+
+- **Rules**, by driving the tracker directly: out lap ignored, timing starts on
+  the line, gates enforced in order, a deliberate cut (1 → 2 → 9) rejected with
+  `_next_required` held at 3, an early line crossing ignored, second lap still
+  recorded correctly, best lap stored.
+- **Physical triggering**, by driving down the opening straight: gates 1, 2 and
+  3 fired in order at 77 m, 157 m and 249 m, matching the 80 m spacing. The
+  rules test emits signals directly and so never exercises `Area3D` detection,
+  box size or gate orientation.
+
+An autonomous pure-pursuit driver was written to attempt a full timed lap but
+did not complete one in reasonable time and was abandoned; it is worth revisiting
+alongside AI opponents rather than as a test harness.
+
 ### Still open
 
 - Steering is still linear with a speed-based falloff; no countersteer assist.
@@ -334,7 +369,6 @@ penalty for leaving the circuit, which lap timing (M4) will need to care about.
   power-sliding slightly in a straight line. Not obviously wrong for an arcade
   racer, but it has not been deliberately tuned.
 - The grid shader aliases badly toward the horizon; wants a distance fade.
-- No lap timing or checkpoints yet (M4).
 - The circuit has no chicane: `roadCurved` always offsets the same way relative
   to travel, so mirroring it needs a negative scale rather than a Y rotation.
 - Walls approximate `roadCurved` as a straight line between its endpoints.
