@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/camera/chase_camera.gd" id="1_621sx"]
+
+[node name="ChaseCamera" type="Camera3D" unique_id=2122466852]
+current = true
+script = ExtResource("1_621sx")

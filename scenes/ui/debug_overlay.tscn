@@ -1,0 +1,23 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/debug_overlay.gd" id="1_tasbd"]
+
+[node name="DebugOverlay" type="CanvasLayer" unique_id=1595088290]
+script = ExtResource("1_tasbd")
+
+[node name="Panel" type="PanelContainer" parent="." unique_id=1457163545]
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 12.0
+offset_bottom = 12.0
+
+[node name="MarginContainer" type="MarginContainer" parent="Panel" unique_id=1768652850]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="Label" type="Label" parent="Panel/MarginContainer" unique_id=838785268]
+layout_mode = 2
+text = "debug"

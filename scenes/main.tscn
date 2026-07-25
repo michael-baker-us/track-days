@@ -1,0 +1,27 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/track/track_01.tscn" id="1_o6xl0"]
+[ext_resource type="PackedScene" path="res://scenes/car/car.tscn" id="2_tipki"]
+[ext_resource type="Script" path="res://scripts/car/car_controller.gd" id="3_85g3d"]
+[ext_resource type="PackedScene" path="res://scenes/camera/chase_camera.tscn" id="4_choun"]
+[ext_resource type="Script" path="res://scripts/camera/chase_camera.gd" id="5_ya4ey"]
+[ext_resource type="PackedScene" path="res://scenes/ui/debug_overlay.tscn" id="6_eb6dy"]
+[ext_resource type="Script" path="res://scripts/ui/debug_overlay.gd" id="7_trceg"]
+
+[node name="Main" type="Node3D" unique_id=981734970]
+
+[node name="Track01" type="Node3D" parent="." unique_id=1236813311 instance=ExtResource("1_o6xl0")]
+
+[node name="Car" type="VehicleBody3D" parent="." unique_id=1573721948 instance=ExtResource("2_tipki")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+mass = 1200.0
+center_of_mass_mode = 1
+center_of_mass = Vector3(0, -0.3, 0)
+script = ExtResource("3_85g3d")
+
+[node name="ChaseCamera" type="Camera3D" parent="." unique_id=2122466852 instance=ExtResource("4_choun")]
+current = true
+script = ExtResource("5_ya4ey")
+
+[node name="DebugOverlay" type="CanvasLayer" parent="." unique_id=1595088290 instance=ExtResource("6_eb6dy")]
+script = ExtResource("7_trceg")

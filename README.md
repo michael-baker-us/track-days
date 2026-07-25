@@ -18,6 +18,18 @@ See [`docs/plan.md`](docs/plan.md) for the full milestone plan and architecture 
 /path/to/Godot.app/Contents/MacOS/Godot --headless --path . --quit
 ```
 
+## Controls
+
+| Action | Keyboard | Gamepad |
+|---|---|---|
+| Steer | A/D or Left/Right | Left stick |
+| Accelerate | W or Up | Right trigger |
+| Brake / reverse | S or Down | Left trigger |
+| Handbrake | Space | A |
+| Reset car | R | Y |
+| Toggle debug overlay | F3 | — |
+
 ## Status
 
-M0 — project skeleton (input map, physics tick rate, directory layout).
+M1 — drivable `VehicleBody3D` car (Kenney Car Kit, RWD) on a flat plane, chase camera,
+debug overlay. Feel is untuned; that's M2.
