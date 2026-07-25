@@ -273,11 +273,9 @@ Took 4.0/4.5. `handbrake_rear_friction` rescaled 0.5 → 1.2 to keep roughly the
 same ratio below rear grip. Slalom re-checked at the new grip: still 0/600
 frames with any wheel off the ground at 162 km/h.
 
-**Barriers.** Track edges are now Kenney `railDouble` guardrails (2.8 m) placed
-along the same offset polyline the collision boxes follow, so what you see is
-where you actually get stopped. Wall offset tightened from 8 m to 7 m — 2 m of
-runoff past the 5 m road edge — so going off nudges you back rather than letting
-you wander into open grass.
+**Barriers.** Track edges were given Kenney `railDouble` guardrails (2.8 m)
+placed along the same offset polyline the collision boxes follow. **Since
+disabled** — see M3d.
 
 > Two dead ends worth recording. `barrierWall` at 1.3 m was too low to read as a
 > boundary from the chase camera — from above it looked like a road marking.
@@ -307,11 +305,29 @@ Barrier scale was decoupled from track scale in the process — guardrails were
 sized off the track scale, so widening would have grown them to 3.9 m alongside
 an unchanged 2.5 m car. They now have their own fixed scale.
 
+### M3d — guardrails switched off
+
+They cut across the racing line at corners. The cause is in `_offset_line`:
+each vertex of the offset polyline is offset by the **preceding segment's
+normal only**, with no mitring. At every direction change the offset therefore
+lags a segment and kinks inward, which on the inside of a corner puts rail —
+and its collision — across drivable road.
+
+Offsetting a polyline properly needs the averaged normal of the two adjacent
+segments at each vertex, plus arcs on outer corners where the offset opens up.
+Not worth building now, so `BARRIERS_ENABLED` defaults to `false` and the code
+is left intact behind the flag.
+
+Nothing is lost by having them off: collision is a single flat ground plane, so
+the car simply drives on grass off-track and can rejoin. What is lost is any
+penalty for leaving the circuit, which lap timing (M4) will need to care about.
+
 ### Still open
 
 - Steering is still linear with a speed-based falloff; no countersteer assist.
 - Grass has the same friction as tarmac — going off-track costs nothing but
-  time, since collision is one flat plane under both.
+  time, since collision is one flat plane under both. With guardrails off there
+  is nothing at all keeping the car on the circuit.
 - Suspension squat/roll under load is not yet visible enough to read as weight
   transfer.
 - Rear wheels sit at skid 0.66 under full throttle at 100 km/h — the car is

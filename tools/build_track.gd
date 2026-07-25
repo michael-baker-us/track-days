@@ -26,6 +26,18 @@ const WALL_GAP := 0.7 * SCALE
 # railDouble is a 0.28-unit guardrail (2.8 m once scaled) - tall enough to read
 # as the track edge from the chase camera, unlike the 1.3 m barrierWall which
 # looked like a road marking. Its length runs along local +Z, not +X.
+# Guardrails and their wall collision, off by default.
+#
+# They are disabled because the offset polyline they follow is wrong at corners:
+# `_offset_line` offsets each vertex by the *preceding* segment's normal only,
+# with no mitring, so at every direction change the offset lags a segment and
+# kinks - which puts inner rails across the racing line and cuts off parts of
+# the track. Offsetting a polyline properly needs the averaged normal of the two
+# adjacent segments at each vertex (and outer-corner arcs). Not worth doing yet;
+# the circuit drives fine without them since the ground is one flat plane.
+#
+# Set true to build them anyway - everything below still works, it just clips.
+const BARRIERS_ENABLED := false
 const BARRIER_PIECE := "railDouble"
 const BARRIER_LENGTH_AXIS := "z"
 # Deliberately independent of SCALE: the car never scales, so a guardrail sized
@@ -135,7 +147,8 @@ func _initialize() -> void:
 		gap.x, gap.y, heading, turn_total
 	])
 
-	_build_walls(root_node)
+	if BARRIERS_ENABLED:
+		_build_walls(root_node)
 	_build_ground(root_node)
 	_build_lighting(root_node)
 
