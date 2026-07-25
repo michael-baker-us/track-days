@@ -24,7 +24,7 @@ the demo suggests. That decision is deliberately deferred.
 | Vehicle physics | **Built-in `VehicleBody3D`** |
 | Art | **Kenney CC0 asset packs** (Car Kit + Racing Kit) |
 | Layout | **Godot project at repo root** |
-| Target feel | **Arcade / drifty** — Ridge Racer, OutRun, Horizon Chase |
+| Target feel | **Grippy arcade** — Forza Horizon-ish: planted and predictable, slides only when provoked |
 
 ---
 
@@ -50,7 +50,7 @@ racing/
     track/{lap_tracker.gd,checkpoint.gd}
   resources/tuning/
     car_tuning.gd                         # class_name CarTuning extends Resource
-    drifty.tres  grippy.tres              # swappable presets
+    grippy.tres  drifty.tres              # swappable presets
   docs/{architecture.md,tuning-journal.md}
   tests/                                  # GUT, from M5
 ```
@@ -113,9 +113,10 @@ Nothing past this point matters until that's true.
 
 ### M2 — Feel pass (expect to spend real time here)
 - Introduce `CarTuning`; migrate every magic number out of `car_controller.gd`.
-- Dial in **drifty**: rear `wheel_friction_slip` meaningfully below front (the default 10.5
-  is glued to the road), handbrake cuts rear grip and applies rear-only brake force, enough
-  engine force to break traction out of a corner.
+- Dial in **grippy arcade**: rear `wheel_friction_slip` slightly *above* front so the car
+  washes into mild, predictable understeer at the limit instead of snapping into oversteer;
+  handbrake cuts rear grip hard so slides are provoked deliberately. Aerodynamic drag sets
+  top speed and makes acceleration taper naturally.
 - Suspension stiffness / travel / damping so the car squats and rolls visibly under load —
   weight transfer you can *see* is most of what sells arcade handling.
 - Camera lag and FOV kick tuned against the new grip model.
