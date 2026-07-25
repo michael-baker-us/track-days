@@ -77,19 +77,70 @@ force balances it, and makes acceleration taper naturally.
 | 0.0 | 331.9 km/h | 3.09 s |
 | 1.6 | 236.7 km/h | 3.17 s |
 
-Kept 1.6 — barely touches acceleration, brings top speed somewhere controllable.
+Took 1.6 at this point — superseded in M2b below, where top speed came down
+further.
 
-**Grip balance.** Rear `wheel_friction_slip` (11.5) set slightly *above* front
-(10.5) so the car washes into mild understeer at the limit rather than snapping
-into oversteer. Measured cornering slip angle at a governed 120 km/h:
-**3.3° average, 5.1° peak** — planted, no spin.
+**Grip balance.** Rear `wheel_friction_slip` set slightly *above* front so the
+car washes into mild understeer at the limit rather than snapping into
+oversteer. The *ratio* survived; the absolute values (10.5/11.5) did not — see
+M2b, where they turn out to be the cause of the sudden braking.
 
-**Handbrake provokes slides.** Rather than only braking, the handbrake now drops
-rear `wheel_friction_slip` to 2.0 while held. Slip angle reaches ~70°, i.e. the
-back end genuinely comes around on demand.
+**Handbrake provokes slides.** Rather than only braking, the handbrake drops
+rear `wheel_friction_slip` while held, so the back end comes around on demand.
 
 Re-ran the slalom afterwards to confirm the grip/drag rework did not regress
 roll stability: **0/600 frames** with any wheel off the ground at 224 km/h.
+
+### M2b — top speed and braking
+
+Feedback: top speed too high, braking too sudden. Braking measured at **20 g**
+(100 km/h to a stop in 0.14 s / 2.0 m), which is why it felt like hitting a wall.
+
+**Two saturation ceilings were hiding the real problem.**
+
+`wheel_friction_slip` at Godot's default 10.5 is far past anything physical.
+Everything was traction-limited at absurd grip: ~20 g braking and ~9 g
+cornering. Sweeping grip against braking from 100 km/h:
+
+| friction f/r | Stop time | Distance | Decel |
+|---|---|---|---|
+| 10.5 / 11.5 | 0.14 s | 2.0 m | 20.0 g |
+| 2.0 / 2.4 | 0.62 s | 8.9 m | 4.6 g |
+| 1.4 / 1.7 | 0.86 s | 12.3 m | 3.3 g |
+| 0.7 / 0.85 | 1.60 s | 22.5 m | 1.8 g |
+
+But grip drives cornering too, and dropping it far enough to fix braking made
+the car push wide badly — yaw rate at 100 km/h fell from 4.33 rad/s to
+0.30 rad/s. Grip alone could not fix braking without ruining cornering.
+
+`brake_force` **saturates around 150**. Everything from 300 to 3000 produced
+byte-identical results because the wheels simply lock and grip takes over. The
+shipped value was 3000, i.e. 20× past the point where the control does anything.
+Once below saturation it behaves sensibly:
+
+| brake_force | Stop time | Distance | Decel |
+|---|---|---|---|
+| 0 | never stopped | — | — |
+| 20 | 2.74 s | 37.8 m | 1.03 g |
+| 32 | 1.83 s | 25.8 m | 1.55 g |
+| 60 | 1.04 s | 14.9 m | 2.72 g |
+| 150+ | 0.86 s | 12.3 m | 3.30 g (saturated) |
+
+So the fix is both: grip at 1.4/1.7 for realistic cornering (~1.3 g lateral),
+and brake force at 32 — below saturation, so braking is brake-limited and
+progressive rather than an instant traction-limited stop.
+
+**Top speed** lowered via drag, which is the honest lever since it also shapes
+the acceleration curve: 1.6 → 249 km/h, 3.0 → 200, 4.0 → 180, 5.0 → 165.
+Kept 5.0.
+
+**Handbrake rescaled.** `handbrake_rear_friction` was 2.0 — above the new rear
+grip of 1.7, so it would have *increased* rear grip. Now 0.5. `handbrake_force`
+was likewise saturated at 4000; now 40.
+
+Final: top speed 165 km/h, 0–100 in 3.54 s, 100→0 in 1.75 s / 24.1 m (1.62 g),
+cornering 0.46 rad/s yaw at 100 km/h with no spin, and the slalom still shows
+0/600 frames with any wheel off the ground at 161 km/h.
 
 ### Current values
 
@@ -100,10 +151,10 @@ roll stability: **0/600 frames** with any wheel off the ground at 224 km/h.
 | `suspension_stiffness` / `max_force` | 60 / 12000 |
 | `damping_compression` / `relaxation` | 0.9 / 0.95 |
 | `engine_force_value` | 8000 |
-| `brake_force` / `reverse_force_value` | 3000 / 3000 |
-| `drag_coefficient` | 1.6 |
-| `friction_front` / `friction_rear` | 10.5 / 11.5 |
-| `handbrake_rear_friction` / `handbrake_force` | 2.0 / 4000 |
+| `brake_force` / `reverse_force_value` | 32 / 3000 |
+| `drag_coefficient` | 5.0 |
+| `friction_front` / `friction_rear` | 1.4 / 1.7 |
+| `handbrake_rear_friction` / `handbrake_force` | 0.5 / 40 |
 | `antiroll_stiffness` / `antiroll_damping` | 15 / 4 |
 
 ### Still open

@@ -3,21 +3,28 @@ extends VehicleBody3D
 @export_group("Drivetrain")
 @export var engine_force_value: float = 8000.0
 @export var reverse_force_value: float = 3000.0
-@export var brake_force: float = 3000.0
+## VehicleBody3D brake force saturates around 150 - past that the wheels just
+## lock and deceleration is capped by tyre grip instead, which is what made
+## braking feel instant. Useful range is roughly 20-60.
+@export var brake_force: float = 32.0
 ## Aerodynamic drag. Force grows with speed squared, so this sets the top
 ## speed (engine force balances drag) and makes acceleration taper off
 ## naturally instead of climbing linearly forever.
-@export var drag_coefficient: float = 1.6
+@export var drag_coefficient: float = 5.0
 
 @export_group("Grip")
 ## Rear grip sits slightly above front so the car washes out into mild,
 ## predictable understeer at the limit rather than snapping into oversteer.
-@export var friction_front: float = 10.5
-@export var friction_rear: float = 11.5
+## Godot's default of 10.5 is far beyond anything physical - it made the car
+## brake at ~20 g and corner at ~9 g, which is what read as "sudden". These
+## values put braking near 1.6 g and cornering near 1.3 g.
+@export var friction_front: float = 1.4
+@export var friction_rear: float = 1.7
 ## Handbrake cuts rear grip to break the back loose on demand - slides are
-## something you provoke, not something that happens to you.
-@export var handbrake_rear_friction: float = 2.0
-@export var handbrake_force: float = 4000.0
+## something you provoke, not something that happens to you. Must stay well
+## below friction_rear or the handbrake would *add* grip.
+@export var handbrake_rear_friction: float = 0.5
+@export var handbrake_force: float = 40.0
 
 @export_group("Steering")
 @export var max_steer_angle: float = 0.6
