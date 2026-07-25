@@ -289,6 +289,24 @@ you wander into open grass.
 > correctly. If a generator's output must be saved as a scene, check the saved
 > `.tscn`, not just the in-memory result.
 
+### M3c — wider track
+
+Kenney has no wider road tiles, so road width, corner radii and lap length all
+come from one number: metres per tile unit, raised 10 -> 14. The car does not
+scale, so this widens the track relative to the car and opens the corners at the
+same time.
+
+| | Before | After |
+|---|---|---|
+| Road width | 10 m | 14 m |
+| Corner radii | 15 / 25 m | 21 / 35 m |
+| Corner speeds at 3.65 g | 83 / 108 km/h | 98 / 127 km/h |
+| Lap length | 913 m | 1278 m |
+
+Barrier scale was decoupled from track scale in the process — guardrails were
+sized off the track scale, so widening would have grown them to 3.9 m alongside
+an unchanged 2.5 m car. They now have their own fixed scale.
+
 ### Still open
 
 - Steering is still linear with a speed-based falloff; no countersteer assist.

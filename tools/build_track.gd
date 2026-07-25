@@ -12,7 +12,10 @@ extends SceneTree
 # driving surface with no seams for the raycast wheels to catch on. The road
 # meshes are visual only; walls constrain the car to the circuit.
 
-const SCALE := 10.0            # 1 tile unit -> 10 m, so the road is 10 m wide
+# 1 tile unit -> this many metres. Sets road width, corner radii and lap length
+# together, since Kenney has no wider road tiles. The car does not scale, so
+# raising this widens the track relative to the car and opens up the corners.
+const SCALE := 14.0
 const ROAD_HALF := 0.5 * SCALE
 # Distance from centreline to wall. Must stay below the smallest corner's
 # centreline radius or the inner offset polyline inverts and the walls cross
@@ -25,7 +28,10 @@ const WALL_GAP := 0.7 * SCALE
 # looked like a road marking. Its length runs along local +Z, not +X.
 const BARRIER_PIECE := "railDouble"
 const BARRIER_LENGTH_AXIS := "z"
-const BARRIER_STEP := 1.0 * SCALE  # the barrier mesh is 1 tile unit long
+# Deliberately independent of SCALE: the car never scales, so a guardrail sized
+# off the track scale would tower over it. 10 gives a ~2.8 m rail in 10 m spans.
+const BARRIER_SCALE := 10.0
+const BARRIER_STEP := 1.0 * BARRIER_SCALE
 const WALL_H := 2.8  # matches the guardrail height so you cannot see over it
 const WALL_T := 0.6
 const ARC_STEPS := 8
@@ -265,7 +271,9 @@ func _build_walls(root_node: Node3D) -> void:
 				atan2(tan.x, tan.y) if BARRIER_LENGTH_AXIS == "z"
 				else atan2(-tan.y, tan.x)
 			)
-			var basis := Basis(Vector3.UP, yaw).scaled(Vector3(SCALE, SCALE, SCALE))
+			var basis := Basis(Vector3.UP, yaw).scaled(
+				Vector3(BARRIER_SCALE, BARRIER_SCALE, BARRIER_SCALE)
+			)
 			var origin := Vector3(pt.x, 0.0, pt.y) - basis * barrier_centre
 			barrier_xforms.append(Transform3D(basis, origin))
 
