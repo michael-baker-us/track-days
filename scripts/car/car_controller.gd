@@ -8,6 +8,12 @@ extends VehicleBody3D
 @export var steer_speed: float = 4.0
 @export var steer_falloff_reference_kmh: float = 200.0
 
+## Virtual anti-roll bar. VehicleBody3D has no roll stiffness of its own, so
+## quick steering reversals unload the inside wheels and put the car on two
+## wheels. This resists body roll without reducing grip.
+@export var antiroll_stiffness: float = 15.0
+@export var antiroll_damping: float = 4.0
+
 func _ready() -> void:
 	add_to_group("player_car")
 
@@ -42,8 +48,18 @@ func _physics_process(delta: float) -> void:
 		engine_force = 0.0
 		brake = 0.0
 
+	_apply_antiroll()
+
 	if Input.is_action_just_pressed("reset_car"):
 		_reset()
+
+func _apply_antiroll() -> void:
+	var basis := global_transform.basis
+	# basis.x . basis.y is always 0 for an orthonormal basis; the car's right
+	# vector against world up is the actual signed roll (sin of the roll angle).
+	var tilt := basis.x.dot(Vector3.UP)
+	var roll_rate := angular_velocity.dot(basis.z)
+	apply_torque(-basis.z * (tilt * antiroll_stiffness + roll_rate * antiroll_damping) * mass)
 
 func _reset() -> void:
 	global_transform.basis = Basis()
