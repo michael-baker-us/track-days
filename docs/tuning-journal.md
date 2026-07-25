@@ -203,6 +203,50 @@ at the actual top speed.
 All of the above live in `resources/tuning/car_tuning.gd` as the grippy
 baseline; `car.tscn` references `grippy.tres`.
 
+## M3 — a real track
+
+Circuit built by `_build_track.gd` from a layout spec rather than placed by
+hand, so the layout can be edited and rebuilt. Kenney road tiles sit on a
+1-unit grid with off-centre origins; each piece is normalised so its cell min
+corner is at the origin, then placed by matching its entry connection point and
+edge normal to a walker's current position and heading. Rotations are found by
+searching the four yaw angles and both travel directions for one that matches.
+
+Piece geometry was measured rather than eyeballed — a diagnostic reads mesh
+vertices and reports which tile edges the road ribbon actually reaches and where
+along each edge it sits. All corners turn out to be quarter arcs centred at
+(0.5, 0.5) in cell coordinates, connecting the East and South edges.
+
+Scale is 10 m per tile unit, giving a 10 m road. Corner centreline radii are
+5 m (`roadCornerSmall`), 15 m (`Large`), 25 m (`Larger`). Current circuit is
+913 m with a closure gap of exactly zero and net −4 turns.
+
+**Collision does not come from the road meshes.** Every tile is flat at y=0, so
+the ground plane already is a perfectly smooth driving surface with no seams for
+the raycast wheels to catch on. Road tiles are visual only, sitting 2 cm proud
+of the grass; walls constrain the car.
+
+Three things worth keeping:
+
+> `roadCornerSmall` has a 5 m centreline radius — its inner road edge is a
+> single point, and it is smaller than the wall offset, so the inner wall
+> polyline inverts and self-intersects. Wall offset must stay below the smallest
+> corner radius in use; the tight corner is currently unused.
+
+> **`main.tscn` carried a stale instance override** pinning `center_of_mass` to
+> `(0, -0.3, 0)`. Instance overrides beat the source scene, so the corrected
+> `(0, 0, 0)` in `car.tscn` never applied in the actual game — only in
+> diagnostics, which load `car.tscn` directly. That is very likely why wheel
+> lift persisted after the "fix" and only went away once the anti-roll bar
+> masked it. `main.tscn` is now generated programmatically so it carries no
+> overrides, and diagnostics that care about real behaviour load `main.tscn`.
+
+> Wall collision boxes were given both an explicit `size` of `seg_len` and a
+> transform already scaled by `seg_len`, making each one `seg_len²` long and
+> burying the circuit in invisible geometry. A screenshot showed an empty road;
+> only a drive test that measured distance travelled revealed the car was
+> stopping. Visual checks and behavioural checks catch different bugs.
+
 ### Still open
 
 - Steering is still linear with a speed-based falloff; no countersteer assist.
@@ -212,4 +256,9 @@ baseline; `car.tscn` references `grippy.tres`.
   power-sliding slightly in a straight line. Not obviously wrong for an arcade
   racer, but it has not been deliberately tuned.
 - The grid shader aliases badly toward the horizon; wants a distance fade.
-- No track yet — everything so far is measured on a flat plane (M3).
+- No lap timing or checkpoints yet (M4).
+- The circuit has no chicane: `roadCurved` always offsets the same way relative
+  to travel, so mirroring it needs a negative scale rather than a Y rotation.
+- Walls approximate `roadCurved` as a straight line between its endpoints.
+- `track_01.tscn` (bare flat plane) is kept deliberately — physics measurements
+  want a surface with no walls to run into.

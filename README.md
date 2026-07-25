@@ -31,5 +31,19 @@ See [`docs/plan.md`](docs/plan.md) for the full milestone plan and architecture 
 
 ## Status
 
-M1 — drivable `VehicleBody3D` car (Kenney Car Kit, RWD) on a flat plane, chase camera,
-debug overlay. Feel is untuned; that's M2.
+M3 — a 913 m closed circuit built from Kenney Racing Kit tiles, with walls and a
+start line. Handling is tuned to a grippy-arcade target (top speed 165 km/h,
+0–100 in 3.5 s, 100–0 in 24 m); all feel parameters live in a swappable
+`CarTuning` resource. Next: lap timing and checkpoints.
+
+See [`docs/tuning-journal.md`](docs/tuning-journal.md) for how the handling
+numbers were arrived at and what is still open.
+
+## Scenes
+
+| Scene | Purpose |
+|---|---|
+| `scenes/main.tscn` | Entry point — circuit, car, chase camera, debug overlay |
+| `scenes/track/track_02.tscn` | The circuit. Generated; edit the layout spec and rebuild |
+| `scenes/track/track_01.tscn` | Bare flat plane, kept for physics measurement |
+| `scenes/car/car.tscn` | Car geometry only; feel comes from `resources/tuning/` |
