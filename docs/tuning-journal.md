@@ -142,6 +142,46 @@ Final: top speed 165 km/h, 0–100 in 3.54 s, 100→0 in 1.75 s / 24.1 m (1.62 g
 cornering 0.46 rad/s yaw at 100 km/h with no spin, and the slalom still shows
 0/600 frames with any wheel off the ground at 161 km/h.
 
+### M2c — CarTuning resource, and the camera
+
+**Tuning moved into a resource.** Every feel parameter now lives on
+`CarTuning` (`resources/tuning/car_tuning.gd`) instead of being scattered as
+`@export`s on the controller and hand-set values on the wheel nodes in
+`car.tscn`. Suspension is included, so the wheels are configured from the
+resource in `_ready()` and the scene holds only geometry — wheel positions,
+radius, and which wheels steer or drive.
+
+Godot only serialises properties that differ from a script's defaults, so the
+defaults *are* the grippy baseline, `grippy.tres` is intentionally empty, and
+every other preset records just its deltas. `drifty.tres` is four lines, and
+those four lines are exactly what makes it drifty. Verified the refactor was
+behaviour-preserving by re-running the whole battery: t100 3.54 s, 100→0 in
+1.75 s / 24.1 m / 1.62 g, top speed 164.9 km/h, slalom 0/600 — all identical.
+
+> Gotcha while verifying: node `_ready()` callbacks have not been flushed while
+> `SceneTree._initialize()` is still running, so a diagnostic that reads wheel
+> properties there sees Godot's defaults and looks like the tuning never
+> applied. Check on the first physics frame instead.
+
+**Screenshots.** Added a harness that renders the real main scene and saves a
+PNG (`RenderingServer.force_draw()` then `root.get_texture().get_image()`, run
+non-headless). Camera work had been guesswork up to this point; this makes it
+checkable.
+
+**The camera was much further away than it claimed.** The first screenshot
+showed the car as a speck filling ~3% of screen width. Pulling the follow
+offset from 7 m to 4.2 m barely changed anything, which was the tell:
+exponential smoothing trails a moving target by roughly `velocity / lag`, so at
+29 m/s with lag 4 the camera sat ~7 m behind its own target. Real distance was
+~11 m and the offset had stopped meaning anything.
+
+Fixed by feeding the car's velocity forward into the target position, which
+cancels the steady-state trailing error while leaving the smoothing to absorb
+acceleration and bumps. The offset is now honest at any speed, and the car
+fills ~14% of frame width — a third-person racer view rather than a camera
+drone. FOV reference also dropped 180 → 165 km/h so the kick reaches full value
+at the actual top speed.
+
 ### Current values
 
 | Parameter | Value |
@@ -156,12 +196,20 @@ cornering 0.46 rad/s yaw at 100 km/h with no spin, and the slalom still shows
 | `friction_front` / `friction_rear` | 1.4 / 1.7 |
 | `handbrake_rear_friction` / `handbrake_force` | 0.5 / 40 |
 | `antiroll_stiffness` / `antiroll_damping` | 15 / 4 |
+| `camera_follow_offset` / `camera_look_offset` | (0, 1.4, -4.2) / (0, 0.45, 0) |
+| `camera_position_lag` / `camera_rotation_lag` | 4 / 5 |
+| `camera_base_fov` / `max_fov_kick` / `fov_reference_kmh` | 70 / 12 / 165 |
+
+All of the above live in `resources/tuning/car_tuning.gd` as the grippy
+baseline; `car.tscn` references `grippy.tres`.
 
 ### Still open
 
-- Camera lag and FOV kick have not been retuned against the new grip model.
 - Steering is still linear with a speed-based falloff; no countersteer assist.
 - Suspension squat/roll under load is not yet visible enough to read as weight
   transfer.
-- These values live as `@export`s on `car_controller.gd`, not yet as the
-  `CarTuning` resource the plan calls for.
+- Rear wheels sit at skid 0.66 under full throttle at 100 km/h — the car is
+  power-sliding slightly in a straight line. Not obviously wrong for an arcade
+  racer, but it has not been deliberately tuned.
+- The grid shader aliases badly toward the horizon; wants a distance fade.
+- No track yet — everything so far is measured on a flat plane (M3).
