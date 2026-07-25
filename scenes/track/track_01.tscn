@@ -1,10 +1,16 @@
 [gd_scene format=3]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_xbr40"]
-albedo_color = Color(0.28, 0.32, 0.28, 1)
+[ext_resource type="Shader" path="res://assets/shaders/ground_grid.gdshader" id="1_grid"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_xbr40"]
+shader = ExtResource("1_grid")
+shader_parameter/grid_size = 5.0
+shader_parameter/line_width = 0.05
+shader_parameter/base_color = Color(0.24, 0.28, 0.24, 1)
+shader_parameter/line_color = Color(0.85, 0.9, 0.85, 1)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_tmivk"]
-material = SubResource("StandardMaterial3D_xbr40")
+material = SubResource("ShaderMaterial_xbr40")
 size = Vector2(300, 300)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_b0kff"]

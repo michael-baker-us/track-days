@@ -202,6 +202,8 @@ wheel_rest_length = 0.1
 suspension_travel = 0.2
 suspension_stiffness = 60.0
 suspension_max_force = 12000.0
+damping_compression = 0.9
+damping_relaxation = 0.95
 
 [node name="wheel-front-left" type="MeshInstance3D" parent="WheelFrontLeft" unique_id=1244607608]
 mesh = SubResource("ArrayMesh_vp2fj")
@@ -214,6 +216,8 @@ wheel_rest_length = 0.1
 suspension_travel = 0.2
 suspension_stiffness = 60.0
 suspension_max_force = 12000.0
+damping_compression = 0.9
+damping_relaxation = 0.95
 
 [node name="wheel-front-right" type="MeshInstance3D" parent="WheelFrontRight" unique_id=160649711]
 mesh = SubResource("ArrayMesh_vf27a")
@@ -226,6 +230,8 @@ wheel_rest_length = 0.1
 suspension_travel = 0.2
 suspension_stiffness = 60.0
 suspension_max_force = 12000.0
+damping_compression = 0.9
+damping_relaxation = 0.95
 
 [node name="wheel-back-left" type="MeshInstance3D" parent="WheelBackLeft" unique_id=392733789]
 mesh = SubResource("ArrayMesh_umhrx")
@@ -238,6 +244,8 @@ wheel_rest_length = 0.1
 suspension_travel = 0.2
 suspension_stiffness = 60.0
 suspension_max_force = 12000.0
+damping_compression = 0.9
+damping_relaxation = 0.95
 
 [node name="wheel-back-right" type="MeshInstance3D" parent="WheelBackRight" unique_id=1159285155]
 mesh = SubResource("ArrayMesh_nrwvs")
