@@ -77,6 +77,16 @@ const DIRS := {
 	"E": Vector2(1, 0), "W": Vector2(-1, 0),
 }
 
+## Deck height of the bridge corner pieces, in tile units, measured from the art:
+## their road surface tops out at local y 0.117 and every Kenney glb carries its
+## mesh 0.01 low, so the deck sits 0.107 above the piece origin.
+##
+## Not 0.5 like `roadStraightBridge`, which is a full bridge with supports down to
+## the ground; the bridge corners are deck-only sections meant to be carried at
+## height. Getting this wrong does not fail loudly — the corner simply sits a few
+## metres proud of the straights it joins.
+const BRIDGE_CORNER_DECK := 0.107
+
 # name -> cell size, origin shift, connection points in normalised cell coords,
 # connection heights in tile units, and for corners the arc centre.
 const PIECES := {
@@ -127,6 +137,27 @@ const PIECES := {
 	"roadCornerLarger": {
 		"cell": Vector2(3.0, 3.0), "shift": Vector2(0.35, 3.65),
 		"conns": {"E": Vector2(3.0, 0.5), "S": Vector2(0.5, 3.0)},
+		"arc": Vector2(3.0, 3.0),
+	},
+	# Corners that hold their height, so an elevated section can carry on round a
+	# bend instead of having to come back down for it. Same footprint and arc as
+	# the flat corners; only the deck height differs.
+	"roadCornerBridgeSmall": {
+		"cell": Vector2(1.0, 1.0), "shift": Vector2(0.35, 1.65),
+		"conns": {"E": Vector2(1.0, 0.5), "S": Vector2(0.5, 1.0)},
+		"conn_y": {"E": BRIDGE_CORNER_DECK, "S": BRIDGE_CORNER_DECK},
+		"arc": Vector2(1.0, 1.0),
+	},
+	"roadCornerBridgeLarge": {
+		"cell": Vector2(2.0, 2.0), "shift": Vector2(0.35, 2.65),
+		"conns": {"E": Vector2(2.0, 0.5), "S": Vector2(0.5, 2.0)},
+		"conn_y": {"E": BRIDGE_CORNER_DECK, "S": BRIDGE_CORNER_DECK},
+		"arc": Vector2(2.0, 2.0),
+	},
+	"roadCornerBridgeLarger": {
+		"cell": Vector2(3.0, 3.0), "shift": Vector2(0.35, 3.65),
+		"conns": {"E": Vector2(3.0, 0.5), "S": Vector2(0.5, 3.0)},
+		"conn_y": {"E": BRIDGE_CORNER_DECK, "S": BRIDGE_CORNER_DECK},
 		"arc": Vector2(3.0, 3.0),
 	},
 }

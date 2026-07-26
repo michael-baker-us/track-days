@@ -196,14 +196,48 @@ hairpin or long sweeper, paid for in straight.
 A corner also may not pave over road it does not own, so an oversized sweeper is
 rejected where the circuit doubles back close to itself.
 
-### Elevation
+### Elevation, and sustaining it
 
-Kenney has no banked or raised corner piece, so a plateau lives inside one
-straight run and comes back down before the next corner — exactly what the
-hand-built Highland layout does. A run is given a *level*; each level costs a
-`roadRampLong` up and another down, and the compiler places the ramps and bridge
-in the run's spare cells. Because every plateau returns to zero within its own
-run, height closes for the same structural reason position does.
+Every segment — each straight and each corner — carries an absolute *level*, and
+the compiler works out where the ramps have to go. Raise a straight, the corner
+after it, and the straight after that, and the result is one sustained elevated
+section beginning and ending exactly where the player said.
+
+The tile set is what makes that possible: `roadCornerBridge{Small,Large,Larger}`
+hold their height, so a raised stretch can carry on round a bend instead of
+dropping back down for it. Their decks sit `BRIDGE_CORNER_DECK` = 0.107 tile
+units above the piece origin — *not* the 0.5 of `roadStraightBridge`, which is a
+full bridge with supports to the ground where the corners are deck-only sections
+meant to be carried at height. Getting that number wrong does not fail loudly;
+the corner simply sits a few metres proud of the straights it joins.
+
+Height can only *change* inside a straight, because a corner tile has the same
+deck height at both ends. So a run reconciles three numbers — the level of the
+corner before it, its own, and the level of the corner after — ramping from the
+first to its own, holding, then ramping to the third. One `roadRampLong` per
+level of difference, two cells each.
+
+Two rules make it safe:
+
+- **The start run is flat and the corner immediately before it is pinned to
+  ground level.** The start line and its grid belong on the ground, and that pin
+  is what makes the running height return to where it began — closure for
+  elevation, the same trick the grid pulls for position.
+- **Requests that do not fit are reduced, not refused.** A run that cannot afford
+  its ramps has the highest of the three levels shaved until it can, preferring
+  the run's own so a sustained section survives a short straight rather than
+  being broken in half by it. The badge then shows what was actually built, and
+  the headroom offered for cycling is probed against the resolved circuit, so
+  every level the editor offers is one the compiler will really build.
+
+The old behaviour — a plateau inside one straight — is now just the case where
+both neighbouring corners are at zero.
+
+> Levels and geometry are tracked separately: levels are absolute per segment,
+> while the builder only ever moves height via ramps. They can therefore diverge
+> silently, leaving the resolver describing a circuit that was never built. The
+> suite pins them together by asserting the built peak equals the highest
+> resolved level times the per-level rise.
 
 ### Drawing and shaping are peers
 

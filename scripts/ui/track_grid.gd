@@ -62,7 +62,7 @@ const COL_HANDLE_HOT := Color(1.0, 1.0, 1.0)
 const COL_BADGE := Color(0.16, 0.18, 0.22)
 const COL_REFUSED := Color(0.85, 0.30, 0.30)
 
-enum Hit { NONE, CORNER, EDGE, RADIUS, CLIMB, START }
+enum Hit { NONE, CORNER, EDGE, RADIUS, CLIMB, CORNER_CLIMB, START }
 
 var layout: TrackLayout
 var compiled: TrackLayout.Compiled
@@ -190,6 +190,12 @@ func _hit_test(pos: Vector2) -> Array:
 				continue
 			if at.distance_to(_climb_badge_at(run)) < GRAB:
 				return [Hit.CLIMB, i]
+		for i in compiled.corners.size():
+			var corner: TrackLayout.Bend = compiled.corners[i]
+			if corner.max_level <= 0 and corner.level <= 0:
+				continue
+			if at.distance_to(_corner_climb_badge_at(corner)) < GRAB:
+				return [Hit.CORNER_CLIMB, i]
 		if at.distance_to(Vector2(compiled.start_marker) + Vector2(0.5, 0.5)) < GRAB:
 			return [Hit.START, 0]
 
@@ -217,6 +223,15 @@ func _radius_badge_at(corner: TrackLayout.Bend) -> Vector2:
 	if away.dot(at - _centre) < 0.0:
 		away = -away
 	return at + away * 1.7
+
+## A corner's climb badge sits inside the loop, opposite its radius badge, so the
+## two never collide and which is which is obvious from the side it is on.
+func _corner_climb_badge_at(corner: TrackLayout.Bend) -> Vector2:
+	var at := Vector2(corner.cell) + Vector2(0.5, 0.5)
+	var away := (Vector2(corner.in_dir) - Vector2(corner.out_dir)).normalized()
+	if away.dot(at - _centre) < 0.0:
+		away = -away
+	return at - away * 1.7
 
 func _climb_badge_at(run: TrackLayout.Run) -> Vector2:
 	var mid := Vector2(run.cells[run.cells.size() / 2]) + Vector2(0.5, 0.5)
@@ -291,6 +306,8 @@ func _button(event: InputEventMouseButton) -> void:
 			corner_clicked.emit(compiled.corners[index].cell)
 		Hit.CLIMB:
 			elevation_clicked.emit(_climb_cell(index))
+		Hit.CORNER_CLIMB:
+			elevation_clicked.emit(compiled.corners[index].cell)
 		Hit.START:
 			status.emit("Drag the flag along the road to move the start line.")
 			_drag = Hit.START
@@ -342,7 +359,7 @@ func _update_cursor() -> void:
 	match _hot:
 		Hit.CORNER, Hit.EDGE, Hit.START:
 			mouse_default_cursor_shape = Control.CURSOR_DRAG
-		Hit.RADIUS, Hit.CLIMB:
+		Hit.RADIUS, Hit.CLIMB, Hit.CORNER_CLIMB:
 			mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		_:
 			mouse_default_cursor_shape = Control.CURSOR_ARROW
@@ -623,20 +640,38 @@ func _draw_badges() -> void:
 			_radius_badge_at(corner), str(corner.size), COL_TEXT,
 			_hot == Hit.RADIUS and _hot_index == i
 		)
+	# Straights and corners both carry a height, so both get a badge — raising a
+	# corner is what lets an elevated stretch carry on round the bend instead of
+	# dropping back down for it.
 	for i in compiled.runs.size():
 		var run: TrackLayout.Run = compiled.runs[i]
 		if run.cells.is_empty() or run.max_level <= 0:
 			continue
-		var hot: bool = _hot == Hit.CLIMB and _hot_index == i
-		# A raised straight shows its height; a flat one that *could* be raised
-		# shows a faint prompt, so the option is discoverable without a mode.
-		if run.level > 0:
-			_badge(_climb_badge_at(run), "+%d" % run.level, COL_HIGH, hot)
-		elif hot:
-			_badge(_climb_badge_at(run), "+", COL_TEXT, true)
-		else:
-			var at := cell_to_screen(_climb_badge_at(run))
-			draw_circle(at, maxf(2.0, _cell_px * 0.09), COL_TEXT * Color(1, 1, 1, 0.35))
+		_climb_badge(
+			_climb_badge_at(run), run.level,
+			_hot == Hit.CLIMB and _hot_index == i
+		)
+	for i in compiled.corners.size():
+		var corner: TrackLayout.Bend = compiled.corners[i]
+		if corner.max_level <= 0 and corner.level <= 0:
+			continue
+		_climb_badge(
+			_corner_climb_badge_at(corner), corner.level,
+			_hot == Hit.CORNER_CLIMB and _hot_index == i
+		)
+
+## A raised segment shows its height; a flat one that *could* be raised shows a
+## faint dot, so the option is discoverable without a mode or a tooltip.
+func _climb_badge(at: Vector2, level: int, hot: bool) -> void:
+	if level > 0:
+		_badge(at, "+%d" % level, COL_HIGH, hot)
+	elif hot:
+		_badge(at, "+", COL_TEXT, true)
+	else:
+		draw_circle(
+			cell_to_screen(at), maxf(2.0, _cell_px * 0.09),
+			COL_TEXT * Color(1, 1, 1, 0.35)
+		)
 
 func _badge(cell: Vector2, text: String, col: Color, hot: bool) -> void:
 	var font := ThemeDB.fallback_font

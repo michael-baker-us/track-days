@@ -202,7 +202,25 @@ func _cycle_corner(cell: Vector2i) -> void:
 func _corner_word(size: int) -> String:
 	return ["", "tight", "medium", "sweeping"][clampi(size, 0, 3)]
 
+## Raises or lowers whichever segment was clicked. A corner is keyed by its own
+## bend cell, a straight by any cell along it, and bend cells never belong to a
+## run — so which kind was clicked is unambiguous.
 func _cycle_elevation(cell: Vector2i) -> void:
+	for corner in _compiled.corners:
+		if corner.cell != cell:
+			continue
+		if corner.max_level <= 0:
+			_flash(
+				"This corner cannot be raised — the straights either side have no "
+				+ "room for the ramps."
+			)
+			return
+		var next := (corner.level + 1) % (corner.max_level + 1)
+		_set_level(cell, next)
+		_flash("Corner %s." % ("back on the ground" if next == 0 else "held at +%d" % next))
+		_on_edited()
+		return
+
 	for run in _compiled.runs:
 		if not run.cells.has(cell):
 			continue
@@ -214,11 +232,16 @@ func _cycle_elevation(cell: Vector2i) -> void:
 		for c in run.cells:
 			_layout.elevation.erase(c)
 		var next := (run.level + 1) % (run.max_level + 1)
-		if next > 0:
-			_layout.elevation[cell] = next
-		_flash("Climb set to %s." % ("flat" if next == 0 else "+%d" % next))
+		_set_level(cell, next)
+		_flash("Straight %s." % ("back on the ground" if next == 0 else "held at +%d" % next))
 		_on_edited()
 		return
+
+func _set_level(cell: Vector2i, level: int) -> void:
+	if level > 0:
+		_layout.elevation[cell] = level
+	else:
+		_layout.elevation.erase(cell)
 
 # --- the panel ---
 
@@ -269,8 +292,24 @@ func _guidance() -> String:
 			+ "middle of a straight to add a climb."
 		)
 	if raised == 0:
-		return "Add a climb: click the small dot in the middle of a long straight."
+		return (
+			"Add a climb: click a faint dot inside the loop. Raise a corner too "
+			+ "and the height carries on round it."
+		)
+	if not _has_sustained_section():
+		return (
+			"That climb drops back down before the next corner. Raise the corner "
+			+ "as well to carry the height through it."
+		)
 	return "Happy with it? Test drive, then Save."
+
+## True once height is held across a corner rather than rising and falling inside
+## a single straight — the difference between a crest and a raised section.
+func _has_sustained_section() -> bool:
+	for corner in _compiled.corners:
+		if corner.level > 0:
+			return true
+	return false
 
 func _standing_hint() -> String:
 	if _grid.draw_mode:
@@ -307,7 +346,16 @@ func _summary() -> String:
 		"%d left / %d right" % [lefts, _compiled.corners.size() - lefts],
 	]
 	if result.peak > 0.5:
-		lines.append("climbs %.1f m" % result.peak)
+		var raised_corners := 0
+		for corner in _compiled.corners:
+			if corner.level > 0:
+				raised_corners += 1
+		lines.append("climbs %.1f m%s" % [
+			result.peak,
+			"" if raised_corners == 0 else ", held through %d corner%s" % [
+				raised_corners, "" if raised_corners == 1 else "s"
+			]
+		])
 	if not result.closed:
 		# Should be unreachable: both the shape editor and the compiler refuse
 		# anything that is not a closed ring. If it fires they have drifted

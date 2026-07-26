@@ -88,7 +88,8 @@ circuit is refused, so loose ends and crossings cannot be made this way.
 | Slide a straight | Drag the road |
 | Add a bend | Double-click a straight, then drag it in or out |
 | Remove a corner | Right-click a green dot |
-| Corner radius / climb | Click the badge outside / inside the loop |
+| Corner radius | Click the numbered badge outside the loop |
+| Raise a straight or corner | Click the badge inside the loop |
 | Move the start line | Drag the flag |
 | Lay road without leaving shaping | Shift-drag / shift-right-drag |
 
@@ -121,9 +122,14 @@ it leaves a valid loop, a broken circuit cannot be built in the first place.
 
 Corner radius stays a choice: all three Kenney corners join the same two centre
 lines, so the widest that fits is picked automatically and can be cycled down,
-trading straight for a faster corner. Climbs live inside one straight and come
-back down before the next corner, so height closes for the same reason position
-does. Circuits are saved as JSON under `user://tracks/` and appear on the title
+trading straight for a faster corner.
+
+Elevation is per segment, straights *and* corners. Raise a straight on its own
+and you get a crest that climbs and falls inside it; raise the corner after it
+too and the height carries on round the bend, so an elevated section runs from
+wherever you start it to wherever you stop it. Height closes for the same
+structural reason position does — the corner before the start line is pinned to
+the ground, so the running height always returns to where it began. Circuits are saved as JSON under `user://tracks/` and appear on the title
 screen with their own lap records and an **Edit** button, so a saved track can
 always be reopened — including one left too unfinished to drive.
 

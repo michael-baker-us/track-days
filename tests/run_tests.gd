@@ -19,6 +19,7 @@ var frame := 0
 var step := 0
 
 var custom_track: Node3D
+var sustained_track: Node3D
 
 func _initialize() -> void:
 	# race.tscn instances whichever track GameState has selected, so the suite
@@ -669,6 +670,210 @@ func test_title_offers_editing_of_custom_tracks() -> void:
 	TrackStore.delete(good.id)
 	TrackStore.delete(broken.id)
 
+## Sustained elevation: height held across a corner rather than rising and falling
+## inside one straight. This is what the bridge corner tiles are for, and the
+## thing that makes an elevated *section* possible rather than just a crest.
+func test_sustained_elevation_across_corners() -> void:
+	var layout := _roomy_rectangle()
+	var first := layout.compile()
+	check_true("the test circuit compiles flat", first.ok)
+
+	# Raise a straight, the corner after it, and the straight after that.
+	layout.elevation[first.runs[1].cells[0]] = 2
+	layout.elevation[first.corners[1].cell] = 2
+	layout.elevation[first.runs[2].cells[0]] = 2
+	var raised := layout.compile()
+	check_true("the raised circuit compiles", raised.ok)
+
+	check("the straight is held up", raised.runs[1].level, 2)
+	check("the corner is held up", raised.corners[1].level, 2)
+	check("the next straight is held up", raised.runs[2].level, 2)
+
+	# A corner that holds height must use the tile that can, and the run between
+	# two raised corners must need no ramps at all.
+	var bridge_corners := 0
+	var ramps := 0
+	for seg in raised.segments:
+		if String(seg[1]).begins_with("roadCornerBridge"):
+			bridge_corners += 1
+		if seg[1] == "roadRampLong":
+			ramps += int(seg[2])
+	check("one bridge corner is used", bridge_corners, 1)
+	# Two ramps of two levels: up once at the start, down once at the end. A
+	# section that dropped for the corner would need four.
+	check("the height is gained and lost once", ramps, 4)
+
+	var result := TrackBuilder.new().measure(raised.segments)
+	check_true("a sustained section still closes", result.closed)
+	check_near("and returns to ground level", result.height_gap, 0.0, 0.001)
+	check_true("and actually climbs (%.1f m)" % result.peak, result.peak > 5.0)
+
+	# The invariant the whole model rests on: the levels the resolver settled on
+	# are the heights the builder actually walked. They are tracked separately —
+	# levels are absolute per segment, while the builder only ever moves height
+	# via ramps — so they can silently diverge, and then the resolver's arithmetic
+	# would be describing a circuit that was never built.
+	check_near("the built height matches the resolved level",
+		result.peak, _metres_per_level() * _highest_level(raised), 0.05)
+
+## One level of climb, in metres: half a tile unit of rise, scaled.
+func _metres_per_level() -> float:
+	return 0.5 * TrackBuilder.SCALE * TrackBuilder.VERT
+
+func _highest_level(compiled: TrackLayout.Compiled) -> int:
+	var highest := 0
+	for run in compiled.runs:
+		highest = maxi(highest, run.level)
+	for corner in compiled.corners:
+		highest = maxi(highest, corner.level)
+	return highest
+
+func test_a_corner_can_be_raised_on_its_own() -> void:
+	var layout := _roomy_rectangle()
+	var first := layout.compile()
+	layout.elevation[first.corners[1].cell] = 1
+	var raised := layout.compile()
+	check_true("a lone raised corner compiles", raised.ok)
+	check("the corner is raised", raised.corners[1].level, 1)
+	var result := TrackBuilder.new().measure(raised.segments)
+	check_true("and closes", result.closed)
+	check_true("and climbs", result.peak > 1.0)
+	# The straights either side have to do the climbing for it.
+	check_true("the straight before ramps up to it", raised.runs[1].exit_level == 1)
+	check_true("the straight after ramps back down", raised.runs[2].entry_level == 1)
+
+## Height closes because the corner immediately before the start line is pinned to
+## the ground. Without that pin the running height would not return to where it
+## began and the circuit would not join up vertically.
+func test_start_line_stays_on_the_ground() -> void:
+	var layout := _roomy_rectangle()
+	var first := layout.compile()
+	var last := first.corners.size() - 1
+	layout.elevation[first.corners[last].cell] = 3
+	layout.elevation[first.runs[0].cells[0]] = 3
+	var raised := layout.compile()
+	check_true("still compiles", raised.ok)
+	check("the corner before the line stays down", raised.corners[last].level, 0)
+	check("the start run stays flat", raised.runs[0].level, 0)
+	check_true("so the circuit still closes",
+		TrackBuilder.new().measure(raised.segments).closed)
+
+## Every level the editor offers has to be one the compiler will actually build,
+## and any level it will not build has to be reduced rather than emitted broken.
+func test_elevation_requests_are_reduced_not_broken() -> void:
+	var layout := _roomy_rectangle()
+	var first := layout.compile()
+
+	# Ask for far too much, everywhere at once.
+	for run in first.runs:
+		if not run.cells.is_empty():
+			layout.elevation[run.cells[0]] = TrackLayout.MAX_LEVEL + 4
+	for corner in first.corners:
+		layout.elevation[corner.cell] = TrackLayout.MAX_LEVEL + 4
+	var greedy := layout.compile()
+	check_true("an impossible request still compiles", greedy.ok)
+	for i in greedy.runs.size():
+		check_true("run %d is within its own limit" % i,
+			greedy.runs[i].level <= greedy.runs[i].max_level)
+		check_true("run %d can pay for its ramps" % i,
+			greedy.runs[i].ramp_cells() <= greedy.runs[i].free)
+		check_true("corner %d is within its limit" % i,
+			greedy.corners[i].level <= greedy.corners[i].max_level)
+	var greedy_result := TrackBuilder.new().measure(greedy.segments)
+	check_true("and it still closes", greedy_result.closed)
+	check_near("the reduced levels are what got built",
+		greedy_result.peak, _metres_per_level() * _highest_level(greedy), 0.05)
+
+	# The advertised headroom must be honest: raising each segment to the max it
+	# reports has to keep the circuit buildable.
+	var honest := _roomy_rectangle()
+	var probe := honest.compile()
+	for i in probe.runs.size():
+		if not probe.runs[i].cells.is_empty():
+			honest.elevation[probe.runs[i].cells[0]] = probe.runs[i].max_level
+	var at_max := honest.compile()
+	check_true("a circuit at its advertised maximum compiles", at_max.ok)
+	check_true("and closes", TrackBuilder.new().measure(at_max.segments).closed)
+
+## The old behaviour is now just the case where both neighbouring corners are on
+## the ground, and it has to still work.
+func test_plateau_inside_one_straight_still_works() -> void:
+	var layout := _roomy_rectangle()
+	var first := layout.compile()
+	layout.elevation[first.runs[2].cells[0]] = 1
+	var raised := layout.compile()
+	check("only that straight is raised", raised.runs[2].level, 1)
+	check("its corners stay down", raised.corners[1].level + raised.corners[2].level, 0)
+	var bridge_corners := 0
+	for seg in raised.segments:
+		if String(seg[1]).begins_with("roadCornerBridge"):
+			bridge_corners += 1
+	check("no bridge corner is needed", bridge_corners, 0)
+	var result := TrackBuilder.new().measure(raised.segments)
+	check_true("a plateau closes", result.closed)
+	check_true("and climbs", result.peak > 1.0)
+
+## The road surface has to follow a sustained section, including over the corner —
+## the same one-sided-collision trap the shipped circuits have a test for, but on
+## geometry only the editor can produce.
+##
+## Split in two because the raycasts need the bodies to have had a physics step:
+## `await` cannot be used here, since it would turn the staged `_physics_process`
+## into a coroutine and its return value would stop driving the runner.
+func stage_sustained_track() -> void:
+	var layout := _roomy_rectangle()
+	var first := layout.compile()
+	layout.elevation[first.runs[1].cells[0]] = 2
+	layout.elevation[first.corners[1].cell] = 2
+	layout.elevation[first.runs[2].cells[0]] = 2
+
+	sustained_track = TrackBuilder.new().build(
+		"sustained", layout.compile().segments
+	).root
+	var ground := sustained_track.get_node("Ground")
+	sustained_track.remove_child(ground)
+	ground.free()
+	# Clear of the raced track's 4 km ground plane, and of the custom track.
+	sustained_track.position = Vector3(-6000.0, 0.0, 0.0)
+	root.add_child(sustained_track)
+
+func test_collision_follows_a_sustained_section() -> void:
+	check_true("sustained track built", sustained_track != null)
+	if sustained_track == null:
+		return
+	var space: PhysicsDirectSpaceState3D = sustained_track.get_world_3d().direct_space_state
+	var elevated := 0
+	for gate in sustained_track.get_node("Checkpoints").get_children():
+		var half_h: float = gate.get_child(0).shape.size.y * 0.5
+		var road: Vector3 = gate.global_transform.origin - Vector3(0, half_h, 0)
+		if road.y > 0.5:
+			elevated += 1
+		var query := PhysicsRayQueryParameters3D.create(
+			road + Vector3(0, 30, 0), road - Vector3(0, 30, 0)
+		)
+		var hit: Dictionary = space.intersect_ray(query)
+		check_true("surface under sustained gate at y=%.1f" % road.y, not hit.is_empty())
+		if not hit.is_empty():
+			check_near("sustained surface height at y=%.1f" % road.y,
+				hit["position"].y, road.y, 0.35)
+	check_true("the sustained section really is elevated", elevated >= 3)
+
+## A rectangle with enough straight to afford ramps at level 2 either side of a
+## corner, which the smaller test layout cannot.
+func _roomy_rectangle() -> TrackLayout:
+	var layout := TrackLayout.new()
+	layout.display_name = "Roomy"
+	var p := Vector2i(0, 0)
+	for move in [
+		[Vector2i(1, 0), 26], [Vector2i(0, 1), 18],
+		[Vector2i(-1, 0), 26], [Vector2i(0, -1), 18],
+	]:
+		for i in int(move[1]):
+			layout.cells.append(p)
+			p += move[0] as Vector2i
+	layout.start_cell = Vector2i(8, 0)
+	return layout
+
 ## Custom tracks are JSON on disk, so the whole shape has to survive the trip.
 func test_layout_round_trip() -> void:
 	var layout := sample_layout()
@@ -857,11 +1062,22 @@ func _physics_process(_delta: float) -> bool:
 		test_timing_gate_sits_on_the_start_line()
 		test_gates_stay_evenly_spaced()
 		test_title_offers_editing_of_custom_tracks()
+		test_sustained_elevation_across_corners()
+		test_a_corner_can_be_raised_on_its_own()
+		test_start_line_stays_on_the_ground()
+		test_elevation_requests_are_reduced_not_broken()
+		test_plateau_inside_one_straight_still_works()
+		stage_sustained_track()
 		return false
 
 	if frame == 4:
 		test_custom_track_is_complete()
 		test_custom_spawn_is_on_the_road()
+		return false
+
+	if frame == 5:
+		# A frame later than the staging, so the new bodies are in the space.
+		test_collision_follows_a_sustained_section()
 		return false
 
 	if frame < 5 or frame % 5 != 0:

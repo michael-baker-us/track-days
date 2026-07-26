@@ -114,7 +114,9 @@ func _initialize() -> void:
 		"     drag that bend in or out",
 		"  right-click a dot — remove a corner",
 		"  numbered badge — corner radius",
-		"  badge inside the loop — climb",
+		"  badge inside the loop — raise it",
+		"     raise a corner too to hold the",
+		"     height right through it",
 		"  drag the flag — move the start",
 	]:
 		legend.add_child(_label("LegendRow", row, 13))
