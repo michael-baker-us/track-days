@@ -54,22 +54,26 @@ const GRAB := 0.75
 ## like it is dragging the canvas.
 const PAN_GESTURE_SPEED := 14.0
 
-const COL_BG := Color(0.10, 0.11, 0.13)
-const COL_GRID := Color(0.16, 0.18, 0.21)
+## The canvas paints itself rather than using widgets, so it cannot pick up the
+## project theme — but it must not look like a different program either. Anything
+## with a counterpart in `UiTheme` takes it from there, and what is left is
+## specific to drawing a track: road fill, the two hover states, the start line.
+const COL_BG := UiTheme.BG
+const COL_GRID := UiTheme.LINE
 const COL_ROAD := Color(0.29, 0.31, 0.35)
 const COL_ROAD_HOT := Color(0.38, 0.41, 0.47)
-const COL_LINE := Color(0.55, 0.80, 0.45)
-const COL_HIGH := Color(0.95, 0.72, 0.30)
+const COL_LINE := UiTheme.GREEN
+const COL_HIGH := UiTheme.ACCENT
 ## Distinct from the climb badge's amber, so a glance tells leaning apart from
 ## climbing without reading either number.
 const COL_BANK := Color(0.45, 0.78, 0.95)
-const COL_PROBLEM := Color(0.85, 0.30, 0.30)
+const COL_PROBLEM := UiTheme.DANGER
 const COL_START := Color(0.95, 0.95, 0.98)
-const COL_TEXT := Color(0.88, 0.90, 0.93)
-const COL_HANDLE := Color(0.55, 0.80, 0.45)
+const COL_TEXT := UiTheme.TEXT
+const COL_HANDLE := UiTheme.GREEN
 const COL_HANDLE_HOT := Color(1.0, 1.0, 1.0)
-const COL_BADGE := Color(0.16, 0.18, 0.22)
-const COL_REFUSED := Color(0.85, 0.30, 0.30)
+const COL_BADGE := UiTheme.SURFACE_HI
+const COL_REFUSED := UiTheme.DANGER
 
 enum Hit { NONE, CORNER, EDGE, RADIUS, BANK, CLIMB, CORNER_CLIMB, START }
 

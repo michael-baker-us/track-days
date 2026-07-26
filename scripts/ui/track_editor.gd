@@ -19,18 +19,20 @@ const EDITOR_SCENE := "res://scenes/editor/track_editor.tscn"
 const UNDO_LIMIT := 64
 
 @onready var _grid: TrackGrid = $Split/Grid
-@onready var _name_edit: LineEdit = $Split/Side/Scroll/Panel/NameEdit
-@onready var _picker: OptionButton = $Split/Side/Scroll/Panel/Picker
-@onready var _draw_button: Button = $Split/Side/Scroll/Panel/DrawButton
-@onready var _guide: Label = $Split/Side/Scroll/Panel/Guide
-@onready var _status: Label = $Split/Side/Scroll/Panel/Status
-@onready var _readout: Label = $Split/Side/Scroll/Panel/Readout
-@onready var _close_button: Button = $Split/Side/Actions/CloseButton
-@onready var _undo_button: Button = $Split/Side/Actions/UndoButton
-@onready var _save_button: Button = $Split/Side/Actions/SaveButton
-@onready var _test_button: Button = $Split/Side/Actions/TestButton
-@onready var _delete_button: Button = $Split/Side/Actions/DeleteButton
-@onready var _back_button: Button = $Split/Side/Actions/BackButton
+@onready var _name_edit: LineEdit = $Split/Side/Rows/NameEdit
+@onready var _picker: OptionButton = $Split/Side/Rows/Picker
+@onready var _draw_button: Button = $Split/Side/Rows/DrawButton
+@onready var _guide: Label = $Split/Side/Rows/GuideCard/Rows/Guide
+@onready var _status: Label = $Split/Side/Rows/Status
+@onready var _readout: Label = $Split/Side/Rows/ReadoutCard/Rows/Readout
+@onready var _legend_toggle: Button = $Split/Side/Rows/LegendToggle
+@onready var _legend: PanelContainer = $LegendFlyout
+@onready var _close_button: Button = $Split/Side/Rows/Actions/CloseButton
+@onready var _undo_button: Button = $Split/Side/Rows/Actions/UndoRow/UndoButton
+@onready var _save_button: Button = $Split/Side/Rows/Actions/UndoRow/SaveButton
+@onready var _test_button: Button = $Split/Side/Rows/Actions/TestButton
+@onready var _delete_button: Button = $Split/Side/Rows/Actions/ExitRow/DeleteButton
+@onready var _back_button: Button = $Split/Side/Rows/Actions/ExitRow/BackButton
 
 var _layout: TrackLayout
 var _compiled: TrackLayout.Compiled
@@ -59,6 +61,7 @@ func _ready() -> void:
 	_grid.status.connect(_flash)
 
 	_draw_button.toggled.connect(_set_draw_mode)
+	_legend_toggle.toggled.connect(_show_legend)
 	_close_button.pressed.connect(_close_gap)
 	_name_edit.text_changed.connect(func(t): _layout.display_name = t)
 	_picker.item_selected.connect(_on_picked)
@@ -110,6 +113,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		_undo_last()
 	elif key_event.keycode == KEY_S and key_event.ctrl_pressed:
 		_on_save()
+
+## The legend is reference, not a control, so it folds away — and it opens over
+## the canvas, because the panel column is 720 units tall on every window and
+## never has room for it.
+func _show_legend(on: bool) -> void:
+	_legend.visible = on
 
 ## Drawing and shaping are the two ways to build a circuit, and which one is
 ## active has to be unmistakable — the canvas hides its handles while drawing, so

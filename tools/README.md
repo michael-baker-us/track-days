@@ -18,6 +18,11 @@ runtime.
 ```bash
 GODOT=/path/to/Godot.app/Contents/MacOS/Godot
 
+# Rebuild the project theme after editing scripts/ui/ui_theme.gd. Nothing picks
+# up a palette change until this is re-run; the suite compares the committed
+# resource against a freshly built one so a stale theme fails CI.
+"$GODOT" --headless --path . --script tools/build_theme.gd
+
 # Rebuild every circuit after editing a layout in build_track.gd.
 # Prints a closure gap per track: it must be (0, 0) with net turns +/-4 and
 # height back to 0, or the loop does not join up. Adjust straight counts until
@@ -44,7 +49,12 @@ GODOT=/path/to/Godot.app/Contents/MacOS/Godot
 ```
 
 Run `build_track.gd` and `build_ui.gd` before `build_race.gd`, which instances
-`hud.tscn`.
+`hud.tscn`. `build_theme.gd` is independent of the rest.
+
+**No styling in these files.** They place nodes and name theme type variations
+(`UiTheme.V_PRIMARY` and friends); colours, borders and font sizes live in
+`scripts/ui/ui_theme.gd`. A mistyped variation name fails silently — the control
+renders as the plain base type — which is why they are constants.
 
 **Owner rule.** When packing a scene, set `owner` on nodes you created and on
 instanced sub-scene *roots*, but never on an instance's internal nodes — those

@@ -3,204 +3,306 @@
 [ext_resource type="Script" path="res://scripts/ui/track_editor.gd" id="1_64auw"]
 [ext_resource type="Script" path="res://scripts/ui/track_grid.gd" id="2_7d7mg"]
 
-[node name="TrackEditor" type="Control" unique_id=212115932]
+[node name="TrackEditor" type="Control" unique_id=1983531153]
 layout_mode = 3
 anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_64auw")
 
-[node name="Background" type="ColorRect" parent="." unique_id=1208477907]
+[node name="Background" type="ColorRect" parent="." unique_id=971179542]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
-color = Color(0.11, 0.13, 0.15, 1)
+color = Color(0.043, 0.055, 0.075, 1)
 
-[node name="Split" type="HBoxContainer" parent="." unique_id=1937176523]
+[node name="Split" type="HBoxContainer" parent="." unique_id=555110339]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_constants/separation = 0
 
-[node name="Grid" type="Control" parent="Split" unique_id=1652083098]
+[node name="Grid" type="Control" parent="Split" unique_id=2118674526]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("2_7d7mg")
 
-[node name="Side" type="VBoxContainer" parent="Split" unique_id=1121824429]
-custom_minimum_size = Vector2(330, 0)
+[node name="Side" type="PanelContainer" parent="Split" unique_id=1228701255]
+custom_minimum_size = Vector2(364, 0)
+layout_mode = 2
+theme_type_variation = &"Sidebar"
+
+[node name="Rows" type="VBoxContainer" parent="Split/Side" unique_id=1387743836]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Scroll" type="ScrollContainer" parent="Split/Side" unique_id=439320769]
+[node name="Header" type="VBoxContainer" parent="Split/Side/Rows" unique_id=2001857623]
 layout_mode = 2
-size_flags_vertical = 3
-horizontal_scroll_mode = 0
+theme_override_constants/separation = 2
 
-[node name="Panel" type="VBoxContainer" parent="Split/Side/Scroll" unique_id=1782684218]
-custom_minimum_size = Vector2(306, 0)
+[node name="Heading" type="Label" parent="Split/Side/Rows/Header" unique_id=297891569]
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 7
-
-[node name="Heading" type="Label" parent="Split/Side/Scroll/Panel" unique_id=1227567778]
-layout_mode = 2
-theme_override_font_sizes/font_size = 25
+theme_type_variation = &"Heading"
 text = "TRACK EDITOR"
 
-[node name="NameEdit" type="LineEdit" parent="Split/Side/Scroll/Panel" unique_id=906964651]
+[node name="Sub" type="Label" parent="Split/Side/Rows/Header" unique_id=733429446]
+layout_mode = 2
+theme_type_variation = &"Muted"
+text = "draw a circuit, then drive it"
+
+[node name="NameEdit" type="LineEdit" parent="Split/Side/Rows" unique_id=527103654]
 layout_mode = 2
 placeholder_text = "Circuit name"
 
-[node name="Picker" type="OptionButton" parent="Split/Side/Scroll/Panel" unique_id=772025692]
+[node name="Picker" type="OptionButton" parent="Split/Side/Rows" unique_id=303139683]
 layout_mode = 2
 
-[node name="DrawButton" type="Button" parent="Split/Side/Scroll/Panel" unique_id=704750935]
-custom_minimum_size = Vector2(0, 30)
+[node name="DrawButton" type="Button" parent="Split/Side/Rows" unique_id=2039659541]
+custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 toggle_mode = true
 text = "Draw road  (D)"
 
-[node name="Guide" type="Label" parent="Split/Side/Scroll/Panel" unique_id=811781834]
-custom_minimum_size = Vector2(306, 54)
+[node name="GuideCard" type="PanelContainer" parent="Split/Side/Rows" unique_id=651040920]
+layout_mode = 2
+theme_type_variation = &"CardPanel"
+
+[node name="Rows" type="VBoxContainer" parent="Split/Side/Rows/GuideCard" unique_id=236772945]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Caption" type="Label" parent="Split/Side/Rows/GuideCard/Rows" unique_id=1838017546]
+layout_mode = 2
+theme_type_variation = &"SectionLabel"
+text = "DO THIS NEXT"
+
+[node name="Guide" type="Label" parent="Split/Side/Rows/GuideCard/Rows" unique_id=1395414000]
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 15
+theme_type_variation = &"PanelBody"
 autowrap_mode = 3
 
-[node name="Rule" type="ColorRect" parent="Split/Side/Scroll/Panel" unique_id=887735691]
-custom_minimum_size = Vector2(0, 1)
+[node name="ReadoutCard" type="PanelContainer" parent="Split/Side/Rows" unique_id=824957404]
 layout_mode = 2
-color = Color(1, 1, 1, 0.1)
+theme_type_variation = &"CardPanel"
 
-[node name="Readout" type="Label" parent="Split/Side/Scroll/Panel" unique_id=801310323]
-custom_minimum_size = Vector2(306, 92)
+[node name="Rows" type="VBoxContainer" parent="Split/Side/Rows/ReadoutCard" unique_id=1798748711]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Caption" type="Label" parent="Split/Side/Rows/ReadoutCard/Rows" unique_id=914590608]
+layout_mode = 2
+theme_type_variation = &"SectionLabel"
+text = "THIS CIRCUIT"
+
+[node name="Readout" type="Label" parent="Split/Side/Rows/ReadoutCard/Rows" unique_id=892821498]
+custom_minimum_size = Vector2(0, 84)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 15
+theme_type_variation = &"PanelBody"
 autowrap_mode = 3
 
-[node name="Status" type="Label" parent="Split/Side/Scroll/Panel" unique_id=1849839333]
-custom_minimum_size = Vector2(306, 32)
+[node name="Status" type="Label" parent="Split/Side/Rows" unique_id=776154172]
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 13
+theme_type_variation = &"FineText"
 autowrap_mode = 3
 
-[node name="@ColorRect@14" type="ColorRect" parent="Split/Side/Scroll/Panel" unique_id=228145985]
-custom_minimum_size = Vector2(0, 1)
+[node name="LegendToggle" type="Button" parent="Split/Side/Rows" unique_id=559476622]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
-color = Color(1, 1, 1, 0.1)
+theme_type_variation = &"Disclosure"
+toggle_mode = true
+button_pressed = true
+text = "HANDLES ON THE CANVAS"
+alignment = 0
 
-[node name="Legend" type="VBoxContainer" parent="Split/Side/Scroll/Panel" unique_id=1829331147]
+[node name="Actions" type="VBoxContainer" parent="Split/Side/Rows" unique_id=1555277870]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="CloseButton" type="Button" parent="Split/Side/Rows/Actions" unique_id=157337732]
+visible = false
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+theme_type_variation = &"PrimaryButton"
+text = "Join the ends up"
+
+[node name="UndoRow" type="HBoxContainer" parent="Split/Side/Rows/Actions" unique_id=1211933931]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="UndoButton" type="Button" parent="Split/Side/Rows/Actions/UndoRow" unique_id=386300755]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Undo  (ctrl+Z)"
+
+[node name="SaveButton" type="Button" parent="Split/Side/Rows/Actions/UndoRow" unique_id=865906637]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Save  (ctrl+S)"
+
+[node name="TestButton" type="Button" parent="Split/Side/Rows/Actions" unique_id=662537941]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_type_variation = &"PrimaryButton"
+text = "Test drive"
+
+[node name="ExitRow" type="HBoxContainer" parent="Split/Side/Rows/Actions" unique_id=1534846093]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="DeleteButton" type="Button" parent="Split/Side/Rows/Actions/ExitRow" unique_id=643525982]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"DangerButton"
+text = "Delete"
+
+[node name="BackButton" type="Button" parent="Split/Side/Rows/Actions/ExitRow" unique_id=1733745161]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Back  (esc)"
+
+[node name="Keys" type="Label" parent="Split/Side/Rows" unique_id=1158379810]
+custom_minimum_size = Vector2(0, 28)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"FineText"
+text = "wheel or pinch zooms · middle-drag, two-finger drag or cmd-drag pans · F refits · shift-drag draws"
+autowrap_mode = 3
+
+[node name="LegendFlyout" type="PanelContainer" parent="." unique_id=282145199]
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -376.0
+offset_top = -16.0
+offset_right = -376.0
+offset_bottom = -16.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="Panel" type="VBoxContainer" parent="LegendFlyout" unique_id=1024106188]
+custom_minimum_size = Vector2(316, 0)
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Legend" type="VBoxContainer" parent="LegendFlyout/Panel" unique_id=959003912]
 layout_mode = 2
 theme_override_constants/separation = 3
 
-[node name="LegendRow" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1113081202]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "DRAW ON"
-
-[node name="@Label@15" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1824605967]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "  drag lays road · right-drag erases"
-
-[node name="@Label@16" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1845893805]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "DRAW OFF"
-
-[node name="@Label@17" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1890154055]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "  drag a green dot — move a corner"
-
-[node name="@Label@18" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1082876814]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "  drag the road — slide a straight"
-
-[node name="@Label@19" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=53639076]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "  double-click it — add a bend, then"
-
-[node name="@Label@20" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=487459752]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "     drag that bend in or out"
-
-[node name="@Label@21" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=833430355]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "  right-click a dot — remove a corner"
-
-[node name="@Label@22" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1774021978]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "  numbered badge — corner radius"
-
-[node name="@Label@23" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1943108679]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "  badge inside the loop — raise it"
-
-[node name="@Label@24" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=69077151]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "     raise a corner too to hold the"
-
-[node name="@Label@25" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1094372337]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "     height right through it"
-
-[node name="@Label@26" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=670176226]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "  drag the flag — move the start"
-
-[node name="Actions" type="VBoxContainer" parent="Split/Side" unique_id=261345271]
-layout_mode = 2
-theme_override_constants/separation = 5
-
-[node name="CloseButton" type="Button" parent="Split/Side/Actions" unique_id=2127074969]
-visible = false
-custom_minimum_size = Vector2(0, 30)
-layout_mode = 2
-text = "Join the ends up"
-
-[node name="UndoButton" type="Button" parent="Split/Side/Actions" unique_id=199043857]
-custom_minimum_size = Vector2(0, 30)
-layout_mode = 2
-text = "Undo  (ctrl+Z)"
-
-[node name="SaveButton" type="Button" parent="Split/Side/Actions" unique_id=1531460640]
-custom_minimum_size = Vector2(0, 30)
-layout_mode = 2
-text = "Save  (ctrl+S)"
-
-[node name="TestButton" type="Button" parent="Split/Side/Actions" unique_id=58133226]
-custom_minimum_size = Vector2(0, 30)
-layout_mode = 2
-text = "Test drive"
-
-[node name="DeleteButton" type="Button" parent="Split/Side/Actions" unique_id=1856363743]
-custom_minimum_size = Vector2(0, 30)
-layout_mode = 2
-text = "Delete"
-
-[node name="BackButton" type="Button" parent="Split/Side/Actions" unique_id=1319196908]
-custom_minimum_size = Vector2(0, 30)
-layout_mode = 2
-text = "Back to menu  (esc)"
-
-[node name="Keys" type="Label" parent="Split/Side" unique_id=82474492]
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend" unique_id=1856076182]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 12
-text = "zoom: wheel or pinch · pan: two-finger drag, middle-drag, or cmd-drag · F refits · shift-drag draws"
+theme_type_variation = &"SectionLabel"
+text = "DRAW ON"
+autowrap_mode = 3
+
+[node name="LegendIndent" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=544472804]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/LegendIndent" unique_id=2139907482]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Muted"
+text = "drag lays road · right-drag erases"
+autowrap_mode = 3
+
+[node name="Spacer" type="Control" parent="LegendFlyout/Panel/Legend" unique_id=1335415081]
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+
+[node name="@Label@12" type="Label" parent="LegendFlyout/Panel/Legend" unique_id=2028505282]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"SectionLabel"
+text = "DRAW OFF"
+autowrap_mode = 3
+
+[node name="@MarginContainer@13" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=2055777594]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@13" unique_id=595989217]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Muted"
+text = "drag a green dot — move a corner"
+autowrap_mode = 3
+
+[node name="@MarginContainer@14" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=329669201]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@14" unique_id=477490616]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Muted"
+text = "drag the road — slide a straight"
+autowrap_mode = 3
+
+[node name="@MarginContainer@15" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=2052965906]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@15" unique_id=241810312]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Muted"
+text = "double-click it — add a bend, then drag that bend in or out"
+autowrap_mode = 3
+
+[node name="@MarginContainer@16" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=767149800]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@16" unique_id=1489122136]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Muted"
+text = "right-click a dot — remove a corner"
+autowrap_mode = 3
+
+[node name="@MarginContainer@17" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=1565606627]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@17" unique_id=2051004495]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Muted"
+text = "numbered badge — corner radius"
+autowrap_mode = 3
+
+[node name="@MarginContainer@18" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=1981915904]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@18" unique_id=1482270143]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Muted"
+text = "badge inside the loop — raise it; raise a corner too to hold the height right through it"
+autowrap_mode = 3
+
+[node name="@MarginContainer@19" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=589420179]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@19" unique_id=1460120141]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Muted"
+text = "drag the flag — move the start"
 autowrap_mode = 3

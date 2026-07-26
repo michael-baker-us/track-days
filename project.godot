@@ -83,6 +83,10 @@ ui_cancel={
 ]
 }
 
+[gui]
+
+theme/custom="res://resources/ui_theme.tres"
+
 [physics]
 
 common/physics_ticks_per_second=120

@@ -511,6 +511,79 @@ disk. Built-ins come first so their indices never move when a custom track is
 added or deleted, and custom ids are namespaced `user_` so nobody can name a
 circuit "highland" and inherit its lap record.
 
+## The interface
+
+Every widget in the game is styled by one generated resource,
+`resources/ui_theme.tres`, named by `gui/theme/custom` in `project.godot`. A
+Control therefore arrives styled without opting in, and a new screen inherits the
+look by existing.
+
+The theme is *described* in `scripts/ui/ui_theme.gd` and *baked* by
+`tools/build_theme.gd` — the same bargain as the generated scenes: the reasoning
+lives in code, the artefact is committed, and the game never depends on `tools/`
+at runtime. Edit the script and nothing changes until the tool is re-run, which
+is invisible (the colours are simply the old ones), so the suite compares the
+committed resource against a freshly built one.
+
+Three rules keep it from rotting:
+
+- **No colours in the builders.** `tools/build_title.gd` and
+  `tools/build_editor.gd` place nodes and name **type variations**
+  (`UiTheme.V_PRIMARY`, `V_CARD`, `V_SECTION`, ...); a hex value in either of
+  those files belongs in `ui_theme.gd` instead. Variation names are constants for
+  a reason — a mistyped variation fails *silently*, rendering as the base type
+  with nothing to say why.
+- **One palette, including the parts that are painted.** `track_grid.gd` draws
+  the editor canvas by hand and cannot pick up a theme, so it takes its colours
+  from the same constants. The meanings carry across: green is the valid racing
+  line, amber is height *and* the primary action, red is a circuit that will not
+  compile *and* Delete.
+- **No font is shipped.** Godot's built-in face is used at every size, so there
+  is no licensed binary in the repo and nothing extra in the web build. The
+  wordmark is letterspaced by putting spaces between its letters, because glyph
+  spacing in Godot needs a `FontVariation` wrapping a font resource.
+
+> A project-wide theme reaches screens nobody was thinking about. Giving
+> `PanelContainer` sensible padding restyled the HUD too, and the speed readout —
+> anchored to the bottom right and sized by its contents — grew straight off the
+> edge of the screen. The `HudPanel` variation therefore carries a translucent
+> background and *no* padding, because the HUD spaces itself with margin
+> containers. Anything anchored to a screen edge is worth re-checking after a
+> change to a base style.
+
+### A menu row is one button, not a row of widgets
+
+A track row has to be a single focusable, pressable thing — a gamepad and the
+keyboard both move between *controls*, not between decorated boxes. But a
+`Button` draws its own text and hosts no children, so the circuit's name is the
+button's text and the blurb and lap time are mouse-transparent `Label`s anchored
+over it. The `CardButton` style has deliberately lopsided content margins: a deep
+bottom margin lifts the button's own text into the top left and frees the space
+underneath for the overlaid lines.
+
+> `tests/run_tests.gd` asserts the first child of every row is that button, and
+> that the second is an Edit button on custom circuits and a spacer on shipped
+> ones. Both halves of the layout are load-bearing: the spacer is what keeps the
+> menu's right edge straight.
+
+### The editor panel has a fixed height budget
+
+Content scaling pins the canvas to **720 units tall on every landscape window**
+(see *Display scaling*), so the editor's side panel has the same room on a 4K
+monitor as on a laptop — a bigger screen makes it larger, never taller. Anything
+that does not fit has to go somewhere else, not wait for a bigger display.
+
+The column is ordered by what an edit needs answered: what circuit this is, what
+to do next, what the circuit currently *is*, then the actions. Those all stay
+put. The legend of canvas handles is reference the player stops needing, so it is
+the one section that folds away — and it opens as a **flyout over the canvas**
+rather than inside the column, because the column has no spare 200 units to give
+it on any window.
+
+> An earlier arrangement put the whole panel in a scroll region. That pushed the
+> readout — the live verdict, wanted on every single edit — under the fold. The
+> current rule is the opposite: feedback is fixed, reference scrolls.
+
 ## Lap timing
 
 16 `Area3D` gates along the centreline, index 0 on the start line. They never
@@ -697,6 +770,10 @@ editor's direct manipulation want.
 - A bend cannot be shallower than two cells, so dragging one across its own
   straight is refused for a cell either side of flat. Structural, not a bug, but
   it does mean the crossing has a little resistance in it.
+- The interface has no motion beyond the menu rows fading in, no sound, and no
+  transition between screens; a scene change is a hard cut.
+- Nothing persists whether the editor's legend flyout was left open, so it is
+  open again on every visit.
 - No tagged release build yet; web deploys straight from `main`.
 - Physics runs at 120 Hz, which is the main CPU cost in a single-threaded web
   build. Unmeasured on real hardware in a browser.

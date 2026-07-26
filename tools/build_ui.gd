@@ -2,6 +2,10 @@ extends SceneTree
 
 # Builds scenes/ui/hud.tscn. Node names must match the @onready paths in
 # scripts/ui/hud.gd.
+#
+# Panels here use the HUD variation of the project theme: translucent, and with
+# no padding of its own, because the layout below anchors readouts to the screen
+# edges and spaces them with margin containers.
 
 func _initialize() -> void:
 	var layer := CanvasLayer.new()
@@ -17,6 +21,7 @@ func _initialize() -> void:
 	# Lap timing, top right.
 	var lap_panel := PanelContainer.new()
 	lap_panel.name = "LapPanel"
+	lap_panel.theme_type_variation = UiTheme.V_HUD
 	lap_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	lap_panel.position = Vector2(-230.0, 16.0)
 	lap_panel.custom_minimum_size = Vector2(214.0, 0.0)
@@ -42,6 +47,7 @@ func _initialize() -> void:
 	# Speed, bottom right.
 	var speed_panel := PanelContainer.new()
 	speed_panel.name = "SpeedPanel"
+	speed_panel.theme_type_variation = UiTheme.V_HUD
 	speed_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	speed_panel.position = Vector2(-190.0, -84.0)
 	root_ctrl.add_child(speed_panel)
@@ -108,6 +114,7 @@ func _pad(node_name: String, text: String, preset: int, pos: Vector2,
 		size: Vector2) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.name = node_name
+	panel.theme_type_variation = UiTheme.V_HUD
 	panel.set_anchors_preset(preset)
 	panel.position = pos
 	panel.size = size

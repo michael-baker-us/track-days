@@ -49,6 +49,7 @@ regenerated rather than hand-edited (see `tools/README.md`). Order matters:
 `hud.tscn`.
 
 ```bash
+"$GODOT" --headless --path . --script tools/build_theme.gd   # ui_theme.tres
 "$GODOT" --headless --path . --script tools/build_track.gd   # both circuits
 "$GODOT" --headless --path . --script tools/build_ui.gd      # hud.tscn
 "$GODOT" --headless --path . --script tools/build_title.gd   # title.tscn
@@ -102,6 +103,18 @@ scene changes without needing project-settings registration.
 and drops the car on its `SpawnPoint`. One race scene serves every circuit.
 Custom tracks additionally get an **Edit** button that sets `GameState.editing_id`
 and opens `scenes/editor/track_editor.tscn`.
+
+### The interface
+
+One generated `Theme` (`resources/ui_theme.tres`, described in
+`scripts/ui/ui_theme.gd`, baked by `tools/build_theme.gd`) is set as
+`gui/theme/custom` in `project.godot`, so every Control is styled without opting
+in. The scene builders place nodes and name **type variations** — no colours or
+font sizes in `tools/`. `track_grid.gd` paints the editor canvas by hand and
+takes its palette from the same constants, so green/amber/red mean the same thing
+on the canvas and in the widgets. Editing the palette does nothing until
+`build_theme.gd` is re-run; the suite compares the committed resource against a
+fresh build. See `docs/architecture.md` for the menu-row and panel-budget rules.
 
 ### The four load-bearing decisions
 
