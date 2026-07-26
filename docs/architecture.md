@@ -113,6 +113,18 @@ Two things it does that the node does not do for you:
   from signed roll angle and roll rate. `VehicleBody3D` has no roll stiffness,
   so without it quick steering reversals put the car on two wheels.
 
+- **Downforce**, straight down in *world* space. Aligning it to the chassis would
+  press more squarely into the road on a slope, but it points wherever the car
+  points — so a steeply pitched or inverted car would have it pushing *upward*,
+  adding to a launch exactly when that is least wanted. World down can only ever
+  press towards the ground.
+- **Airborne stabilisation.** With no wheel in contact, `VehicleBody3D` offers
+  nothing: the anti-roll bar keeps applying torque with no grip to react against,
+  and whatever rotation the car took off with, it keeps — so it lands crooked and
+  spins. A levelling torque plus damping on its own rotation runs only while
+  airborne, and the anti-roll bar is faded out by the number of wheels still
+  down, so the two never fight.
+
 Braking is deliberately kept *below* the point where `VehicleBody3D.brake`
 saturates (~150). Above that, stopping is limited by tyre grip rather than brake
 force, which reads as an instant jolt — and it means grip can be tuned purely
