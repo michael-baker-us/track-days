@@ -4,6 +4,17 @@ One-off generators, run headlessly. They write scenes into `scenes/`, so the
 generated `.tscn` files are committed and the game does not depend on these at
 runtime.
 
+> **Use `--editor --quit`, not `--import`, to register new `class_name`s.**
+> Both regenerate `.godot/`, but `--import` also rewrites `project.godot` and
+> drops the whole `[rendering]` section — taking
+> `renderer/rendering_method.web="gl_compatibility"` with it, which the web build
+> depends on. `--editor --quit` leaves the file alone, which is why the workflows
+> use it. If you do run `--import`, check `git diff project.godot`.
+
+> A `--script` run that hits an error never reaches `quit()`, so the process
+> idles forever and a pipe to `tail` never flushes. Redirect to a file and use a
+> timeout when running these unattended, or a broken script looks like a hang.
+
 ```bash
 GODOT=/path/to/Godot.app/Contents/MacOS/Godot
 
@@ -19,6 +30,10 @@ GODOT=/path/to/Godot.app/Contents/MacOS/Godot
 
 # Rebuild the title screen (track list comes from GameState at runtime).
 "$GODOT" --headless --path . --script tools/build_title.gd
+
+# Rebuild the track editor. Node names here must match the @onready paths in
+# scripts/ui/track_editor.gd; the mode buttons are generated at runtime.
+"$GODOT" --headless --path . --script tools/build_editor.gd
 
 # Regenerate race.tscn (car + camera + HUD + tracker; the track is instanced at
 # runtime from whatever the title screen selected).

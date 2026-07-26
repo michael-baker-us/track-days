@@ -1,7 +1,7 @@
 # Track Days
 
 A 3D third-person arcade racer, built in Godot 4.7 (GDScript). Pick a circuit,
-chase a lap time.
+chase a lap time — or paint your own circuit and chase a time on that.
 
 Separate from any pseudo-3D OutRun-style racer on the broader project roadmap — this one
 uses real 3D and Godot's built-in `VehicleBody3D` physics.
@@ -39,10 +39,12 @@ Two constraints shape this build, both checked in CI:
 /path/to/Godot.app/Contents/MacOS/Godot --headless --path . --script tests/run_tests.gd
 ```
 
-Covers tuning invariants, lap-ordering rules, checkpoint integrity, and that the
-road collision surface actually follows the track's elevation. Handling *feel*
-is not unit-tested — see [`docs/tuning-journal.md`](docs/tuning-journal.md) for
-how that is measured instead.
+Covers tuning invariants, lap-ordering rules, checkpoint integrity, that the road
+collision surface follows the track's elevation and never kinks away from the
+road at a corner, and that a painted grid loop compiles to a circuit the builder
+agrees closes. Handling *feel* is not unit-tested — see
+[`docs/tuning-journal.md`](docs/tuning-journal.md) for how that is measured
+instead.
 
 ## Running
 
@@ -66,6 +68,15 @@ how that is measured instead.
 | Toggle debug overlay | F3 | — |
 | Back to track select | Esc | — |
 
+### Track editor
+
+| Action | Control |
+|---|---|
+| Lay road / erase | Left-drag / right-drag |
+| Switch mode | 1 paint · 2 start line · 3 corners · 4 elevation |
+| Zoom / pan / refit | Wheel · middle-drag · F |
+| Save | Ctrl+S |
+
 ## Status
 
 M3 — two circuits, both 14 m wide and built from Kenney Racing Kit tiles by a
@@ -83,6 +94,19 @@ sessions. Laps only count if every gate is crossed in sequence, so corners
 cannot be cut. The car starts just behind the line, so timing begins about two
 seconds in rather than after an out lap.
 
+M5 — a track editor. Paint a closed loop of cells on a grid and the game
+compiles it into a real circuit: Kenney tiles, a seamless collision ribbon, and
+sixteen ordered gates, identical in kind to the shipped tracks. Closure, which
+the shipped layouts had to be hand-solved into, comes free — a loop drawn on a
+grid necessarily joins up.
+
+Corner radius stays a choice: all three Kenney corners join the same two centre
+lines, so the widest that fits is picked automatically and can be cycled down,
+trading straight for a faster corner. Climbs live inside one straight and come
+back down before the next corner, so height closes for the same reason position
+does. Circuits are saved as JSON under `user://tracks/` and appear on the title
+screen with their own lap records.
+
 See [`docs/tuning-journal.md`](docs/tuning-journal.md) for how the handling
 numbers were arrived at and what is still open.
 
@@ -91,6 +115,7 @@ numbers were arrived at and what is still open.
 | Scene | Purpose |
 |---|---|
 | `scenes/title.tscn` | Entry point — track selection |
+| `scenes/editor/track_editor.tscn` | Paint a circuit on a grid and drive it |
 | `scenes/race.tscn` | A race. The track is instanced at runtime from the selection |
 | `scenes/track/track_*.tscn` | The circuits. Generated; edit the layout spec and rebuild |
 | `scenes/track/track_01.tscn` | Bare flat plane, kept for physics measurement |
