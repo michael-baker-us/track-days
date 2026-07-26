@@ -1,67 +1,62 @@
 extends Control
 
-## The track editor. Paint a loop of cells; everything else — corner radii, the
-## start line, where the hills go — is a decision layered on top of that loop.
+## The track editor.
 ##
-## The four modes exist because a click on a cell is ambiguous once the circuit
-## compiles: it could mean paint here, start here, change this corner, or raise
-## this straight. Modes make it explicit and keep the canvas free of modifier-key
-## folklore.
+## The circuit is edited by dragging the road itself — see `track_grid.gd` for
+## why there are no tool modes. This script owns everything around the canvas:
+## what the panel says, the undo stack, and saving.
 ##
-## Nothing is written to disk until Save, except that Test drive saves first —
-## the race scene builds a custom track from the stored layout, so an untested
-## unsaved edit has nothing to build from.
+## Nothing reaches disk until Save, except that Test drive saves first: the race
+## scene builds a custom track from the stored layout, so an unsaved edit has
+## nothing to build from.
 
 const TITLE_SCENE := "res://scenes/title.tscn"
 const RACE_SCENE := "res://scenes/race.tscn"
 const EDITOR_SCENE := "res://scenes/editor/track_editor.tscn"
 
-const MODES := [
-	{"name": "Paint road", "hint": "Drag to lay road, right-drag to erase. Paint one closed loop."},
-	{"name": "Start line", "hint": "Click a straight to move the start line. Its straight needs four spare cells."},
-	{"name": "Corners", "hint": "Click a corner to tighten it. Wider corners are faster but eat the straights either side."},
-	{"name": "Elevation", "hint": "Click a straight to raise it. The climb and descent both have to fit inside that straight."},
-]
+## Deep enough to undo a whole misjudged reshaping, small enough that the
+## snapshots (a few hundred cells each) stay trivial.
+const UNDO_LIMIT := 64
 
 @onready var _grid: TrackGrid = $Split/Grid
-@onready var _name_edit: LineEdit = $Split/Panel/NameEdit
-@onready var _picker: OptionButton = $Split/Panel/Picker
-@onready var _modes: VBoxContainer = $Split/Panel/Modes
-@onready var _hint: Label = $Split/Panel/Hint
-@onready var _readout: Label = $Split/Panel/Readout
-@onready var _save_button: Button = $Split/Panel/Actions/SaveButton
-@onready var _test_button: Button = $Split/Panel/Actions/TestButton
-@onready var _delete_button: Button = $Split/Panel/Actions/DeleteButton
-@onready var _back_button: Button = $Split/Panel/Actions/BackButton
+@onready var _name_edit: LineEdit = $Split/Side/Scroll/Panel/NameEdit
+@onready var _picker: OptionButton = $Split/Side/Scroll/Panel/Picker
+@onready var _guide: Label = $Split/Side/Scroll/Panel/Guide
+@onready var _status: Label = $Split/Side/Scroll/Panel/Status
+@onready var _readout: Label = $Split/Side/Scroll/Panel/Readout
+@onready var _undo_button: Button = $Split/Side/Actions/UndoButton
+@onready var _save_button: Button = $Split/Side/Actions/SaveButton
+@onready var _test_button: Button = $Split/Side/Actions/TestButton
+@onready var _delete_button: Button = $Split/Side/Actions/DeleteButton
+@onready var _back_button: Button = $Split/Side/Actions/BackButton
 
 var _layout: TrackLayout
 var _compiled: TrackLayout.Compiled
-var _mode_buttons: Array[Button] = []
-var _mode := TrackGrid.Mode.PAINT
+var _undo: Array[Dictionary] = []
+var _transient_status := ""
 
 func _ready() -> void:
-	# Esc out of a test drive comes back here rather than to the menu, so the
-	# circuit being worked on stays on screen.
+	# Esc out of a test drive comes back here, not to the menu, so the circuit
+	# being worked on stays on screen.
 	GameState.return_scene = EDITOR_SCENE
 
-	_layout = TrackStore.load_layout(GameState.editing_id) if not GameState.editing_id.is_empty() else null
+	_layout = (
+		TrackStore.load_layout(GameState.editing_id)
+		if not GameState.editing_id.is_empty() else null
+	)
 	if _layout == null:
 		_layout = _starter_layout()
 
-	for i in MODES.size():
-		var button := Button.new()
-		button.text = "%d  %s" % [i + 1, MODES[i]["name"]]
-		button.toggle_mode = true
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.pressed.connect(_set_mode.bind(i))
-		_modes.add_child(button)
-		_mode_buttons.append(button)
-
 	_grid.layout = _layout
-	_grid.layout_edited.connect(_recompile)
-	_grid.cell_activated.connect(_on_cell_activated)
+	_grid.layout_edited.connect(_on_edited)
+	_grid.layout_touched.connect(_on_touched)
+	_grid.corner_clicked.connect(_cycle_corner)
+	_grid.elevation_clicked.connect(_cycle_elevation)
+	_grid.status.connect(_flash)
+
 	_name_edit.text_changed.connect(func(t): _layout.display_name = t)
 	_picker.item_selected.connect(_on_picked)
+	_undo_button.pressed.connect(_undo_last)
 	_save_button.pressed.connect(_on_save)
 	_test_button.pressed.connect(_on_test)
 	_delete_button.pressed.connect(_on_delete)
@@ -69,15 +64,15 @@ func _ready() -> void:
 
 	_name_edit.text = _layout.display_name
 	_refresh_picker()
-	_set_mode(TrackGrid.Mode.PAINT)
+	_reset_undo()
 	_recompile()
 	# The canvas has no size until the containers have laid out once.
 	await get_tree().process_frame
 	_grid.fit_view()
 
 ## A new track opens as a driveable rectangle rather than a blank grid. An empty
-## canvas gives no clue that cells must form one closed loop, and the first thing
-## anyone wants to do is drive something and then change it.
+## canvas gives no clue that the cells have to form one closed loop, and the
+## first thing anyone wants is to drive something and then change it.
 func _starter_layout() -> TrackLayout:
 	var layout := TrackLayout.new()
 	layout.display_name = "New Circuit"
@@ -100,35 +95,152 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if not (event is InputEventKey and event.pressed):
 		return
-	var key := (event as InputEventKey).keycode
-	if key >= KEY_1 and key <= KEY_4:
-		_set_mode(key - KEY_1)
-	elif key == KEY_F:
+	var key_event := event as InputEventKey
+	if key_event.keycode == KEY_F:
 		_grid.fit_view()
-	elif key == KEY_S and event.ctrl_pressed:
+	elif key_event.keycode == KEY_Z and key_event.ctrl_pressed:
+		_undo_last()
+	elif key_event.keycode == KEY_S and key_event.ctrl_pressed:
 		_on_save()
 
-func _set_mode(mode: int) -> void:
-	_mode = mode
-	_grid.mode = mode
-	_hint.text = MODES[mode]["hint"]
-	for i in _mode_buttons.size():
-		_mode_buttons[i].button_pressed = (i == mode)
+# --- editing ---
+
+## A live change mid-drag: recompile so the readout and the preview keep up, but
+## do not record it — one drag is one undo step, not sixty.
+func _on_touched() -> void:
+	_recompile()
+
+func _on_edited() -> void:
+	_push_undo()
+	_recompile()
+
+## Seeds the stack with the state the player is looking at. Without this entry
+## the first edit is unundoable — there is nothing recorded to go back *to*.
+func _reset_undo() -> void:
+	_undo.clear()
+	_undo.append(_layout.to_dict())
+	_undo_button.disabled = true
+
+func _push_undo() -> void:
+	_undo.append(_layout.to_dict())
+	if _undo.size() > UNDO_LIMIT:
+		_undo.remove_at(0)
+	_undo_button.disabled = _undo.size() < 2
+
+## The stack holds the state *after* each edit, so undoing means dropping the
+## current state and restoring the one before it.
+func _undo_last() -> void:
+	if _undo.size() < 2:
+		_flash("Nothing left to undo.")
+		return
+	_undo.pop_back()
+	var restored := TrackLayout.from_dict(_undo[_undo.size() - 1])
+	restored.id = _layout.id
+	_layout = restored
+	_grid.layout = _layout
+	_name_edit.text = _layout.display_name
+	_undo_button.disabled = _undo.size() < 2
+	_recompile()
 
 func _recompile() -> void:
 	_compiled = _layout.compile()
-	_grid.compiled = _compiled
-	_grid.queue_redraw()
-	_update_readout()
+	_grid.refresh(_compiled)
+	_update_panel()
 
-## The live verdict. Closure is guaranteed by the grid, so this reports what the
-## circuit *is* rather than whether it joined up — length, corner mix, climb —
-## and falls back to the compiler's complaints when the loop is not yet valid.
-func _update_readout() -> void:
-	_test_button.disabled = not _compiled.ok
-	if not _compiled.ok:
-		_readout.text = "\n".join(_compiled.errors)
+func _flash(text: String) -> void:
+	_transient_status = text
+	_status.text = text
+
+## Steps a corner down through the tiles that fit and wraps back to the widest,
+## so one control covers the whole choice.
+func _cycle_corner(cell: Vector2i) -> void:
+	for corner in _compiled.corners:
+		if corner.cell != cell:
+			continue
+		if corner.max_size <= 1:
+			_flash("This corner cannot be widened — its straights are too short.")
+			return
+		var next := corner.size - 1
+		if next < 1:
+			next = corner.max_size
+		_layout.corner_sizes[cell] = next
+		_flash("Corner set to %s." % _corner_word(next))
+		_on_edited()
 		return
+
+func _corner_word(size: int) -> String:
+	return ["", "tight", "medium", "sweeping"][clampi(size, 0, 3)]
+
+func _cycle_elevation(cell: Vector2i) -> void:
+	for run in _compiled.runs:
+		if not run.cells.has(cell):
+			continue
+		if run.max_level <= 0:
+			_flash("This straight is too short for a climb.")
+			return
+		# Clear the old key first: elevation is recorded against whichever cell
+		# was clicked, and a stale one would give the run two.
+		for c in run.cells:
+			_layout.elevation.erase(c)
+		var next := (run.level + 1) % (run.max_level + 1)
+		if next > 0:
+			_layout.elevation[cell] = next
+		_flash("Climb set to %s." % ("flat" if next == 0 else "+%d" % next))
+		_on_edited()
+		return
+
+# --- the panel ---
+
+func _update_panel() -> void:
+	_test_button.disabled = not _compiled.ok
+	_guide.text = _guidance()
+	_readout.text = _summary()
+	# A message from the last action outlives one repaint, then gives way to the
+	# standing hint, so the panel is never stale but never silent either.
+	_status.text = _transient_status if not _transient_status.is_empty() else _standing_hint()
+	_transient_status = ""
+
+## What to do next, in one line. This is the only place that answers "I have
+## opened the editor, now what", so it always names a concrete next action.
+func _guidance() -> String:
+	if not _compiled.ok:
+		return "Fix the circuit first — see below."
+	if not _grid.has_handles():
+		return "Drag the green corner dots to reshape the circuit."
+	var raised := 0
+	for run in _compiled.runs:
+		if run.level > 0:
+			raised += 1
+	if _compiled.corners.size() <= 4:
+		return (
+			"Drag a green corner dot to reshape. Double-click a straight to add "
+			+ "a new bend — four corners is just an oval."
+		)
+	if _layout.corner_sizes.is_empty() and raised == 0:
+		return (
+			"Now try a numbered badge to tighten a corner, or the dot in the "
+			+ "middle of a straight to add a climb."
+		)
+	if raised == 0:
+		return "Add a climb: click the small dot in the middle of a long straight."
+	return "Happy with it? Test drive, then Save."
+
+func _standing_hint() -> String:
+	if not _compiled.ok:
+		return "Shift-drag lays road · shift-right-drag erases"
+	return "Drag corners and straights · right-click a corner removes it"
+
+## The live verdict: what the circuit *is*, since closure is guaranteed by the
+## shape editing rather than being something to check.
+func _summary() -> String:
+	if not _compiled.ok:
+		var lines := _compiled.errors.duplicate()
+		lines.append("")
+		lines.append(
+			"A circuit is one closed loop of road, one cell wide. "
+			+ "Undo (ctrl+Z) is usually the quickest way back."
+		)
+		return "\n".join(lines)
 
 	var result := TrackBuilder.new().measure(_compiled.segments)
 	var widths := {1: 0, 2: 0, 3: 0}
@@ -148,52 +260,13 @@ func _update_readout() -> void:
 	if result.peak > 0.5:
 		lines.append("climbs %.1f m" % result.peak)
 	if not result.closed:
-		# Should be unreachable: a painted loop closes by construction. If it
-		# ever fires, the compiler and the builder disagree and that is a bug
-		# worth surfacing rather than hiding behind a happy readout.
+		# Should be unreachable: both the shape editor and the compiler refuse
+		# anything that is not a closed ring. If it fires they have drifted
+		# apart, which is worth surfacing rather than hiding.
 		lines.append("BUG: builder says this does not close (%s)" % result.summary())
-	_readout.text = "\n".join(lines)
+	return "\n".join(lines)
 
-func _on_cell_activated(cell: Vector2i) -> void:
-	match _mode:
-		TrackGrid.Mode.START:
-			if _layout.cells.has(cell):
-				_layout.start_cell = cell
-		TrackGrid.Mode.CORNER:
-			_cycle_corner(cell)
-		TrackGrid.Mode.ELEVATION:
-			_cycle_elevation(cell)
-	_recompile()
-
-## Steps a corner down through the tiles that fit and wraps back to the widest,
-## so one control covers the whole choice without needing a second button.
-func _cycle_corner(cell: Vector2i) -> void:
-	for corner in _compiled.corners:
-		if corner.cell != cell:
-			continue
-		var next := corner.size - 1
-		if next < 1:
-			next = corner.max_size
-		_layout.corner_sizes[cell] = next
-		return
-
-func _cycle_elevation(cell: Vector2i) -> void:
-	for run in _compiled.runs:
-		if not run.cells.has(cell):
-			continue
-		if run.max_level <= 0:
-			_readout.text = "That straight is too short for a climb — it needs %d spare cells." % (
-				TrackLayout.CELLS_PER_LEVEL + 1
-			)
-			return
-		# Clear the old key first: elevation is recorded against whichever cell
-		# was clicked, and leaving a stale one behind would give the run two.
-		for c in run.cells:
-			_layout.elevation.erase(c)
-		var next := (run.level + 1) % (run.max_level + 1)
-		if next > 0:
-			_layout.elevation[cell] = next
-		return
+# --- files ---
 
 func _refresh_picker() -> void:
 	_picker.clear()
@@ -216,6 +289,7 @@ func _on_picked(index: int) -> void:
 	_grid.layout = _layout
 	_name_edit.text = _layout.display_name
 	_delete_button.disabled = _layout.id.is_empty()
+	_reset_undo()
 	_recompile()
 	_grid.fit_view()
 
@@ -227,22 +301,23 @@ func _on_save() -> void:
 	var err := TrackStore.save(_layout)
 	GameState.editing_id = _layout.id
 	_refresh_picker()
-	_readout.text = (
+	_flash(
 		"Saved as %s." % _layout.display_name if err == OK
 		else "Could not save (error %d)." % err
 	)
+	_update_panel()
 
 func _on_test() -> void:
 	_on_save()
 	# The race scene picks its track out of the same list the menu shows, so the
-	# layout has to be on disk and found by id before the scene change.
+	# layout has to be on disk and findable by id before the scene change.
 	var tracks := GameState.all_tracks()
 	for i in tracks.size():
 		if tracks[i]["id"] == _layout.id:
 			GameState.selected_index = i
 			get_tree().change_scene_to_file(RACE_SCENE)
 			return
-	_readout.text = "Could not find the saved circuit to test."
+	_flash("Could not find the saved circuit to test.")
 
 func _on_delete() -> void:
 	if _layout.id.is_empty():
@@ -252,6 +327,7 @@ func _on_delete() -> void:
 	_layout = _starter_layout()
 	_grid.layout = _layout
 	_name_edit.text = _layout.display_name
+	_reset_undo()
 	_refresh_picker()
 	_recompile()
 	_grid.fit_view()

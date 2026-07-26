@@ -155,7 +155,8 @@ Adding a shipped circuit is a layout constant plus an entry in
 
 ## The track editor
 
-`scenes/editor/track_editor.tscn` lets the player paint a circuit on a grid.
+`scenes/editor/track_editor.tscn` lets the player build a circuit by dragging
+it into shape on a grid.
 `TrackLayout` (`scripts/track/track_layout.gd`) holds the painted cells and
 compiles them into the segment list the builder walks.
 
@@ -199,6 +200,48 @@ hand-built Highland layout does. A run is given a *level*; each level costs a
 `roadRampLong` up and another down, and the compiler places the ramps and bridge
 in the run's spare cells. Because every plateau returns to zero within its own
 run, height closes for the same structural reason position does.
+
+### Editing is direct manipulation, not tool modes
+
+The first version had four modes — paint, start line, corners, elevation — and a
+click on a cell meant whichever the toolbar last said. The player had to keep the
+current mode in their head, and the canvas gave no clue what a click would do.
+
+Now every action has its own thing on screen to hit: a corner handle, a radius
+badge, a climb badge, the start flag, the body of a straight. What a click does
+is decided by what is under it, which is visible. Badges are drawn *off* the
+road — corner badges outside the loop, climb badges inside — because a badge
+sitting on the road steals clicks meant for the road beneath it.
+
+Freehand painting survives on Shift, for anything the handles cannot express.
+
+### The loop is edited as a shape, and invalid states are unreachable
+
+`TrackShape` (`scripts/track/track_shape.gd`) views the painted cells as a
+rectilinear polygon. Dragging a corner carries its two neighbours along one axis
+each so the straights stay axis-aligned; dragging a straight slides it whole;
+double-clicking one pushes a bend out of it; right-clicking a corner straightens
+the jog it belongs to.
+
+Every one of those goes through `_accept`, which prunes redundant vertices and
+then refuses the edit outright unless the resulting cells still walk as one
+simple ring. So the failure modes that made painting miserable — loose ends,
+junctions, a loop folded onto itself — are not reachable by dragging at all. A
+refused drag says so rather than silently doing nothing.
+
+`TrackShape.walk` is the *single* definition of "a valid painted loop", and
+`TrackLayout.compile` calls it too, so the shape editor and the compiler can
+never disagree about what counts as a circuit.
+
+Cells remain the source of truth; corners are derived from them on every change.
+That keeps persistence, the compiler and the tests unchanged, and lets handle
+edits and freehand painting mix freely.
+
+> Painting had a plain bug worth remembering: the stroke was applied only to the
+> cell under each motion event, with no interpolation. A drag across thirteen
+> cells painted four of them. Every normal-speed stroke laid a dotted line, the
+> validator then correctly reported loose ends, and the tool read as broken
+> because it was. Any grid painter needs to fill in between samples.
 
 ### The canvas draws the compiled circuit, not the cells
 
@@ -300,6 +343,10 @@ added.
   unambiguous. A figure-eight would need a bridge piece and a real graph walk.
 - Custom circuits get no name validation beyond being non-empty, and there is no
   confirmation on Delete.
+- Undo is a stack of whole-layout snapshots and there is no redo. Fine at this
+  size; a diff-based command stack would be the move if layouts grow.
+- Dragging a corner cannot move it *past* an adjacent one — the edit is refused
+  rather than reordering the ring — so some reshapes need two drags.
 - No tagged release build yet; web deploys straight from `main`.
 - Physics runs at 120 Hz, which is the main CPU cost in a single-threaded web
   build. Unmeasured on real hardware in a browser.

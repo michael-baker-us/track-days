@@ -1,7 +1,7 @@
 # Track Days
 
 A 3D third-person arcade racer, built in Godot 4.7 (GDScript). Pick a circuit,
-chase a lap time — or paint your own circuit and chase a time on that.
+chase a lap time — or build your own circuit and chase a time on that.
 
 Separate from any pseudo-3D OutRun-style racer on the broader project roadmap — this one
 uses real 3D and Godot's built-in `VehicleBody3D` physics.
@@ -41,8 +41,8 @@ Two constraints shape this build, both checked in CI:
 
 Covers tuning invariants, lap-ordering rules, checkpoint integrity, that the road
 collision surface follows the track's elevation and never kinks away from the
-road at a corner, and that a painted grid loop compiles to a circuit the builder
-agrees closes. Handling *feel* is not unit-tested — see
+road at a corner, that a painted grid loop compiles to a circuit the builder
+agrees closes, and that no shape edit can produce a loop that does not. Handling *feel* is not unit-tested — see
 [`docs/tuning-journal.md`](docs/tuning-journal.md) for how that is measured
 instead.
 
@@ -70,10 +70,19 @@ instead.
 
 ### Track editor
 
+Reshape the circuit by dragging the road itself — there are no tool modes, and
+an edit that would break the loop is refused rather than accepted and flagged.
+
 | Action | Control |
 |---|---|
-| Lay road / erase | Left-drag / right-drag |
-| Switch mode | 1 paint · 2 start line · 3 corners · 4 elevation |
+| Move a corner | Drag a green dot |
+| Slide a straight | Drag the road |
+| Add a bend | Double-click a straight |
+| Remove a corner | Right-click a green dot |
+| Corner radius / climb | Click the badge outside / inside the loop |
+| Move the start line | Drag the flag |
+| Freehand paint / erase | Shift-drag / shift-right-drag |
+| Undo | Ctrl+Z |
 | Zoom / pan / refit | Wheel · middle-drag · F |
 | Save | Ctrl+S |
 
@@ -94,11 +103,12 @@ sessions. Laps only count if every gate is crossed in sequence, so corners
 cannot be cut. The car starts just behind the line, so timing begins about two
 seconds in rather than after an out lap.
 
-M5 — a track editor. Paint a closed loop of cells on a grid and the game
-compiles it into a real circuit: Kenney tiles, a seamless collision ribbon, and
-sixteen ordered gates, identical in kind to the shipped tracks. Closure, which
-the shipped layouts had to be hand-solved into, comes free — a loop drawn on a
-grid necessarily joins up.
+M5 — a track editor. A new circuit opens as a driveable rectangle; drag its
+corners and straights into the shape you want and the game compiles that into a
+real track — Kenney tiles, a seamless collision ribbon, and sixteen ordered
+gates, identical in kind to the shipped ones. Closure, which the shipped layouts
+had to be hand-solved into, comes free, and because every drag is refused unless
+it leaves a valid loop, a broken circuit cannot be built in the first place.
 
 Corner radius stays a choice: all three Kenney corners join the same two centre
 lines, so the widest that fits is picked automatically and can be cycled down,
@@ -115,7 +125,7 @@ numbers were arrived at and what is still open.
 | Scene | Purpose |
 |---|---|
 | `scenes/title.tscn` | Entry point — track selection |
-| `scenes/editor/track_editor.tscn` | Paint a circuit on a grid and drive it |
+| `scenes/editor/track_editor.tscn` | Drag a circuit into shape and drive it |
 | `scenes/race.tscn` | A race. The track is instanced at runtime from the selection |
 | `scenes/track/track_*.tscn` | The circuits. Generated; edit the layout spec and rebuild |
 | `scenes/track/track_01.tscn` | Bare flat plane, kept for physics measurement |

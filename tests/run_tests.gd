@@ -303,6 +303,111 @@ func test_elevation() -> void:
 	check_true("over-raised layout still closes",
 		TrackBuilder.new().measure(over.segments).closed)
 
+
+## The promise the handle editing makes: an edit either produces a valid loop or
+## is refused outright. If this slips, dragging silently starts making circuits
+## the compiler will reject, and the editor is back to fighting the player.
+func test_shape_edits_stay_valid() -> void:
+	var layout := sample_layout()
+	var corners := TrackShape.corners_of(layout.cells)
+	check("corners found", corners.size(), 8)
+	check("cells round-trip through corners",
+		TrackShape.cells_from_corners(corners).size(), layout.cells.size())
+
+	# Every corner, dragged a long way in each direction. Whatever comes back is
+	# either empty or a circuit the compiler accepts — never anything between.
+	var accepted := 0
+	var refused := 0
+	for i in corners.size():
+		for delta in [
+			Vector2i(6, 0), Vector2i(-6, 0), Vector2i(0, 6), Vector2i(0, -6),
+			Vector2i(20, 20), Vector2i(-20, -20), Vector2i(3, -4),
+		]:
+			var moved := TrackShape.move_corner(corners, i, corners[i] + delta)
+			if moved.is_empty():
+				refused += 1
+				continue
+			accepted += 1
+			var probe := TrackLayout.new()
+			probe.cells = TrackShape.cells_from_corners(moved)
+			probe.start_cell = probe.cells[0]
+			var compiled := probe.compile()
+			check_true("drag %d by %s leaves a loop" % [i, delta],
+				not TrackShape.walk(probe.cells).is_empty())
+			# It must also be a circuit, not merely a ring.
+			check_true("drag %d by %s compiles" % [i, delta], compiled.ok)
+			check_true("drag %d by %s closes" % [i, delta],
+				TrackBuilder.new().measure(compiled.segments).closed)
+	check_true("some drags were accepted", accepted > 0)
+	# A drag right across the circuit has to be refused, or the loop could fold
+	# onto itself and the road would run through its own surface.
+	check_true("some drags were refused", refused > 0)
+
+## Sliding a whole straight, and the two operations that change how many corners
+## there are.
+func test_shape_add_and_remove() -> void:
+	var layout := sample_layout()
+	var corners := TrackShape.corners_of(layout.cells)
+
+	var slid := TrackShape.move_edge(corners, 0, corners[0] + Vector2i(0, -3))
+	check_true("a straight can be slid", not slid.is_empty())
+	check("sliding does not change the corner count", slid.size(), corners.size())
+
+	var bumped := TrackShape.insert_bump(corners, 0, corners[0], -6)
+	check_true("a bend can be added", not bumped.is_empty())
+	check("adding a bend adds four corners", bumped.size(), corners.size() + 4)
+	check_true("the bigger loop is still valid", TrackShape.corners_valid(bumped))
+
+	var straightened := TrackShape.straighten_at(bumped, 2)
+	check_true("the bend can be taken out again", not straightened.is_empty())
+	check_true("and that leaves fewer corners", straightened.size() < bumped.size())
+
+	# The floor holds: a plain rectangle cannot be reduced below four corners.
+	var square: Array[Vector2i] = [
+		Vector2i(0, 0), Vector2i(12, 0), Vector2i(12, 8), Vector2i(0, 8),
+	]
+	check_true("cannot straighten below four corners",
+		TrackShape.straighten_at(square, 1).is_empty())
+
+## Redundant vertices have to go, or the loop accumulates handles that are not
+## bends — they would show a grab dot that does nothing and inflate the corner
+## count the player is shown.
+func test_shape_prunes_non_corners() -> void:
+	var with_flat: Array[Vector2i] = [
+		Vector2i(0, 0), Vector2i(6, 0), Vector2i(12, 0),  # middle is not a bend
+		Vector2i(12, 8), Vector2i(0, 8),
+	]
+	var pruned := TrackShape.prune(with_flat)
+	check("collinear vertex dropped", pruned.size(), 4)
+	check_true("the loop survives pruning", TrackShape.corners_valid(pruned))
+
+## Anything that is not one simple ring must be rejected by the same test the
+## editor uses to police drags, so the two can never disagree.
+func test_shape_rejects_bad_rings() -> void:
+	var good := sample_layout().cells
+	check_true("a real loop walks", not TrackShape.walk(good).is_empty())
+
+	var gapped: Array[Vector2i] = []
+	gapped.assign(good.slice(0, good.size() - 2))
+	check_true("a gapped loop does not walk", TrackShape.walk(gapped).is_empty())
+
+	var spurred: Array[Vector2i] = good.duplicate()
+	spurred.append(good[4] + Vector2i(0, -1))
+	check_true("a spur does not walk", TrackShape.walk(spurred).is_empty())
+
+	var doubled: Array[Vector2i] = good.duplicate()
+	doubled.append(good[0])
+	check_true("a repeated cell does not walk", TrackShape.walk(doubled).is_empty())
+
+	var two: Array[Vector2i] = good.duplicate()
+	for x in 6:
+		two.append(Vector2i(400 + x, 400))
+		two.append(Vector2i(400 + x, 403))
+	for y in range(401, 403):
+		two.append(Vector2i(400, y))
+		two.append(Vector2i(405, y))
+	check_true("two separate rings do not walk", TrackShape.walk(two).is_empty())
+
 ## Custom tracks are JSON on disk, so the whole shape has to survive the trip.
 func test_layout_round_trip() -> void:
 	var layout := sample_layout()
@@ -481,6 +586,10 @@ func _physics_process(_delta: float) -> bool:
 		test_corner_sizing()
 		test_elevation()
 		test_layout_round_trip()
+		test_shape_edits_stay_valid()
+		test_shape_add_and_remove()
+		test_shape_prunes_non_corners()
+		test_shape_rejects_bad_rings()
 		return false
 
 	if frame == 4:

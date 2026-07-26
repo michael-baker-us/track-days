@@ -132,7 +132,10 @@ func compile() -> Compiled:
 		return out
 
 	var occupied := {}
+	var doubled := false
 	for c in cells:
+		if occupied.has(c):
+			doubled = true
 		occupied[c] = true
 
 	# Exactly two neighbours everywhere is precisely the condition for a simple
@@ -141,7 +144,7 @@ func compile() -> Compiled:
 	var loose := 0
 	var junctions := 0
 	for c in cells:
-		var n := _neighbour_count(occupied, c)
+		var n := TrackShape.neighbour_count(occupied, c)
 		if n == 2:
 			continue
 		out.problem_cells.append(c)
@@ -164,14 +167,17 @@ func compile() -> Compiled:
 	if not out.problem_cells.is_empty():
 		return out
 
-	var cycle := _walk(occupied, cells[0])
-	if cycle.size() != cells.size():
+	# TrackShape.walk is the single definition of a valid painted loop; the
+	# handle edits in the editor are refused against exactly this test, so the
+	# two can never disagree about what counts as a circuit.
+	var cycle := TrackShape.walk(cells)
+	if cycle.is_empty() or doubled:
 		out.errors.append("That is more than one separate loop — join them or erase one.")
 		return out
 	if reversed:
 		cycle.reverse()
 
-	var bends := _find_bends(cycle)
+	var bends := TrackShape.bend_indices(cycle)
 	if bends.size() < 4:
 		out.errors.append("A circuit needs at least four corners.")
 		return out
@@ -193,47 +199,8 @@ func compile() -> Compiled:
 	out.ok = out.errors.is_empty()
 	return out
 
-func _neighbour_count(occupied: Dictionary, c: Vector2i) -> int:
-	var n := 0
-	for d in NEIGHBOURS:
-		if occupied.has(c + d):
-			n += 1
-	return n
 
-## Follows the loop from a starting cell, always stepping to the neighbour that
-## is not where we just came from.
-func _walk(occupied: Dictionary, from: Vector2i) -> Array[Vector2i]:
-	var order: Array[Vector2i] = [from]
-	var prev := from
-	var cur := from
-	for d in NEIGHBOURS:
-		if occupied.has(from + d):
-			cur = from + d
-			break
-	while cur != from:
-		order.append(cur)
-		var next := cur
-		for d in NEIGHBOURS:
-			var cand := cur + d
-			if occupied.has(cand) and cand != prev:
-				next = cand
-				break
-		prev = cur
-		cur = next
-		if order.size() > occupied.size():
-			break
-	return order
 
-## Indices into the cycle where travel direction changes.
-func _find_bends(cycle: Array[Vector2i]) -> Array[int]:
-	var n := cycle.size()
-	var out: Array[int] = []
-	for i in n:
-		var into := cycle[i] - cycle[(i - 1 + n) % n]
-		var away := cycle[(i + 1) % n] - cycle[i]
-		if into != away:
-			out.append(i)
-	return out
 
 func _build_corners_and_runs(
 	cycle: Array[Vector2i], bends: Array[int], out: Compiled

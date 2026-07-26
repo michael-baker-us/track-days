@@ -3,102 +3,162 @@
 [ext_resource type="Script" path="res://scripts/ui/track_editor.gd" id="1_64auw"]
 [ext_resource type="Script" path="res://scripts/ui/track_grid.gd" id="2_7d7mg"]
 
-[node name="TrackEditor" type="Control" unique_id=1259963549]
+[node name="TrackEditor" type="Control" unique_id=1378133974]
 layout_mode = 3
 anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_64auw")
 
-[node name="Background" type="ColorRect" parent="." unique_id=859115032]
+[node name="Background" type="ColorRect" parent="." unique_id=1416287141]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 color = Color(0.11, 0.13, 0.15, 1)
 
-[node name="Split" type="HBoxContainer" parent="." unique_id=2015016509]
+[node name="Split" type="HBoxContainer" parent="." unique_id=1190592817]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_constants/separation = 0
 
-[node name="Grid" type="Control" parent="Split" unique_id=1295855463]
+[node name="Grid" type="Control" parent="Split" unique_id=2113743021]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("2_7d7mg")
 
-[node name="Panel" type="VBoxContainer" parent="Split" unique_id=1891463425]
-custom_minimum_size = Vector2(320, 0)
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Heading" type="Label" parent="Split/Panel" unique_id=107300574]
-layout_mode = 2
-theme_override_font_sizes/font_size = 26
-text = "TRACK EDITOR"
-
-[node name="NameEdit" type="LineEdit" parent="Split/Panel" unique_id=613168537]
-layout_mode = 2
-placeholder_text = "Circuit name"
-
-[node name="Picker" type="OptionButton" parent="Split/Panel" unique_id=180651295]
-layout_mode = 2
-
-[node name="@Control@12" type="Control" parent="Split/Panel" unique_id=2106448261]
-custom_minimum_size = Vector2(0, 6)
-layout_mode = 2
-
-[node name="Modes" type="VBoxContainer" parent="Split/Panel" unique_id=1102739253]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="Hint" type="Label" parent="Split/Panel" unique_id=294088886]
-custom_minimum_size = Vector2(296, 52)
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-autowrap_mode = 3
-
-[node name="@Control@13" type="Control" parent="Split/Panel" unique_id=1287779975]
-custom_minimum_size = Vector2(0, 6)
-layout_mode = 2
-
-[node name="Readout" type="Label" parent="Split/Panel" unique_id=1457935023]
-custom_minimum_size = Vector2(296, 120)
-layout_mode = 2
-theme_override_font_sizes/font_size = 15
-autowrap_mode = 3
-
-[node name="Filler" type="Control" parent="Split/Panel" unique_id=739577675]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="Actions" type="VBoxContainer" parent="Split/Panel" unique_id=1547918389]
+[node name="Side" type="VBoxContainer" parent="Split" unique_id=1623948657]
+custom_minimum_size = Vector2(330, 0)
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="SaveButton" type="Button" parent="Split/Panel/Actions" unique_id=899638924]
-custom_minimum_size = Vector2(0, 34)
+[node name="Scroll" type="ScrollContainer" parent="Split/Side" unique_id=2034542923]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Panel" type="VBoxContainer" parent="Split/Side/Scroll" unique_id=2096626216]
+custom_minimum_size = Vector2(306, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 7
+
+[node name="Heading" type="Label" parent="Split/Side/Scroll/Panel" unique_id=629421454]
+layout_mode = 2
+theme_override_font_sizes/font_size = 25
+text = "TRACK EDITOR"
+
+[node name="NameEdit" type="LineEdit" parent="Split/Side/Scroll/Panel" unique_id=1384524536]
+layout_mode = 2
+placeholder_text = "Circuit name"
+
+[node name="Picker" type="OptionButton" parent="Split/Side/Scroll/Panel" unique_id=191272292]
+layout_mode = 2
+
+[node name="Guide" type="Label" parent="Split/Side/Scroll/Panel" unique_id=947573766]
+custom_minimum_size = Vector2(306, 54)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 15
+autowrap_mode = 3
+
+[node name="Rule" type="ColorRect" parent="Split/Side/Scroll/Panel" unique_id=1357729550]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(1, 1, 1, 0.1)
+
+[node name="Legend" type="VBoxContainer" parent="Split/Side/Scroll/Panel" unique_id=535937709]
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="LegendRow" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=686045119]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "drag a green dot — move that corner"
+
+[node name="@Label@14" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=413697783]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "drag the road — slide that straight"
+
+[node name="@Label@15" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=884820031]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "double-click the road — add a bend"
+
+[node name="@Label@16" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=237518751]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "right-click a green dot — remove that corner"
+
+[node name="@Label@17" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=791379319]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "click a numbered badge — corner radius"
+
+[node name="@Label@18" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=596028156]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "click a badge inside the loop — climb"
+
+[node name="@Label@19" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1234236446]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "drag the flag — move the start line"
+
+[node name="@ColorRect@20" type="ColorRect" parent="Split/Side/Scroll/Panel" unique_id=1895631757]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(1, 1, 1, 0.1)
+
+[node name="Readout" type="Label" parent="Split/Side/Scroll/Panel" unique_id=1473993855]
+custom_minimum_size = Vector2(306, 96)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 15
+autowrap_mode = 3
+
+[node name="Status" type="Label" parent="Split/Side/Scroll/Panel" unique_id=787559203]
+custom_minimum_size = Vector2(306, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 3
+
+[node name="Actions" type="VBoxContainer" parent="Split/Side" unique_id=359770638]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="UndoButton" type="Button" parent="Split/Side/Actions" unique_id=1694407110]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+text = "Undo  (ctrl+Z)"
+
+[node name="SaveButton" type="Button" parent="Split/Side/Actions" unique_id=859280830]
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 text = "Save  (ctrl+S)"
 
-[node name="TestButton" type="Button" parent="Split/Panel/Actions" unique_id=588461092]
-custom_minimum_size = Vector2(0, 34)
+[node name="TestButton" type="Button" parent="Split/Side/Actions" unique_id=763273129]
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 text = "Test drive"
 
-[node name="DeleteButton" type="Button" parent="Split/Panel/Actions" unique_id=1185455765]
-custom_minimum_size = Vector2(0, 34)
+[node name="DeleteButton" type="Button" parent="Split/Side/Actions" unique_id=96433282]
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 text = "Delete"
 
-[node name="BackButton" type="Button" parent="Split/Panel/Actions" unique_id=923351250]
-custom_minimum_size = Vector2(0, 34)
+[node name="BackButton" type="Button" parent="Split/Side/Actions" unique_id=1447311999]
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 text = "Back to menu  (esc)"
 
-[node name="Keys" type="Label" parent="Split/Panel" unique_id=19068317]
+[node name="Keys" type="Label" parent="Split/Side" unique_id=830966244]
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "wheel zooms · middle-drag pans · F refits"
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "wheel zooms · middle-drag pans · F refits · shift-drag paints freehand"
+autowrap_mode = 3
