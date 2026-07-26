@@ -35,6 +35,15 @@ func _initialize() -> void:
 	rows.add_child(tracks)
 
 	rows.add_child(_spacer(18))
+
+	var editor_button := Button.new()
+	editor_button.name = "EditorButton"
+	editor_button.text = "Build a track"
+	editor_button.custom_minimum_size = Vector2(460.0, 44.0)
+	editor_button.add_theme_font_size_override("font_size", 18)
+	rows.add_child(editor_button)
+
+	rows.add_child(_spacer(10))
 	rows.add_child(_label("Hint", "esc returns here from a race", 15))
 
 	_set_owner(root_ctrl, root_ctrl)

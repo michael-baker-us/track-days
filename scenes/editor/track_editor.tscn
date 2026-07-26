@@ -1,0 +1,104 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/track_editor.gd" id="1_64auw"]
+[ext_resource type="Script" path="res://scripts/ui/track_grid.gd" id="2_7d7mg"]
+
+[node name="TrackEditor" type="Control" unique_id=1259963549]
+layout_mode = 3
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_64auw")
+
+[node name="Background" type="ColorRect" parent="." unique_id=859115032]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.11, 0.13, 0.15, 1)
+
+[node name="Split" type="HBoxContainer" parent="." unique_id=2015016509]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/separation = 0
+
+[node name="Grid" type="Control" parent="Split" unique_id=1295855463]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("2_7d7mg")
+
+[node name="Panel" type="VBoxContainer" parent="Split" unique_id=1891463425]
+custom_minimum_size = Vector2(320, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="Label" parent="Split/Panel" unique_id=107300574]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "TRACK EDITOR"
+
+[node name="NameEdit" type="LineEdit" parent="Split/Panel" unique_id=613168537]
+layout_mode = 2
+placeholder_text = "Circuit name"
+
+[node name="Picker" type="OptionButton" parent="Split/Panel" unique_id=180651295]
+layout_mode = 2
+
+[node name="@Control@12" type="Control" parent="Split/Panel" unique_id=2106448261]
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+
+[node name="Modes" type="VBoxContainer" parent="Split/Panel" unique_id=1102739253]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Hint" type="Label" parent="Split/Panel" unique_id=294088886]
+custom_minimum_size = Vector2(296, 52)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+autowrap_mode = 3
+
+[node name="@Control@13" type="Control" parent="Split/Panel" unique_id=1287779975]
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+
+[node name="Readout" type="Label" parent="Split/Panel" unique_id=1457935023]
+custom_minimum_size = Vector2(296, 120)
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+autowrap_mode = 3
+
+[node name="Filler" type="Control" parent="Split/Panel" unique_id=739577675]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Actions" type="VBoxContainer" parent="Split/Panel" unique_id=1547918389]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SaveButton" type="Button" parent="Split/Panel/Actions" unique_id=899638924]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+text = "Save  (ctrl+S)"
+
+[node name="TestButton" type="Button" parent="Split/Panel/Actions" unique_id=588461092]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+text = "Test drive"
+
+[node name="DeleteButton" type="Button" parent="Split/Panel/Actions" unique_id=1185455765]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+text = "Delete"
+
+[node name="BackButton" type="Button" parent="Split/Panel/Actions" unique_id=923351250]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+text = "Back to menu  (esc)"
+
+[node name="Keys" type="Label" parent="Split/Panel" unique_id=19068317]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "wheel zooms · middle-drag pans · F refits"

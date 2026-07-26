@@ -88,6 +88,9 @@ class Run extends RefCounted:
 class Compiled extends RefCounted:
 	var ok := false
 	var errors: Array[String] = []
+	## Cells the player needs to look at, so the editor can point at the problem
+	## instead of only describing it.
+	var problem_cells: Array[Vector2i] = []
 	var segments: Array = []
 	var corners: Array[Bend] = []
 	var runs: Array[Run] = []
@@ -132,14 +135,31 @@ func compile() -> Compiled:
 	# Exactly two neighbours everywhere is precisely the condition for a simple
 	# closed loop: fewer means a dead end, more means a junction or a blob, and
 	# neither can be driven as a circuit.
+	var loose := 0
+	var junctions := 0
 	for c in cells:
 		var n := _neighbour_count(occupied, c)
+		if n == 2:
+			continue
+		out.problem_cells.append(c)
 		if n < 2:
-			out.errors.append("Loose end at %d, %d — the road has to join up." % [c.x, c.y])
-			return out
-		if n > 2:
-			out.errors.append("Junction at %d, %d — the road cannot branch or double back on itself." % [c.x, c.y])
-			return out
+			loose += 1
+		else:
+			junctions += 1
+	# Report every bad cell in one pass rather than stopping at the first, so a
+	# player fixing a half-drawn circuit can see all of it at once.
+	if loose > 0:
+		out.errors.append(
+			"%d loose end%s — the road has to join back up into one loop."
+			% [loose, "" if loose == 1 else "s"]
+		)
+	if junctions > 0:
+		out.errors.append(
+			"%d junction%s — the road cannot branch or run alongside itself."
+			% [junctions, "" if junctions == 1 else "s"]
+		)
+	if not out.problem_cells.is_empty():
+		return out
 
 	var cycle := _walk(occupied, cells[0])
 	if cycle.size() != cells.size():

@@ -2,21 +2,21 @@
 
 [ext_resource type="Script" path="res://scripts/ui/title_screen.gd" id="1_4ignj"]
 
-[node name="Title" type="Control" unique_id=1693367026]
+[node name="Title" type="Control" unique_id=66556595]
 layout_mode = 3
 anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_4ignj")
 
-[node name="Background" type="ColorRect" parent="." unique_id=1229932511]
+[node name="Background" type="ColorRect" parent="." unique_id=785027522]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 color = Color(0.11, 0.13, 0.15, 1)
 
-[node name="Rows" type="VBoxContainer" parent="." unique_id=1669089838]
+[node name="Rows" type="VBoxContainer" parent="." unique_id=1593866817]
 custom_minimum_size = Vector2(460, 0)
 layout_mode = 0
 anchor_left = 0.5
@@ -29,31 +29,41 @@ offset_right = -230.0
 offset_bottom = -190.0
 theme_override_constants/separation = 10
 
-[node name="Heading" type="Label" parent="Rows" unique_id=1805665309]
+[node name="Heading" type="Label" parent="Rows" unique_id=129018148]
 layout_mode = 2
 theme_override_font_sizes/font_size = 60
 text = "TRACK DAYS"
 horizontal_alignment = 1
 
-[node name="Sub" type="Label" parent="Rows" unique_id=1830301967]
+[node name="Sub" type="Label" parent="Rows" unique_id=1992323343]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "select a circuit"
 horizontal_alignment = 1
 
-[node name="@Control@2" type="Control" parent="Rows" unique_id=1598202285]
+[node name="@Control@2" type="Control" parent="Rows" unique_id=658831729]
 custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
 
-[node name="Tracks" type="VBoxContainer" parent="Rows" unique_id=176059956]
+[node name="Tracks" type="VBoxContainer" parent="Rows" unique_id=400303227]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="@Control@3" type="Control" parent="Rows" unique_id=568512855]
+[node name="@Control@3" type="Control" parent="Rows" unique_id=909703299]
 custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
 
-[node name="Hint" type="Label" parent="Rows" unique_id=2043461695]
+[node name="EditorButton" type="Button" parent="Rows" unique_id=670391372]
+custom_minimum_size = Vector2(460, 44)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Build a track"
+
+[node name="@Control@4" type="Control" parent="Rows" unique_id=2007646375]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="Hint" type="Label" parent="Rows" unique_id=529413298]
 layout_mode = 2
 theme_override_font_sizes/font_size = 15
 text = "esc returns here from a race"

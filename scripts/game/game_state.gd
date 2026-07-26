@@ -28,8 +28,49 @@ const TRACKS := [
 
 static var selected_index: int = 0
 
+## Where Esc out of a race goes. The editor points it at itself so that taking a
+## circuit for a lap and coming back does not throw away the edit in progress.
+static var return_scene: String = "res://scenes/title.tscn"
+
+## Which custom track the editor should open. Empty means start a new one.
+static var editing_id: String = ""
+
+## The shipped circuits followed by whatever the player has built, which is the
+## order the title screen lists them in and the order `selected_index` counts
+## through. Built-ins come first so their indices never move when a custom track
+## is added or deleted.
+##
+## A shipped track carries a `scene` to instance; a custom one carries a
+## `layout` for `TrackBuilder` to build on the spot. `race.gd` is the only place
+## that has to care which.
+static func all_tracks() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	out.assign(TRACKS)
+	for layout in TrackStore.list_layouts():
+		out.append({
+			"id": layout.id,
+			"name": layout.display_name,
+			"blurb": describe(layout),
+			"layout": layout,
+			"custom": true,
+		})
+	return out
+
+## A one-line summary of a custom circuit for the menu, from the same compile
+## the editor uses — so the list cannot claim a length the track does not have.
+static func describe(layout: TrackLayout) -> String:
+	var compiled := layout.compile()
+	if not compiled.ok:
+		return "unfinished — open the editor to fix it"
+	var result := TrackBuilder.new().measure(compiled.segments)
+	var text := "%.0f m, %d corners" % [result.length, compiled.corners.size()]
+	if result.peak > 0.5:
+		text += ", climbs %.1f m" % result.peak
+	return text
+
 static func selected() -> Dictionary:
-	return TRACKS[clampi(selected_index, 0, TRACKS.size() - 1)]
+	var tracks := all_tracks()
+	return tracks[clampi(selected_index, 0, tracks.size() - 1)]
 
 ## One place that knows how a record is keyed, shared by the tracker that
 ## writes them and the title screen that displays them.

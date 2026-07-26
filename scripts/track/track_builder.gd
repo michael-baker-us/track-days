@@ -147,16 +147,23 @@ var _gate_spacing := 0.0
 ## A layout only makes a circuit if it closes: gap (0, 0), net turns +/-4, and
 ## height back to 0. Callers must check `BuildResult.closed` — the builder still
 ## returns geometry for a broken layout so the editor can draw it.
-func build(track_name: String, layout: Array) -> BuildResult:
+##
+## With `with_geometry` false nothing is instanced and `result.root` is null;
+## see `measure()`.
+func build(track_name: String, layout: Array, with_geometry := true) -> BuildResult:
 	centreline = []
+	_triangles = 0
+	_gate_spacing = 0.0
 
-	var root_node := Node3D.new()
-	root_node.name = "Track_%s" % track_name
-
-	var roads := Node3D.new()
-	roads.name = "RoadVisuals"
-	roads.scale = Vector3(SCALE, SCALE * VERT, SCALE)
-	root_node.add_child(roads)
+	var root_node: Node3D = null
+	var roads: Node3D = null
+	if with_geometry:
+		root_node = Node3D.new()
+		root_node.name = "Track_%s" % track_name
+		roads = Node3D.new()
+		roads.name = "RoadVisuals"
+		roads.scale = Vector3(SCALE, SCALE * VERT, SCALE)
+		root_node.add_child(roads)
 
 	var pos := Vector2.ZERO
 	var heading := DIRS["S"]
@@ -185,27 +192,28 @@ func build(track_name: String, layout: Array) -> BuildResult:
 			height = r[5]
 			heading = new_heading
 
-	if BARRIERS_ENABLED:
-		_build_walls(root_node)
-	_build_road_collision(root_node)
-	_build_checkpoints(root_node)
-	_build_ground(root_node)
-	_build_lighting(root_node)
-
 	var total := 0.0
 	for i in centreline.size() - 1:
 		total += centreline[i].distance_to(centreline[i + 1])
 
-	# Start just *behind* the line rather than just past it, so the timer starts
-	# a second or two in instead of after a full out lap.
-	var grid := _point_at_arc(total - SPAWN_BEHIND_LINE)
-	var spawn := Marker3D.new()
-	spawn.name = "SpawnPoint"
-	spawn.position = (grid[0] as Vector3) + Vector3(0.0, 1.0, 0.0)
-	# The car model faces local +Z, so align +Z with the track tangent.
-	var tan: Vector2 = grid[1]
-	spawn.rotation.y = atan2(tan.x, tan.y)
-	root_node.add_child(spawn)
+	if with_geometry:
+		if BARRIERS_ENABLED:
+			_build_walls(root_node)
+		_build_road_collision(root_node)
+		_build_checkpoints(root_node)
+		_build_ground(root_node)
+		_build_lighting(root_node)
+
+		# Start just *behind* the line rather than just past it, so the timer
+		# starts a second or two in instead of after a full out lap.
+		var grid := _point_at_arc(total - SPAWN_BEHIND_LINE)
+		var spawn := Marker3D.new()
+		spawn.name = "SpawnPoint"
+		spawn.position = (grid[0] as Vector3) + Vector3(0.0, 1.0, 0.0)
+		# The car model faces local +Z, so align +Z with the track tangent.
+		var tan: Vector2 = grid[1]
+		spawn.rotation.y = atan2(tan.x, tan.y)
+		root_node.add_child(spawn)
 
 	var result := BuildResult.new()
 	result.root = root_node
@@ -222,13 +230,12 @@ func build(track_name: String, layout: Array) -> BuildResult:
 	)
 	return result
 
-## Walks a layout without building any geometry, returning the centreline in
-## metres. The editor redraws its preview on every click, and instancing a few
-## hundred GLB tiles at that rate is far too slow — this costs nothing.
-func trace(layout: Array) -> Array[Vector3]:
-	var result := build("preview", layout)
-	result.root.free()
-	return centreline
+## Walks a layout without building anything, filling `centreline` and returning
+## the same closure and length figures as a real build. The editor recompiles on
+## every mouse move and the menu measures every custom track it lists, so both
+## need the numbers without paying for the tiles.
+func measure(layout: Array) -> BuildResult:
+	return build("measure", layout, false)
 
 # Returns [exit_pos, exit_heading, entry_pos, origin, theta, exit_height]
 func _place(
@@ -265,18 +272,22 @@ func _place(
 				var origin := pos - _rotate(entry_local, theta)
 				var exit_pos := origin + _rotate(exit_local, theta)
 
-				var holder := Node3D.new()
-				# Lift the piece so its entry connection meets the running height.
-				holder.position = Vector3(origin.x, height - y_in, origin.y)
-				holder.rotation.y = deg_to_rad(theta)
-				parent.add_child(holder)
+				# No parent means a measuring walk: the arithmetic is all that is
+				# wanted, and instancing a few hundred GLB tiles is by far the
+				# most expensive thing the builder does.
+				if parent != null:
+					var holder := Node3D.new()
+					# Lift the piece so its entry connection meets the running height.
+					holder.position = Vector3(origin.x, height - y_in, origin.y)
+					holder.rotation.y = deg_to_rad(theta)
+					parent.add_child(holder)
 
-				var inst: Node3D = load(
-					"res://assets/kenney/racing_kit/%s.glb" % piece
-				).instantiate()
-				var shift: Vector2 = desc["shift"]
-				inst.position = Vector3(shift.x, 0.0, shift.y)
-				holder.add_child(inst)
+					var inst: Node3D = load(
+						"res://assets/kenney/racing_kit/%s.glb" % piece
+					).instantiate()
+					var shift: Vector2 = desc["shift"]
+					inst.position = Vector3(shift.x, 0.0, shift.y)
+					holder.add_child(inst)
 
 				return [exit_pos, want_heading, pos, origin, theta, height + rise]
 
