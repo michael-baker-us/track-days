@@ -38,6 +38,7 @@ var _undo: Array[Dictionary] = []
 var _transient_status := ""
 
 func _ready() -> void:
+	ViewportScaling.attach(get_window())
 	# Esc out of a test drive comes back here, not to the menu, so the circuit
 	# being worked on stays on screen.
 	GameState.return_scene = EDITOR_SCENE

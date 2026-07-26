@@ -24,6 +24,7 @@ const EDIT_W := 74.0
 var _entries: Array[Dictionary] = []
 
 func _ready() -> void:
+	ViewportScaling.attach(get_window())
 	# Whatever the editor last set it to, Esc from a race started here comes back
 	# here.
 	GameState.return_scene = TITLE_SCENE

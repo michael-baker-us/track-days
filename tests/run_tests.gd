@@ -1277,6 +1277,144 @@ func test_web_render_settings_survive() -> void:
 	check_true("the stretch mode is still in the file",
 		text.contains('window/stretch/mode="canvas_items"'))
 
+## `keep_height` is right for every landscape shape but pins the canvas to 720
+## units tall, so a 9:16 phone gets 720 * 9/16 = 405 units of width — narrower
+## than the 300-unit track buttons plus the Edit column, which then run off both
+## sides. Portrait has to keep the width instead and let the canvas grow tall.
+func test_orientation_picks_a_scaling_rule() -> void:
+	check("landscape keeps the measured design size",
+		ViewportScaling.design_size(Vector2i(1920, 1080)), ViewportScaling.LANDSCAPE)
+	check("landscape scales by height",
+		ViewportScaling.aspect_mode(Vector2i(1920, 1080)),
+		Window.CONTENT_SCALE_ASPECT_KEEP_HEIGHT)
+	check("portrait turns the design size over",
+		ViewportScaling.design_size(Vector2i(1170, 2532)), ViewportScaling.PORTRAIT)
+	check("portrait scales by width",
+		ViewportScaling.aspect_mode(Vector2i(1170, 2532)),
+		Window.CONTENT_SCALE_ASPECT_KEEP_WIDTH)
+	# Square is not portrait: it belongs on the already-measured landscape path.
+	check("square stays on the landscape path",
+		ViewportScaling.design_size(Vector2i(800, 800)), ViewportScaling.LANDSCAPE)
+	# The short edge is 720 either way, so a control sized in canvas units covers
+	# the same fraction of the thumb-reachable edge in both orientations.
+	check("the short edge matches in both orientations",
+		mini(ViewportScaling.LANDSCAPE.x, ViewportScaling.LANDSCAPE.y),
+		mini(ViewportScaling.PORTRAIT.x, ViewportScaling.PORTRAIT.y))
+	# The project setting must stay landscape: it is what a fresh window and this
+	# headless suite both get before any scene has run.
+	check("the project default is still the landscape rule",
+		ProjectSettings.get_setting("display/window/stretch/aspect", ""), "keep_height")
+
+func _find_touch_controls() -> Control:
+	var found := root.find_children("TouchControls", "Control", true, false)
+	return found[0] if not found.is_empty() else null
+
+func _touch_event(index: int, pos: Vector2, pressed: bool) -> InputEventScreenTouch:
+	var e := InputEventScreenTouch.new()
+	e.index = index
+	e.position = pos
+	e.pressed = pressed
+	return e
+
+## Feed one touch event to the pads and settle the action state it synthesises.
+##
+## `Input.parse_input_event` buffers: the action a pad presses does not reach
+## `Input.is_action_pressed` until the buffer is flushed, which normally happens
+## once per frame. In the game that is a frame of latency nobody can feel. Here
+## it would mean every assertion read the state from before the touch, so the
+## flush is forced rather than spreading one gesture over several frames.
+func _feed(touch: Control, event: InputEvent) -> void:
+	touch._input(event)
+	Input.flush_buffered_events()
+
+## The touch pads do not steer the car — they press the same actions the keyboard
+## and the pad press, so the car never learns touch exists.
+##
+## The multi-finger bookkeeping is the whole reason these are not `Button`s: a
+## `Button` is driven by the emulated mouse, which is a single pointer, so it
+## cannot hold the gas and steer at the same time. Every check below is a way
+## that hand-rolled bookkeeping has to not leak an action.
+func test_touch_pads_press_the_driving_actions() -> void:
+	var touch := _find_touch_controls()
+	check_true("the hud carries touch controls", touch != null)
+	if touch == null:
+		return
+	# Hidden on a machine with no touchscreen, which is the point of the node —
+	# but the input path is what is under test, so force them on.
+	check("hidden unless the device has a touchscreen",
+		touch.visible, DisplayServer.is_touchscreen_available())
+	var was_visible: bool = touch.visible
+	touch.visible = true
+
+	var gas: Control = touch.get_node("Gas")
+	var steer: Control = touch.get_node("SteerLeft")
+	check_true("the pads have been laid out", gas.get_global_rect().has_area())
+	var on_gas: Vector2 = gas.get_global_rect().get_center()
+	var on_steer: Vector2 = steer.get_global_rect().get_center()
+
+	_feed(touch, _touch_event(0, on_gas, true))
+	_feed(touch, _touch_event(1, on_steer, true))
+	check_true("gas held by the first finger", Input.is_action_pressed("accelerate"))
+	check_true("steering held by the second", Input.is_action_pressed("steer_left"))
+
+	# Lifting one finger must not release what another is holding.
+	_feed(touch, _touch_event(1, Vector2.ZERO, false))
+	check_true("gas survives the other finger lifting",
+		Input.is_action_pressed("accelerate"))
+	check_true("steering released with its own finger",
+		not Input.is_action_pressed("steer_left"))
+
+	# Two fingers on the *same* pad: the first to lift must not release it.
+	_feed(touch, _touch_event(2, on_gas, true))
+	_feed(touch, _touch_event(0, Vector2.ZERO, false))
+	check_true("gas survives while a second finger is still on it",
+		Input.is_action_pressed("accelerate"))
+	_feed(touch, _touch_event(2, Vector2.ZERO, false))
+	check_true("gas releases when the last finger lifts",
+		not Input.is_action_pressed("accelerate"))
+
+	# A thumb that slides off the pad has to release it, or the throttle sticks.
+	_feed(touch, _touch_event(3, on_gas, true))
+	var drag := InputEventScreenDrag.new()
+	drag.index = 3
+	drag.position = on_gas + Vector2(0.0, -400.0)
+	_feed(touch, drag)
+	check_true("sliding off a pad releases it",
+		not Input.is_action_pressed("accelerate"))
+	_feed(touch, _touch_event(3, Vector2.ZERO, false))
+
+	# Leaving the race mid-press must not strand an action down: nothing else
+	# would ever send the matching release.
+	_feed(touch, _touch_event(4, on_gas, true))
+	touch.release_all()
+	# The releases it sends are buffered like any other. In the game the flush
+	# happens next frame with the node already gone, which is fine — the events
+	# are held by `Input`, not by the node that queued them.
+	Input.flush_buffered_events()
+	check_true("release_all clears a held action",
+		not Input.is_action_pressed("accelerate"))
+
+	touch.visible = was_visible
+
+## Portrait is the tight one: the canvas is 720 units wide there against 1280 in
+## landscape, and every pad is anchored to a bottom corner, so what has to fit is
+## the two steering pads plus the pedal column across that width.
+func test_touch_pads_fit_a_portrait_canvas() -> void:
+	var touch := _find_touch_controls()
+	if touch == null:
+		return
+	var steer_right: Control = touch.get_node("SteerRight")
+	var gas: Control = touch.get_node("Gas")
+	# Offsets, not `position`: `position` resolves against the parent's *current*
+	# width, so reading it here would only ever re-measure the landscape canvas
+	# the suite is running in. `offset_left` is anchor-relative, so the same
+	# number describes the control at any canvas width.
+	var pads_end: float = steer_right.offset_left + steer_right.size.x
+	var pedals_start: float = float(ViewportScaling.PORTRAIT.x) + gas.offset_left
+	check_true("the pads clear the pedals across a portrait canvas (%d < %d)"
+		% [int(pads_end), int(pedals_start)],
+		pads_end < pedals_start)
+
 ## Every circuit has to stay reachable however many are saved. The menu used to be
 ## centred with hardcoded offsets, so it grew downwards off the bottom of the
 ## screen and took the last circuits, "Build a track" and the hint with it.
@@ -1536,6 +1674,11 @@ func _physics_process(_delta: float) -> bool:
 		return false
 
 	if frame == 4:
+		# A frame after the HUD was added, so the pads have their final rects —
+		# the hit-testing under test is done against those rects.
+		test_orientation_picks_a_scaling_rule()
+		test_touch_pads_press_the_driving_actions()
+		test_touch_pads_fit_a_portrait_canvas()
 		test_custom_track_is_complete()
 		test_custom_spawn_is_on_the_road()
 		test_banked_collision_leans_into_the_corner()

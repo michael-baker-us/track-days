@@ -58,6 +58,8 @@ func _initialize() -> void:
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root_ctrl.add_child(banner)
 
+	root_ctrl.add_child(_touch_controls())
+
 	_set_owner(layer, layer)
 	var packed := PackedScene.new()
 	packed.pack(layer)
@@ -65,6 +67,58 @@ func _initialize() -> void:
 	print("hud.tscn: %s" % ("ok" if err == OK else "FAILED %s" % err))
 	layer.free()
 	quit(0)
+
+## On-screen driving pads, hidden unless the device has a touchscreen. Node names
+## must match `REGION_ACTIONS` in scripts/ui/touch_controls.gd.
+##
+## Every pad is anchored to a *bottom* corner and sized in canvas units, so the
+## same layout lands correctly in both orientations: portrait keeps the width and
+## grows the canvas downwards, which moves the bottom edge away from the HUD but
+## leaves the pads under the thumbs either way. Nothing here is anchored to the
+## top, which is where a portrait canvas gains its extra room.
+const PAD := 120.0
+const PEDAL_W := 148.0
+const PEDAL_H := 104.0
+const EDGE := 28.0
+
+func _touch_controls() -> Control:
+	var root := Control.new()
+	root.name = "TouchControls"
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# The pads hit-test themselves from raw touch events, so the container must
+	# never swallow a press on its way to anything underneath.
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.set_script(load("res://scripts/ui/touch_controls.gd"))
+
+	# Steering, bottom left, thumb-width apart.
+	root.add_child(_pad("SteerLeft", "<", Control.PRESET_BOTTOM_LEFT,
+		Vector2(EDGE, -(PAD + EDGE)), Vector2(PAD, PAD)))
+	root.add_child(_pad("SteerRight", ">", Control.PRESET_BOTTOM_LEFT,
+		Vector2(EDGE + PAD + 16.0, -(PAD + EDGE)), Vector2(PAD, PAD)))
+
+	# Pedals, bottom right, gas below brake so the resting thumb is on the gas.
+	root.add_child(_pad("Gas", "GAS", Control.PRESET_BOTTOM_RIGHT,
+		Vector2(-(PEDAL_W + EDGE), -(PEDAL_H + EDGE)), Vector2(PEDAL_W, PEDAL_H)))
+	root.add_child(_pad("Brake", "BRAKE", Control.PRESET_BOTTOM_RIGHT,
+		Vector2(-(PEDAL_W + EDGE), -(PEDAL_H * 2.0 + EDGE + 12.0)),
+		Vector2(PEDAL_W, PEDAL_H)))
+	return root
+
+func _pad(node_name: String, text: String, preset: int, pos: Vector2,
+		size: Vector2) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.name = node_name
+	panel.set_anchors_preset(preset)
+	panel.position = pos
+	panel.size = size
+	panel.custom_minimum_size = size
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var label := _label("Label", text, 30)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	panel.add_child(label)
+	return panel
 
 func _margin(node_name: String) -> MarginContainer:
 	var m := MarginContainer.new()

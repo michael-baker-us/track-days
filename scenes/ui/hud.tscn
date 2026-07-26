@@ -1,18 +1,19 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_0mwgc"]
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hqnrr"]
+[ext_resource type="Script" path="res://scripts/ui/touch_controls.gd" id="2_bo48s"]
 
-[node name="HUD" type="CanvasLayer" unique_id=2021212989]
-script = ExtResource("1_0mwgc")
+[node name="HUD" type="CanvasLayer" unique_id=41309740]
+script = ExtResource("1_hqnrr")
 
-[node name="Root" type="Control" parent="." unique_id=385807220]
+[node name="Root" type="Control" parent="." unique_id=1089879117]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 
-[node name="LapPanel" type="PanelContainer" parent="Root" unique_id=858437465]
+[node name="LapPanel" type="PanelContainer" parent="Root" unique_id=227663781]
 custom_minimum_size = Vector2(214, 0)
 layout_mode = 0
 anchor_left = 1.0
@@ -22,46 +23,46 @@ offset_top = 16.0
 offset_right = -230.0
 offset_bottom = 16.0
 
-[node name="LapMargin" type="MarginContainer" parent="Root/LapPanel" unique_id=916691267]
+[node name="LapMargin" type="MarginContainer" parent="Root/LapPanel" unique_id=1161066433]
 layout_mode = 2
 theme_override_constants/margin_left = 14
 theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 14
 theme_override_constants/margin_bottom = 8
 
-[node name="Rows" type="VBoxContainer" parent="Root/LapPanel/LapMargin" unique_id=1615519915]
+[node name="Rows" type="VBoxContainer" parent="Root/LapPanel/LapMargin" unique_id=1352171346]
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="Lap" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=1369748281]
+[node name="Lap" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=685882864]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "OUT LAP"
 horizontal_alignment = 2
 clip_text = true
 
-[node name="Current" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=334051693]
+[node name="Current" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=784855567]
 layout_mode = 2
 theme_override_font_sizes/font_size = 30
 text = "--:--.---"
 horizontal_alignment = 2
 clip_text = true
 
-[node name="Last" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=1673069380]
+[node name="Last" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=1303024659]
 layout_mode = 2
 theme_override_font_sizes/font_size = 15
 text = "last   --:--.---"
 horizontal_alignment = 2
 clip_text = true
 
-[node name="Best" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=371414016]
+[node name="Best" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=1930745081]
 layout_mode = 2
 theme_override_font_sizes/font_size = 15
 text = "best   --:--.---"
 horizontal_alignment = 2
 clip_text = true
 
-[node name="SpeedPanel" type="PanelContainer" parent="Root" unique_id=1573079797]
+[node name="SpeedPanel" type="PanelContainer" parent="Root" unique_id=812022007]
 layout_mode = 0
 anchor_left = 1.0
 anchor_top = 1.0
@@ -72,19 +73,19 @@ offset_top = -84.0
 offset_right = -190.0
 offset_bottom = -84.0
 
-[node name="SpeedMargin" type="MarginContainer" parent="Root/SpeedPanel" unique_id=113771004]
+[node name="SpeedMargin" type="MarginContainer" parent="Root/SpeedPanel" unique_id=2024736342]
 layout_mode = 2
 theme_override_constants/margin_left = 14
 theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 14
 theme_override_constants/margin_bottom = 8
 
-[node name="Speed" type="Label" parent="Root/SpeedPanel/SpeedMargin" unique_id=1031071821]
+[node name="Speed" type="Label" parent="Root/SpeedPanel/SpeedMargin" unique_id=701907559]
 layout_mode = 2
 theme_override_font_sizes/font_size = 34
 text = "  0 km/h"
 
-[node name="Banner" type="Label" parent="Root" unique_id=1349717478]
+[node name="Banner" type="Label" parent="Root" unique_id=901813854]
 custom_minimum_size = Vector2(520, 0)
 layout_mode = 0
 anchor_left = 0.5
@@ -95,3 +96,86 @@ offset_right = -260.0
 offset_bottom = 90.0
 theme_override_font_sizes/font_size = 40
 horizontal_alignment = 1
+
+[node name="TouchControls" type="Control" parent="Root" unique_id=1843691207]
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("2_bo48s")
+
+[node name="SteerLeft" type="PanelContainer" parent="Root/TouchControls" unique_id=247128642]
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 28.0
+offset_top = -148.0
+offset_right = 148.0
+offset_bottom = -28.0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Root/TouchControls/SteerLeft" unique_id=741512035]
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "<"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SteerRight" type="PanelContainer" parent="Root/TouchControls" unique_id=1521131338]
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 164.0
+offset_top = -148.0
+offset_right = 284.0
+offset_bottom = -28.0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Root/TouchControls/SteerRight" unique_id=773300335]
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = ">"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Gas" type="PanelContainer" parent="Root/TouchControls" unique_id=380918618]
+custom_minimum_size = Vector2(148, 104)
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -176.0
+offset_top = -132.0
+offset_right = -28.0
+offset_bottom = -28.0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Root/TouchControls/Gas" unique_id=1639799149]
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "GAS"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Brake" type="PanelContainer" parent="Root/TouchControls" unique_id=839380847]
+custom_minimum_size = Vector2(148, 104)
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -176.0
+offset_top = -248.0
+offset_right = -28.0
+offset_bottom = -144.0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Root/TouchControls/Brake" unique_id=787204527]
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "BRAKE"
+horizontal_alignment = 1
+vertical_alignment = 1

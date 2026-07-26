@@ -173,6 +173,23 @@ gantry's midpoint), *not* arc zero, and each is pushed forward by half its depth
 because `body_entered` fires on the box's leading face. Timing accumulates in
 `_physics_process` so headless runs reproduce real times.
 
+### Input, controllers and touch
+
+Every joypad binding uses **device `-1`** (all devices), never a concrete index.
+`ui_accept` and `ui_cancel` are overridden in `project.godot` purely to add the A
+and B buttons — Godot's defaults for those two are keyboard-only, unlike the
+`ui_*` direction actions, which is why a pad could highlight a track but never
+select one. An override replaces the default outright, so both restate their keys.
+
+Touch pads live in `hud.tscn` as `TouchControls`, hidden unless the device has a
+touchscreen. They synthesise `InputEventAction`s rather than touching the car, so
+`car_controller` reads one set of actions whatever the device. They are not
+`Button`s on purpose: buttons come through the single emulated mouse pointer and
+so cannot do gas-and-steer together. See `docs/architecture.md`.
+
+`ViewportScaling` swaps the content-scale rule per orientation at runtime;
+the `keep_height` project setting stays as the landscape/headless default.
+
 ### Custom tracks are JSON
 
 `TrackStore` writes `user://tracks/*.json`, deliberately not `.tres` — resource

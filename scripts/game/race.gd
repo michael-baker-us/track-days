@@ -13,6 +13,8 @@ const TITLE_SCENE := "res://scenes/title.tscn"
 @onready var _tracker: Node = $LapTracker
 
 func _ready() -> void:
+	ViewportScaling.attach(get_window())
+
 	var track_info: Dictionary = GameState.selected()
 	_tracker.track_id = track_info["id"]
 

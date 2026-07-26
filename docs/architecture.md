@@ -118,6 +118,29 @@ saturates (~150). Above that, stopping is limited by tyre grip rather than brake
 force, which reads as an instant jolt — and it means grip can be tuned purely
 for cornering without touching how braking feels.
 
+## Input, and two traps in the input map
+
+`ui_accept` and `ui_cancel` are **overridden here purely to add a gamepad
+button** (A and B). Godot's defaults for those two are keyboard-only — unlike
+`ui_up`/`ui_down`/`ui_left`/`ui_right`, which do ship with D-pad and left-stick
+bindings. That asymmetry is the whole reason a controller could move the
+track-select highlight but never actually choose a track, which in turn made the
+pad look completely dead when it was not. Overriding an action replaces the
+default outright, so both overrides also restate the keys (Enter/Kp Enter/Space,
+Escape); dropping one of those from the list is how you silently lose a keyboard
+binding.
+
+Every joypad event is bound to **device `-1`** (all devices) rather than a
+concrete index. `InputMap` matches an event only when the binding's device is
+`-1` or an exact match, so `device 0` covers just the *first* pad the OS
+enumerates. This was hardening, not a bug fix — a Bluetooth pad measured on macOS
+did enumerate at index 0 and its `device 0` bindings matched correctly. But a pad
+that sleeps and reconnects can come back on a different index, and there is no
+reason a one-player game should care which index it got.
+
+Neither fact can be recorded in `project.godot` itself — Godot rewrites that file
+on its own schedule and deletes `;` comments.
+
 ## The track builder
 
 `tools/build_track.gd` walks a layout spec, carrying a position, a heading and a
@@ -595,6 +618,63 @@ background reaches every corner with no bars.
 > Controls are laid out in canvas units, so comparing the two makes a correctly
 > scaled UI look broken. `root.get_visible_rect().size` is the canvas, and
 > `root.get_final_transform()` carries the scale.
+
+`keep_height` is right for every *landscape* shape and wrong for portrait: it
+pins the canvas to 720 units tall, so a 9:16 phone gets 720 x 9/16 = 405 units of
+width and the 300-unit track buttons run off both sides. `ViewportScaling`
+(`scripts/ui/viewport_scaling.gd`) therefore swaps the rule at runtime — portrait
+keeps the *width* against a 720x1280 design, landscape keeps the height against
+1280x720 — and every scene root calls `attach()` in `_ready`.
+
+The **project setting stays `keep_height`**, deliberately. It is what a fresh
+window and the headless suite get before any scene has run, and the suite asserts
+it. Only the live window is retargeted.
+
+> The short edge is 720 in both design sizes, so a control sized in canvas units
+> covers the same fraction of the short edge either way. That is what lets one
+> set of touch-pad sizes serve both orientations.
+
+## Touch controls
+
+`TouchControls` lives inside `hud.tscn` and is hidden unless
+`DisplayServer.is_touchscreen_available()`. It does **not** drive the car. It
+synthesises `InputEventAction`s and pushes them through
+`Input.parse_input_event`, so `car_controller` keeps reading exactly the actions
+the keyboard and gamepad feed and never learns touch exists — adding a pad cannot
+change how the car drives, only what presses the same buttons.
+
+**`Button` cannot be used for this, and that is the whole design.** Button presses
+arrive via the emulated mouse (`emulate_mouse_from_touch`, on by default), and the
+emulated mouse is a *single* pointer owned by the first finger down — so a layout
+built from `Button`s physically cannot hold the gas and steer at the same time,
+which is most of driving. Raw `InputEventScreenTouch`/`InputEventScreenDrag` carry
+a per-finger `index`, so the pads hit-test themselves against those.
+
+That hand-rolled bookkeeping is where the bugs live, and each has a test:
+
+- Actions are **reference counted per finger**. Two fingers on the gas and the
+  first one lifting must not release it.
+- A finger that **drags off** a pad releases it, or a thumb slip leaves the
+  throttle stuck on.
+- `release_all()` runs on `_exit_tree` and on being hidden. Leaving the race
+  mid-press would otherwise strand that action down forever — `Input` holds a
+  synthesised press until something sends the matching release, and the node that
+  would have sent it is gone.
+
+> `Input.parse_input_event` **buffers**. The action does not reach
+> `Input.is_action_pressed` until the next flush, which is a frame of latency
+> nobody can feel in the game but which makes a test read the state from before
+> the touch. The suite calls `Input.flush_buffered_events()` after each synthetic
+> event rather than spreading one gesture across frames.
+
+Touch positions arrive in viewport space while `get_global_rect()` is in the
+CanvasLayer's space. They coincide only while that layer's transform is identity,
+so the hit test converts through `get_canvas_transform().affine_inverse()` rather
+than relying on it.
+
+The menus and the track editor need none of this: `emulate_mouse_from_touch`
+already turns a tap into a click, which is exactly what a `Button` and the
+editor's direct manipulation want.
 
 ## Known gaps
 
