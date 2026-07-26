@@ -449,8 +449,9 @@ func _on_test() -> void:
 func _on_delete() -> void:
 	if _layout.id.is_empty():
 		return
-	TrackStore.delete(_layout.id)
-	GameState.editing_id = ""
+	# Via GameState rather than TrackStore, so the circuit's lap record goes with
+	# it and cannot be inherited by the next track given the same name.
+	GameState.delete_track(_layout.id)
 	_layout = _starter_layout()
 	_grid.layout = _layout
 	_name_edit.text = _layout.display_name

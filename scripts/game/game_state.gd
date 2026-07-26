@@ -88,3 +88,26 @@ static func save_best_lap(track_id: String, seconds: float) -> void:
 	cfg.load(records_path)
 	cfg.set_value("records", record_key(track_id), seconds)
 	cfg.save(records_path)
+
+static func clear_best_lap(track_id: String) -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(records_path) != OK:
+		return
+	if not cfg.has_section_key("records", record_key(track_id)):
+		return
+	cfg.erase_section_key("records", record_key(track_id))
+	cfg.save(records_path)
+
+## Removing a circuit removes its record with it, which is why deletion lives
+## here rather than callers reaching for `TrackStore.delete` directly. Ids are
+## derived from the display name and handed straight back out by
+## `TrackStore.new_id` the moment the file is gone, so a record left behind is
+## inherited by the next circuit the player happens to name the same thing —
+## the exact thing `TrackStore.ID_PREFIX` exists to prevent across the shipped
+## tracks. It cannot live in `TrackStore` itself: that would make the two
+## classes reference each other, and this one already calls into it.
+static func delete_track(track_id: String) -> void:
+	TrackStore.delete(track_id)
+	clear_best_lap(track_id)
+	if editing_id == track_id:
+		editing_id = ""

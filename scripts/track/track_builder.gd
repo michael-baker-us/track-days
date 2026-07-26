@@ -27,7 +27,7 @@ extends RefCounted
 ## Banking: the centreline carries a roll angle per point as well as a position,
 ## and the ribbon's lateral offsets are rolled about the track tangent by it, so
 ## corners lean into the turn. The tile meshes are deformed to match — see
-## `_bank_tiles`. Bank rolls about the centreline, so the racing line's *height*
+## `_reshape_tiles`. Bank rolls about the centreline, so the racing line's *height*
 ## is untouched and elevation still closes exactly.
 
 # 1 tile unit -> this many metres. Sets road width, corner radii and lap length
@@ -118,6 +118,12 @@ const BANK_TRANSITION := 1.5
 ## Below this the roll is not worth deforming a mesh for, in radians. Roughly a
 ## tenth of a degree.
 const BANK_EPSILON := 0.002
+
+## The same threshold for the ramp-chain correction, in metres. A centimetre is
+## well under what a wheel can find, and keeping it non-zero means the tiles of a
+## single-tile level change — where the chain profile and the mesh's own are the
+## same curve — go on sharing one imported mesh instead of each baking a copy.
+const LIFT_EPSILON := 0.01
 
 ## How far the bank is carried across the road before it grades back to ground
 ## level, in metres either side of the centreline.
@@ -322,7 +328,7 @@ var bank := PackedFloat32Array()
 var _triangles := 0
 var _gate_spacing := 0.0
 ## One entry per placed tile: its node, and the centreline index range it spans.
-## Filled during the walk and consumed by `_bank_tiles`, which cannot run until
+## Filled during the walk and consumed by `_reshape_tiles`, which cannot run until
 ## the whole loop is known — a corner's bank reaches back into the straight
 ## before it, which has already been placed by the time the corner is reached.
 var _placed: Array = []
@@ -331,6 +337,13 @@ var _placed: Array = []
 var _corner_spans: Array = []
 ## The road's lateral direction at each centreline point; see `_side_vectors`.
 var _sides: Array[Vector3] = []
+## How far, in world units, the centreline at each point sits above the surface
+## the tile mesh under it actually has. Zero everywhere except inside a ramp
+## chain of more than one tile, where the profile spans the whole chain but each
+## mesh still carries its own — see `_trace_straight`. Always the same length as
+## `centreline`; `_frame_at` hands it to the tile reshaper so the visible road
+## and the collision ribbon stay the same surface.
+var _ramp_lift := PackedFloat32Array()
 
 ## Layout grammar:
 ##   ["S", piece, repeat]              straight run
@@ -353,6 +366,7 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 	_placed = []
 	_corner_spans = []
 	_sides = []
+	_ramp_lift = PackedFloat32Array()
 
 	var root_node: Node3D = null
 	var roads: Node3D = null
@@ -375,10 +389,28 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 		var piece: String = seg[1]
 		if kind == "S":
 			var rise_sign: int = seg[3] if seg.size() > 3 else 0
-			for i in int(seg[2]):
+			var count := int(seg[2])
+			# A level change of N is N ramp tiles in a row, and each mesh eases in
+			# *and* out of its own two cells. Traced one at a time that is N humps,
+			# not one hill: the gradient returns to zero at every tile seam, so a
+			# 0-to-3 climb pitches the car three times on the way up. The chain is
+			# therefore given a single profile spanning all N tiles. Peak gradient
+			# is unchanged — an eased ramp's steepest point is a fixed multiple of
+			# its average, and stretching rise and length together leaves that
+			# alone — so this only removes the undulation.
+			var chain := {}
+			if rise_sign != 0 and count > 1:
+				chain = {
+					"base": height,
+					"rise": _tile_rise(piece) * rise_sign * count,
+					"count": count,
+				}
+			for i in count:
 				var r := _place(roads, piece, pos, heading, heading, height, rise_sign)
 				var from_idx := _mark()
-				_trace_straight(piece, r[2], height, r[0], r[5])
+				if not chain.is_empty():
+					chain["index"] = i
+				_trace_straight(piece, r[2], height, r[0], r[5], chain)
 				_record(r[6], from_idx)
 				pos = r[0]
 				height = r[5]
@@ -409,7 +441,7 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 	if with_geometry:
 		# After the whole loop, because a corner's bank reaches back into the
 		# straight before it and forward into the one after.
-		_bank_tiles()
+		_reshape_tiles()
 		if BARRIERS_ENABLED:
 			_build_walls(root_node)
 		_build_road_collision(root_node)
@@ -548,14 +580,36 @@ func _record(holder: Node3D, from_idx: int) -> void:
 static func _ease(t: float) -> float:
 	return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
 
+## The height one tile of `piece` gains, read from its own connection heights so
+## the chain arithmetic in `build` cannot drift from the art.
+func _tile_rise(piece: String) -> float:
+	var conn_y: Dictionary = PIECES.get(piece, {}).get("conn_y", {})
+	var lo := INF
+	var hi := -INF
+	for key in conn_y:
+		lo = minf(lo, conn_y[key])
+		hi = maxf(hi, conn_y[key])
+	return 0.0 if lo > hi else hi - lo
+
 ## Samples a straight into the centreline. Flat straights only need their two
 ## ends, but bank transitions and ramp profiles are curves drawn along the
 ## straight, so it is subdivided finely enough to carry them.
+##
+## `chain` is set for a tile that is one of several ramps making a single level
+## change. It carries the chain's `base` height, total `rise`, tile `count` and
+## this tile's `index`, and makes the profile here a slice of one ease across the
+## whole chain rather than a complete ease across this tile. `from_h` and `to_h`
+## still describe the mesh, which keeps its own shape and its own placement; the
+## difference between the two profiles is recorded in `_ramp_lift` and applied to
+## the tile's vertices later, so the road the player sees is the road the ribbon
+## is built from.
 func _trace_straight(
-	piece: String, from: Vector2, from_h: float, to: Vector2, to_h: float
+	piece: String, from: Vector2, from_h: float, to: Vector2, to_h: float,
+	chain: Dictionary = {}
 ) -> void:
 	if centreline.is_empty():
 		centreline.append(_world(from, from_h))
+		_ramp_lift.append(0.0)
 
 	var eased: bool = PIECES.get(piece, {}).get("eased", false)
 	var steps := maxi(1, int(ceil(from.distance_to(to) / TRACE_STEP)))
@@ -563,8 +617,14 @@ func _trace_straight(
 		steps = maxi(steps, RAMP_STEPS)
 	for i in range(1, steps + 1):
 		var t := float(i) / float(steps)
-		var h := lerpf(from_h, to_h, _ease(t) if eased else t)
+		var tile_h := lerpf(from_h, to_h, _ease(t) if eased else t)
+		var h := tile_h
+		if not chain.is_empty():
+			var u := (float(chain["index"]) + t) / float(chain["count"])
+			h = float(chain["base"]) + float(chain["rise"]) * _ease(u)
 		centreline.append(_world(from.lerp(to, t), h))
+		# In world units, because that is where the vertices it corrects live.
+		_ramp_lift.append((h - tile_h) * SCALE * VERT)
 
 func _trace_arc(
 	piece: String, origin: Vector2, theta: float, from: Vector2, to: Vector2, h: float
@@ -575,6 +635,7 @@ func _trace_arc(
 		return
 	if centreline.is_empty():
 		centreline.append(_world(from, h))
+		_ramp_lift.append(0.0)
 
 	var centre := origin + _rotate(desc["arc"], theta)
 	var v0 := from - centre
@@ -587,6 +648,8 @@ func _trace_arc(
 	for i in range(1, ARC_STEPS + 1):
 		var a: float = a0 + delta * (float(i) / ARC_STEPS)
 		centreline.append(_world(centre + Vector2(cos(a), sin(a)) * radius, h))
+		# Corner tiles are flat end to end, so they are never part of a chain.
+		_ramp_lift.append(0.0)
 
 # --- banking ---
 
@@ -834,22 +897,30 @@ static func _ribbon_cuts() -> Array[float]:
 ##
 ## Tiles on flat road are left alone, so they keep sharing one imported mesh;
 ## only corners and the road either side of them pay for a unique one.
-func _bank_tiles() -> void:
-	if _corner_spans.is_empty():
-		return
+## Two things send a tile through the reshaper, and they use the same machinery:
+## a corner that is banked, and a ramp inside a chain whose grade is the chain's
+## rather than its own. Both are a per-vertex vertical correction against the
+## centreline; see `_roll_point`.
+func _reshape_tiles() -> void:
 	for entry in _placed:
 		# A segment of margin at each end, so a vertex on the seam between two
 		# tiles projects onto the same centreline segment whichever tile it
 		# belongs to, and the two stay welded instead of tearing open.
 		var lo: int = maxi(int(entry["from"]) - 1, 0)
 		var hi: int = mini(int(entry["to"]) + 1, centreline.size() - 1)
-		if not _span_is_banked(lo, hi):
+		if not _span_is_banked(lo, hi) and not _span_is_lifted(lo, hi):
 			continue
-		_bank_tile(entry["holder"], lo, hi)
+		_reshape_tile(entry["holder"], lo, hi)
 
 func _span_is_banked(lo: int, hi: int) -> bool:
 	for i in range(lo, hi + 1):
 		if absf(bank[i]) > BANK_EPSILON:
+			return true
+	return false
+
+func _span_is_lifted(lo: int, hi: int) -> bool:
+	for i in range(lo, hi + 1):
+		if absf(_ramp_lift[i]) > LIFT_EPSILON:
 			return true
 	return false
 
@@ -865,7 +936,7 @@ func _span_is_banked(lo: int, hi: int) -> bool:
 ##
 ## The replacement keeps the holder's "one mesh per piece" shape and sits at
 ## identity, with its vertices baked into holder space.
-func _bank_tile(holder: Node3D, lo: int, hi: int) -> void:
+func _reshape_tile(holder: Node3D, lo: int, hi: int) -> void:
 	var holder_to_track := (holder.get_parent() as Node3D).transform * holder.transform
 	var track_to_holder := holder_to_track.affine_inverse()
 
@@ -882,14 +953,14 @@ func _bank_tile(holder: Node3D, lo: int, hi: int) -> void:
 
 	for src in sources:
 		var mi := MeshInstance3D.new()
-		mi.mesh = _bank_mesh(
+		mi.mesh = _reshaped_mesh(
 			src[0], src[1], holder_to_track, track_to_holder, lo, hi
 		)
 		holder.add_child(mi)
 
 ## A copy of `src` with every vertex rolled about the centreline, expressed in
 ## the holder's own space.
-func _bank_mesh(
+func _reshaped_mesh(
 	src: Mesh, local_to_track: Transform3D, holder_to_track: Transform3D,
 	track_to_holder: Transform3D, lo: int, hi: int
 ) -> ArrayMesh:
@@ -969,6 +1040,7 @@ func _frame_at(w: Vector3, lo: int, hi: int) -> Dictionary:
 			"side": side,
 			"tangent": Vector3(tangent.x, 0.0, tangent.y),
 			"roll": lerpf(bank[i], bank[i + 1], t),
+			"lift": lerpf(_ramp_lift[i], _ramp_lift[i + 1], t),
 			"lateral": (p - foot).dot(Vector2(side.x, side.z)),
 		}
 	return out
@@ -977,12 +1049,17 @@ func _frame_at(w: Vector3, lo: int, hi: int) -> Dictionary:
 ## same function the collision ribbon is built from, which is what makes the road
 ## the car drives on the road the player can see.
 ##
-## The lift is added back here because a tile is placed at the height the walker
-## reached, which is the ground the embankment is built on, while the ribbon is
-## measured from a centreline that has already been raised onto it.
+## The bank lift is added back here because a tile is placed at the height the
+## walker reached, which is the ground the embankment is built on, while the
+## ribbon is measured from a centreline that has already been raised onto it.
+## `frame["lift"]` is the other correction of the same kind: inside a multi-tile
+## ramp the centreline follows one grade across the whole chain while the mesh
+## still carries its own per-tile ease, and this is the gap between them.
 static func _roll_point(w: Vector3, frame: Dictionary) -> Vector3:
 	var roll: float = frame["roll"]
-	return w + Vector3.UP * (_bank_rise(frame["lateral"], roll) + _bank_lift(roll))
+	return w + Vector3.UP * (
+		_bank_rise(frame["lateral"], roll) + _bank_lift(roll) + frame["lift"]
+	)
 
 ## The matching rotation for a normal: the surface has been tilted by its own
 ## local gradient, which is the full bank across the tarmac and the opposite way

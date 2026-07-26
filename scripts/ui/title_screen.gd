@@ -21,6 +21,16 @@ const TITLE_SCENE := "res://scenes/title.tscn"
 ## not have one so every row ends at the same place.
 const EDIT_W := 74.0
 
+## Width reserved for Delete. Fixed rather than sized to its text, because the
+## button relabels itself to "Sure?" when armed and a row that resized under the
+## pointer would move the second press somewhere else.
+const DELETE_W := 84.0
+
+## Gap between the card and the buttons beside it. Named because the spacer that
+## keeps the shipped rows the same width has to reserve exactly what the custom
+## ones spend, including the gaps.
+const ROW_SEP := 8
+
 ## Row geometry. The card style reserves the bottom 40px of the row for the blurb
 ## (see `UiTheme.V_CARD`), so the height here has to leave room for it.
 const CARD_H := 88.0
@@ -48,11 +58,39 @@ const TRACK_LIST_MAX_H := CARD_H * 3.0 + ROW_GAP * 2.0
 
 var _entries: Array[Dictionary] = []
 
+## The one Delete button currently asking "Sure?", if any. At most one: arming a
+## second disarms the first, so the list never shows two circuits both a single
+## press from being gone.
+var _armed: Button = null
+
+## Held so a rebuild can kill the fade still running over rows it is about to
+## free, rather than leaving a half-faded row behind.
+var _reveal_tween: Tween = null
+
 func _ready() -> void:
 	ViewportScaling.attach(get_window())
 	# Whatever the editor last set it to, Esc from a race started here comes back
 	# here.
 	GameState.return_scene = TITLE_SCENE
+	_populate()
+	_editor_button.pressed.connect(_on_editor_pressed)
+	# So the keyboard works without touching the mouse first.
+	_focus_row(0)
+
+## Builds the list from disk. Called again after a deletion rather than reloading
+## the scene, so the menu keeps its scroll position and the row that replaces the
+## deleted one can take focus — a scene change would drop the player back at the
+## top of the list with focus on the first circuit.
+func _populate() -> void:
+	_armed = null
+	if _reveal_tween != null and _reveal_tween.is_valid():
+		_reveal_tween.kill()
+	# `remove_child` as well as `queue_free`: a freed child is still a child until
+	# the end of the frame, and the height measured below counts children.
+	for row in _tracks.get_children():
+		_tracks.remove_child(row)
+		row.queue_free()
+
 	_entries = GameState.all_tracks()
 	for i in _entries.size():
 		_tracks.add_child(_track_row(i))
@@ -62,10 +100,6 @@ func _ready() -> void:
 		_tracks.get_combined_minimum_size().y, TRACK_LIST_MAX_H
 	)
 	_count.text = _count_text()
-	_editor_button.pressed.connect(_on_editor_pressed)
-	# So the keyboard works without touching the mouse first.
-	if _tracks.get_child_count() > 0:
-		_tracks.get_child(0).get_child(0).grab_focus()
 	_reveal()
 
 ## How many circuits, and how many of them are the player's. Two shipped tracks
@@ -83,12 +117,27 @@ func _count_text() -> String:
 ## rows are laid out by a container, so anything that moved them would be fought
 ## by the next layout pass — and the suite measures where they land.
 func _reveal() -> void:
-	var tween := create_tween()
-	tween.set_parallel(true)
+	_reveal_tween = create_tween()
+	_reveal_tween.set_parallel(true)
 	for i in _tracks.get_child_count():
 		var row: Control = _tracks.get_child(i)
 		row.modulate.a = 0.0
-		tween.tween_property(row, "modulate:a", 1.0, 0.18).set_delay(i * 0.035)
+		_reveal_tween.tween_property(row, "modulate:a", 1.0, 0.18).set_delay(i * 0.035)
+
+## Puts the keyboard and the gamepad on a row, used on entry and again after a
+## deletion so the list is still navigable without reaching for the mouse. Takes
+## the first control on the row that will actually accept focus: an unfinished
+## circuit's card is disabled, so on those rows it is Edit that takes it — which
+## is where that circuit needs the player anyway.
+func _focus_row(index: int) -> void:
+	var count := _tracks.get_child_count()
+	if count > 0:
+		for child in _tracks.get_child(clampi(index, 0, count - 1)).get_children():
+			var button := child as Button
+			if button != null and not button.disabled:
+				button.grab_focus()
+				return
+	_editor_button.grab_focus()
 
 ## One row per circuit: the track itself, plus an Edit button for the ones the
 ## player built. Without that, getting back to a saved circuit meant opening the
@@ -96,7 +145,7 @@ func _reveal() -> void:
 func _track_row(index: int) -> HBoxContainer:
 	var info: Dictionary = _entries[index]
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
+	row.add_theme_constant_override("separation", ROW_SEP)
 
 	var button := _track_button(index)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -109,14 +158,39 @@ func _track_row(index: int) -> HBoxContainer:
 		edit.tooltip_text = "Open %s in the track editor" % info["name"]
 		edit.pressed.connect(_on_edit_pressed.bind(String(info["id"])))
 		row.add_child(edit)
+		row.add_child(_delete_button(info))
 	else:
-		# The shipped circuits have nothing to edit, but they still need the width
-		# reserving or their rows run wider than the custom ones and the right-hand
-		# edge of the menu comes out ragged.
+		# The shipped circuits have nothing to edit and cannot be deleted, but they
+		# still need the width reserving or their rows run wider than the custom
+		# ones and the right-hand edge of the menu comes out ragged.
 		var gap := Control.new()
-		gap.custom_minimum_size = Vector2(EDIT_W, 0.0)
+		gap.custom_minimum_size = Vector2(EDIT_W + ROW_SEP + DELETE_W, 0.0)
 		row.add_child(gap)
 	return row
+
+## Removes a circuit the player built. It sits one row-width from "drive this
+## circuit" and there is no undo — the file is gone — so it arms rather than
+## fires: the first press relabels it "Sure?" and only the second deletes.
+##
+## A modal would be the obvious alternative, and was the first thing tried. It
+## costs more than it looks: this menu is deliberately one flat list of focusable
+## rows so a gamepad can walk it, and a `ConfirmationDialog` is a `Window` that
+## takes focus away from that list, hands it back somewhere else on close, and
+## arrives wearing stock Godot chrome, because the project theme styles Controls
+## and says nothing about windows. Arming keeps the whole interaction on the
+## control the player is already pointing at.
+func _delete_button(info: Dictionary) -> Button:
+	var button := Button.new()
+	button.theme_type_variation = UiTheme.V_DANGER
+	button.text = "Delete"
+	button.custom_minimum_size = Vector2(DELETE_W, CARD_H)
+	button.tooltip_text = "Delete %s — this cannot be undone" % info["name"]
+	button.pressed.connect(_on_delete_pressed.bind(button, info))
+	# Walking away disarms it. Without this a row left armed stays a single press
+	# from deletion however long the player spends elsewhere in the menu.
+	button.focus_exited.connect(_disarm.bind(button))
+	button.mouse_exited.connect(_disarm.bind(button))
+	return button
 
 func _track_button(index: int) -> Button:
 	var info: Dictionary = _entries[index]
@@ -200,6 +274,42 @@ func _overlay(card: Button, text: String, variation: StringName,
 		label.modulate.a = 0.5
 	card.add_child(label)
 	return label
+
+func _on_delete_pressed(button: Button, info: Dictionary) -> void:
+	if _armed != button:
+		_arm(button, info)
+		return
+	# Read the index off the live list rather than closing over the one this row
+	# was built with: the list is rebuilt on every deletion, so a captured index
+	# would be stale the second time round.
+	var track_id := String(info["id"])
+	var index := _index_of(track_id)
+	GameState.delete_track(track_id)
+	_populate()
+	# The row that slid up into this one's place, so a second deletion needs no
+	# fresh navigation and the focus never lands on nothing.
+	_focus_row(index)
+
+func _arm(button: Button, info: Dictionary) -> void:
+	_disarm(_armed)
+	_armed = button
+	button.text = "Sure?"
+	button.tooltip_text = "Press again to delete %s" % info["name"]
+
+func _disarm(button: Button) -> void:
+	# Guarded, because both signals that call this fire on rows that were never
+	# armed, and `focus_exited` also fires on the armed button as the list is
+	# rebuilt out from under it.
+	if button == null or not is_instance_valid(button) or button != _armed:
+		return
+	_armed = null
+	button.text = "Delete"
+
+func _index_of(track_id: String) -> int:
+	for i in _entries.size():
+		if String(_entries[i]["id"]) == track_id:
+			return i
+	return 0
 
 func _on_edit_pressed(track_id: String) -> void:
 	GameState.editing_id = track_id

@@ -685,6 +685,58 @@ func test_title_offers_editing_of_custom_tracks() -> void:
 	TrackStore.delete(good.id)
 	TrackStore.delete(broken.id)
 
+## Deleting from the menu, which is the only place a finished circuit can be
+## thrown away without opening the editor first. The button arms rather than
+## fires, so what is really under test is that one press changes nothing: it sits
+## a row-width from "drive this circuit" and there is no undo.
+func test_title_deletes_a_custom_track() -> void:
+	var doomed := sample_layout()
+	doomed.display_name = "Delete Me"
+	doomed.id = ""
+	TrackStore.save(doomed)
+	# A record to leave behind. Ids are derived from the name and handed back out
+	# as soon as the file is gone, so this must not outlive the circuit it
+	# belongs to or the next "Delete Me" inherits a lap it never drove.
+	GameState.save_best_lap(doomed.id, 42.0)
+
+	var title: Control = load("res://scenes/title.tscn").instantiate()
+	root.add_child(title)
+	var rows: VBoxContainer = title.get_node("Centre/Rows/TrackScroll/Tracks")
+	var before := rows.get_child_count()
+
+	var shipped_with_delete := 0
+	var row: Node = null
+	for i in rows.get_child_count():
+		var candidate: Node = rows.get_child(i)
+		if not GameState.all_tracks()[i].get("custom", false):
+			# Card plus one spacer. A third child would mean a shipped circuit is
+			# offering to delete a baked scene that is not the player's to remove.
+			if candidate.get_child_count() > 2:
+				shipped_with_delete += 1
+		if (candidate.get_child(0) as Button).text == doomed.display_name:
+			row = candidate
+	check("no Delete on the shipped circuits", shipped_with_delete, 0)
+	check_true("the doomed circuit has a row", row != null)
+	if row == null:
+		title.free()
+		return
+
+	check("a custom row is card, Edit and Delete", row.get_child_count(), 3)
+	var delete: Button = row.get_child(2)
+	check("Delete starts unarmed", delete.text, "Delete")
+
+	delete.pressed.emit()
+	check("one press only arms it", delete.text, "Sure?")
+	check("and removes no row", rows.get_child_count(), before)
+	check_true("leaving the circuit on disk", TrackStore.load_layout(doomed.id) != null)
+
+	delete.pressed.emit()
+	check("the second press takes the row", rows.get_child_count(), before - 1)
+	check_true("and the file with it", TrackStore.load_layout(doomed.id) == null)
+	check("and the lap record with that", GameState.best_lap_for(doomed.id), 0.0)
+
+	title.free()
+
 ## Sustained elevation: height held across a corner rather than rising and falling
 ## inside one straight. This is what the bridge corner tiles are for, and the
 ## thing that makes an elevated *section* possible rather than just a crest.
@@ -742,6 +794,141 @@ func _highest_level(compiled: TrackLayout.Compiled) -> int:
 	for corner in compiled.corners:
 		highest = maxi(highest, corner.level)
 	return highest
+
+## A change of several levels has to read as one hill, not as a set of steps.
+##
+## A level change of N is N ramp tiles in a row, and `roadRampLongCurved` eases in
+## *and* out of its own two cells — its gradient is zero at both ends. Traced a
+## tile at a time, a 0-to-3 climb therefore went up in three humps: the gradient
+## reached full grade and came back to nothing three times, and the car pitched at
+## every seam. The chain now carries a single profile across all of it.
+func test_a_multi_level_climb_is_one_hill() -> void:
+	var layout := _roomy_rectangle()
+	var first := layout.compile()
+	layout.elevation[first.runs[1].cells[0]] = 3
+	var raised := layout.compile()
+	check("the straight really does climb three levels", raised.runs[1].level, 3)
+
+	var built := TrackBuilder.new()
+	built.measure(raised.segments)
+	var span := _climb_span(built.centreline)
+	check_true("a climbing stretch was found", span[1] > span[0] + 4)
+	if span[1] <= span[0] + 4:
+		return
+
+	var grades := _grades(built.centreline, span[0], span[1])
+	var peak_at := 0
+	for i in grades.size():
+		if grades[i] > grades[peak_at]:
+			peak_at = i
+	# Steepening all the way to one peak and easing off all the way down from it.
+	# Any dip on the way up is a seam between two tiles that each eased to flat.
+	var reversals := 0
+	for i in grades.size() - 1:
+		var rising: bool = grades[i + 1] > grades[i] + 0.0005
+		var falling: bool = grades[i + 1] < grades[i] - 0.0005
+		if (i < peak_at and falling) or (i >= peak_at and rising):
+			reversals += 1
+	check("the gradient never reverses on the way up or down", reversals, 0)
+
+	# Spreading the same ease over three tiles instead of one is not allowed to
+	# make the hill steeper: an eased ramp's steepest point is a fixed multiple of
+	# its average grade, so stretching rise and length together leaves the peak
+	# where it was. A single-level ramp is the yardstick.
+	var one_level := _roomy_rectangle()
+	one_level.elevation[one_level.compile().runs[1].cells[0]] = 1
+	var shallow := TrackBuilder.new()
+	shallow.measure(one_level.compile().segments)
+	var single := _climb_span(shallow.centreline)
+	var reference: float = _grades(shallow.centreline, single[0], single[1]).max()
+	check_true("and is no steeper than a single-level ramp (%.3f vs %.3f)"
+		% [grades[peak_at], reference], grades[peak_at] <= reference + 0.005)
+
+## The visible road has to be the road the car drives on.
+##
+## Collision is a ribbon generated along the centreline, while the tarmac the
+## player sees is the Kenney tile mesh — and inside a ramp chain those two now
+## want different shapes, because the chain's profile is not the profile baked
+## into any one tile. The builder closes the gap by lifting the tile's vertices
+## onto the centreline. If it ever stops doing that the car drives on a smooth
+## grade through a road that still visibly undulates, which no other test would
+## notice: every elevation check in this suite reads the ribbon.
+func test_ramp_tiles_follow_the_climb_they_are_on() -> void:
+	var layout := _roomy_rectangle()
+	layout.elevation[layout.compile().runs[1].cells[0]] = 3
+
+	var built := TrackBuilder.new()
+	var result := built.build("ramp_mesh_test", layout.compile().segments)
+	var line := built.centreline
+	var span := _climb_span(line)
+
+	var verts: Array[Vector3] = []
+	_road_vertices(result.root, Transform3D(), result.root, verts)
+	check_true("the built track has geometry", verts.size() > 100)
+
+	# The tile is sampled where its own vertices are, so the comparison is against
+	# real mesh rows rather than an interpolation of them. A tolerance under a
+	# metre is enough: left uncorrected, the seams of a three-level chain sit more
+	# than 1.3 m off the grade the ribbon takes.
+	var worst := 0.0
+	var sampled := 0
+	for step in 12:
+		var idx: int = span[0] + int((span[1] - span[0]) * float(step) / 11.0)
+		var c: Vector3 = line[idx]
+		var top := -INF
+		for v in verts:
+			if Vector2(v.x - c.x, v.z - c.z).length() < 5.0:
+				top = maxf(top, v.y)
+		if top == -INF:
+			continue
+		sampled += 1
+		worst = maxf(worst, absf(top - c.y))
+	check_true("the climb was sampled against the meshes", sampled >= 6)
+	check_true("the tarmac sits on the ribbon all the way up (worst %.2f m)" % worst,
+		worst < 0.8)
+	result.root.free()
+
+## The stretch of centreline that is climbing: the longest run of strictly rising
+## points. Returns [first, last] indices.
+func _climb_span(line: Array[Vector3]) -> Array[int]:
+	var best := [0, 0]
+	var start := -1
+	for i in line.size() - 1:
+		if line[i + 1].y > line[i].y + 0.0001:
+			if start < 0:
+				start = i
+		elif start >= 0:
+			if i - start > best[1] - best[0]:
+				best = [start, i]
+			start = -1
+	if start >= 0 and line.size() - 1 - start > best[1] - best[0]:
+		best = [start, line.size() - 1]
+	return [best[0], best[1]]
+
+## Gradient — rise over horizontal run — between consecutive centreline points.
+func _grades(line: Array[Vector3], lo: int, hi: int) -> Array[float]:
+	var out: Array[float] = []
+	for i in range(lo, hi):
+		var flat := Vector2(line[i + 1].x - line[i].x, line[i + 1].z - line[i].z)
+		if flat.length() > 0.001:
+			out.append((line[i + 1].y - line[i].y) / flat.length())
+	return out
+
+## Every mesh vertex in the track, in the track root's own space. The tiles are
+## not in the scene tree, so the transform has to be accumulated by hand rather
+## than read off `global_transform`.
+func _road_vertices(n: Node, so_far: Transform3D, root_node: Node,
+		out: Array[Vector3]) -> void:
+	var here := so_far if n == root_node else so_far * (n as Node3D).transform
+	var mi := n as MeshInstance3D
+	if mi != null and mi.mesh != null:
+		for s in mi.mesh.get_surface_count():
+			var arrays: Array = mi.mesh.surface_get_arrays(s)
+			for v in (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array):
+				out.append(here * v)
+	for c in n.get_children():
+		if c is Node3D:
+			_road_vertices(c, here, root_node, out)
 
 func test_a_corner_can_be_raised_on_its_own() -> void:
 	var layout := _roomy_rectangle()
@@ -1236,6 +1423,49 @@ func _roomy_rectangle() -> TrackLayout:
 			p += move[0] as Vector2i
 	layout.start_cell = Vector2i(8, 0)
 	return layout
+
+## Every character the interface puts on screen has to exist in the font that
+## will actually be there.
+##
+## Godot's built-in font carries no system fallbacks into the web export, so a
+## glyph the desktop borrowed from macOS without anyone noticing renders in the
+## browser as a tofu box with its own codepoint printed inside it. The bank badge
+## shipped to GitHub Pages that way, reading "2220" — U+2220, the angle sign,
+## which `track_grid.gd` now draws with two lines instead.
+##
+## Reads the scripts that draw and label the interface and asks the font about
+## every character in them, escapes included, since that is the form the angle
+## sign was written in and a raw scan would have walked straight past it.
+## Comments are covered too. They are never drawn, so this is stricter than it
+## has to be — but only in the direction of the em dashes and middle dots the
+## menus already use, all of which the built-in font has.
+func test_ui_text_stays_inside_the_built_in_font() -> void:
+	var font := ThemeDB.fallback_font
+	check_true("there is a built-in font to check against", font != null)
+	if font == null:
+		return
+	for path in [
+		"res://scripts/ui/track_grid.gd", "res://scripts/ui/track_editor.gd",
+		"res://scripts/ui/title_screen.gd", "res://scripts/ui/hud.gd",
+		"res://tools/build_editor.gd", "res://tools/build_title.gd",
+		"res://tools/build_ui.gd",
+	]:
+		var text := FileAccess.get_file_as_string(path)
+		var missing := {}
+		for i in text.length():
+			var code := text.unicode_at(i)
+			# A `\uXXXX` escape is plain ASCII in the file but a glyph on screen.
+			if code == 0x5c and i + 5 < text.length() and text[i + 1] == "u":
+				var hex := text.substr(i + 2, 4)
+				if hex.is_valid_hex_number():
+					code = hex.hex_to_int()
+			if code > 0x7f and not font.has_char(code):
+				missing[code] = true
+		var names := PackedStringArray()
+		for code: int in missing:
+			names.append("U+%04X" % code)
+		check("%s types only glyphs the font has (%s)" % [
+			path.get_file(), ", ".join(names)], missing.size(), 0)
 
 ## The UI is laid out in pixels, so without content scaling it keeps its pixel
 ## size and shrinks as a fraction of the screen the denser the display gets: the
@@ -1757,6 +1987,8 @@ func _physics_process(_delta: float) -> bool:
 		test_timing_gate_sits_on_the_start_line()
 		test_gates_stay_evenly_spaced()
 		test_title_offers_editing_of_custom_tracks()
+		test_title_deletes_a_custom_track()
+		test_ui_text_stays_inside_the_built_in_font()
 		test_ui_scales_with_the_window()
 		test_web_render_settings_survive()
 		test_the_project_wears_the_theme()
@@ -1765,6 +1997,8 @@ func _physics_process(_delta: float) -> bool:
 		stage_editor_panel()
 		test_sustained_elevation_across_corners()
 		test_a_corner_can_be_raised_on_its_own()
+		test_a_multi_level_climb_is_one_hill()
+		test_ramp_tiles_follow_the_climb_they_are_on()
 		test_start_line_stays_on_the_ground()
 		test_elevation_requests_are_reduced_not_broken()
 		test_plateau_inside_one_straight_still_works()

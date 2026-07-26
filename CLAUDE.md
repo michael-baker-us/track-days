@@ -116,6 +116,13 @@ on the canvas and in the widgets. Editing the palette does nothing until
 `build_theme.gd` is re-run; the suite compares the committed resource against a
 fresh build. See `docs/architecture.md` for the menu-row and panel-budget rules.
 
+A player's own circuit gets **Edit** and **Delete** on its menu row; the shipped
+ones reserve the width and get neither. Delete **arms rather than fires** — first
+press says "Sure?", second removes — and goes through `GameState.delete_track`,
+which takes the lap record with the file. Not `TrackStore.delete`: ids are reused
+as soon as a file is gone, so an orphaned record is inherited by the next circuit
+with the same name.
+
 ### The four load-bearing decisions
 
 1. **Feel lives in a `CarTuning` resource**, not on nodes. `car.tscn` holds
@@ -159,7 +166,11 @@ painted cells  →  TrackShape.walk (the single definition of a valid loop)
   pieces (the eased ramp; the plain `roadRampLong` wedge breaks into its grade at
   a single edge and nothing emits it any more). Requests that do not fit are
   *reduced, not refused*. The start run is flat and the corner before it is
-  pinned to ground, which is what makes height close.
+  pinned to ground, which is what makes height close. A change of N levels is N
+  ramp tiles, and the **whole chain shares one eased profile** — easing in and
+  out of each tile separately made a 0→3 climb arrive as three humps. The
+  correction lives in the centreline, so the tile meshes are lifted onto it by
+  the same per-vertex path banking uses (`_reshape_tiles`).
 - **Banking** is a per-corner choice, `["C", piece, turn, degrees]`, and corners
   are **flat by default** everywhere — a missing 4th element and `0.0` mean the
   same thing, and nothing infers an angle from a corner's radius. The editor
@@ -211,12 +222,18 @@ ids are namespaced `user_` so nobody can inherit a shipped track's lap record.
 
 ## Web build constraints
 
-Both are asserted in CI and by the test suite:
+All three are asserted in CI or by the test suite:
 
 - **Single-threaded** (`variant/thread_support=false`) — threaded builds need
   `SharedArrayBuffer`, which needs COOP/COEP headers GitHub Pages cannot send.
 - **Compatibility renderer for web only** (`renderer/rendering_method.web`), since
   web is WebGL 2 only. Desktop stays Forward+.
+- **No system fonts.** Godot's built-in font covers little beyond Latin, and on
+  desktop the OS silently fills the gaps. The web export cannot, so a missing
+  glyph renders as a tofu box printing its own codepoint — and only in the
+  browser. Do not type a character the built-in font lacks anywhere in the UI
+  scripts, comments included; the suite checks, `\uXXXX` escapes decoded. This
+  shipped once as a bank badge reading "2220" instead of an angle sign.
 
 Godot rewrites `project.godot` on its own schedule and has dropped the
 `[rendering]` override twice, with no warning and a successful-looking export.

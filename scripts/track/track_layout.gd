@@ -51,6 +51,10 @@ extends RefCounted
 ## are crests and dips instead of ridges; the builder reproduces its profile in
 ## the collision ribbon so the wheels feel the same road the player can see.
 ##
+## A change of more than one level is several of those tiles in a row, and the
+## builder gives the whole run one profile rather than easing in and out of each
+## tile — otherwise a 0-to-3 climb arrives as three humps. See `TrackBuilder`.
+##
 ## Closure comes from forcing the corner immediately before the start line to
 ## level zero. Walk the loop and the running height returns to exactly where it
 ## began, so elevation cannot break the circuit however it is arranged. The old

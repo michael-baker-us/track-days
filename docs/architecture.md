@@ -378,6 +378,26 @@ sampling the GLB, because `measure()` traces a centreline without loading a
 single mesh and the editor measures on every mouse move. Worst gradient change
 between collision samples went from a 25% cliff to about 4%.
 
+**A chain of ramps shares one profile.** Easing in and out is exactly right for a
+single tile and exactly wrong repeated: a change of three levels is three tiles
+in a row, and tracing each one's own ease put the gradient back at zero at both
+seams. Measured along a 0→3 climb, the grade ran 0 → 0.23 → 0 three times, and
+the car pitched at each. The chain is now given a single ease spanning all of it,
+which leaves the peak gradient alone — an eased ramp's steepest point is a fixed
+multiple of its average, so stretching rise and length together cancels out
+(measured: 0.232 before, 0.234 after) — and removes the undulation.
+
+That correction lives in the centreline, so the collision ribbon gets it for
+free, but the *tiles* still carry their own baked ease. They would otherwise
+visibly undulate over a road the car drives smoothly, so each centreline point
+records how far it sits above the mesh beneath it (`_ramp_lift`) and the tile's
+vertices are lifted by it. This is the same per-vertex vertical correction
+banking already used, and it reuses the same reshaping path — which is why that
+path is now called `_reshape_tiles` rather than `_bank_tiles`, and why it no
+longer returns early on a circuit with no banked corners. Left off, the tarmac
+sits 2 m from the ribbon at a chain seam; the suite checks both halves, because
+every other elevation test reads the ribbon and would not notice.
+
 Two rules make it safe:
 
 - **The start run is flat and the corner immediately before it is pinned to
@@ -566,6 +586,27 @@ underneath for the overlaid lines.
 > ones. Both halves of the layout are load-bearing: the spacer is what keeps the
 > menu's right edge straight.
 
+A player's own circuit carries a third control, **Delete**, which the shipped
+ones reserve width for and do not get. It **arms rather than fires**: the first
+press relabels it "Sure?" and only the second removes anything. There is no undo
+— the JSON file is gone — and it sits one row-width from "drive this circuit".
+
+A `ConfirmationDialog` was the obvious alternative and costs more than it looks.
+It is a `Window`: it takes focus off the flat list of rows this menu is
+deliberately built as, hands focus back somewhere else on close, and arrives
+wearing stock Godot chrome, because the project theme styles Controls and says
+nothing about windows. Arming keeps the whole interaction on the control the
+player is already pointing at, and walking away — losing focus, or moving the
+pointer off — disarms it.
+
+Deleting goes through `GameState.delete_track`, not `TrackStore.delete`, because
+**the lap record has to go with the file**. Ids are derived from the display name
+and handed straight back out by `TrackStore.new_id` once the file is gone, so a
+record left behind is inherited by the next circuit the player happens to name
+the same thing — the exact thing `ID_PREFIX` exists to prevent across the shipped
+tracks. That cannot live in `TrackStore` itself without the two classes
+referencing each other.
+
 ### The editor panel has a fixed height budget
 
 Content scaling pins the canvas to **720 units tall on every landscape window**
@@ -662,6 +703,23 @@ with slightly brighter tonemapping.
 > that way twice, and nothing warns: the export still succeeds and the page simply
 > renders wrong. So the reasoning lives here rather than in comments there, and
 > `tests/run_tests.gd` asserts both renderer settings are present.
+
+**No system fonts.** Godot's built-in font covers Latin and little else, and
+`allow_system_fallback` quietly fills the gaps from the OS — on desktop. The web
+export has no OS font provider, so any character the built-in font lacks renders
+as a **tofu box with its own codepoint printed inside it**, and only in the
+browser. The editor canvas labelled its bank badges with `∠`, the angle
+sign, which looked right on macOS for as long as it was only ever run there and
+reached GitHub Pages as a box reading "2220". `track_grid.gd` now draws the mark
+with two lines instead of typing it — that canvas draws everything else by hand
+anyway, and two lines are cheaper than shipping a font for one glyph.
+
+> `tests/run_tests.gd` reads the scripts that draw and label the interface and
+> asks the font about every character in them, `\uXXXX` escapes decoded — that
+> being the form this one was written in, where a scan for raw non-ASCII would
+> have walked straight past it. Comments are covered too, so the rule is simply
+> "do not type a glyph the built-in font does not have, anywhere". Em dashes and
+> middle dots are fine; the suite confirms it rather than assuming it.
 
 `export_presets.cfg` is committed (not gitignored as Godot suggests by default)
 because CI needs it. That is safe while web is the only target — it holds no

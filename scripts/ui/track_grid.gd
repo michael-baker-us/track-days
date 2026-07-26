@@ -724,9 +724,9 @@ func _draw_badges() -> void:
 ## corner is deliberately flat" is a state you can see rather than infer.
 func _bank_badge(at: Vector2, level: int, hot: bool) -> void:
 	if level > 0:
-		_badge(at, "%s%d" % ["\u2220", level], COL_BANK, hot)
+		_badge(at, str(level), COL_BANK, hot, true)
 	elif hot:
-		_badge(at, "\u2220", COL_TEXT, true)
+		_badge(at, "", COL_TEXT, true, true)
 	else:
 		draw_circle(
 			cell_to_screen(at), maxf(2.0, _cell_px * 0.09),
@@ -746,18 +746,46 @@ func _climb_badge(at: Vector2, level: int, hot: bool) -> void:
 			COL_TEXT * Color(1, 1, 1, 0.35)
 		)
 
-func _badge(cell: Vector2, text: String, col: Color, hot: bool) -> void:
+## `angle_mark` prefixes the label with a drawn angle sign, for the bank badges.
+## See [method _draw_angle] for why it is drawn and not typed.
+func _badge(cell: Vector2, text: String, col: Color, hot: bool,
+		angle_mark: bool = false) -> void:
 	var font := ThemeDB.fallback_font
 	var pt := int(clampf(_cell_px * 0.46, 10.0, 15.0))
 	var at := cell_to_screen(cell)
 	var r := maxf(_cell_px * 0.42, 9.0)
 	draw_circle(at, r, COL_HANDLE_HOT if hot else COL_BADGE)
 	draw_circle(at, r, COL_TEXT * Color(1, 1, 1, 0.5), false, 1.0)
+	var ink := COL_BG if hot else col
+
+	# Mark, gap and label measured together and then centred as one, so a badge
+	# carrying both still reads as centred in its disc.
+	var mark := pt * 0.60 if angle_mark else 0.0
+	var gap := pt * 0.18 if angle_mark and not text.is_empty() else 0.0
 	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, pt).x
+	var left := at.x - (mark + gap + w) * 0.5
+	if angle_mark:
+		_draw_angle(Vector2(left + mark * 0.5, at.y), mark, ink)
 	draw_string(
-		font, at + Vector2(-w * 0.5, pt * 0.36), text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, pt, COL_BG if hot else col
+		font, Vector2(left + mark + gap, at.y + pt * 0.36), text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, pt, ink
 	)
+
+## The angle sign on a bank badge, as two lines rather than the character U+2220.
+##
+## Godot's built-in font does not contain that glyph. On desktop nothing showed,
+## because the OS font provider quietly supplied it from a system font; the web
+## export has no system fonts to fall back on, so every bank badge on GitHub
+## Pages rendered as a tofu box reading "2220" — its own codepoint. Two lines are
+## cheaper than shipping a font for one glyph, and this canvas draws everything
+## else by hand anyway. Anything else typed here has to stay inside the built-in
+## font; `tests/run_tests.gd` checks that it does.
+func _draw_angle(at: Vector2, size: float, col: Color) -> void:
+	var half := size * 0.5
+	var vertex := at + Vector2(-half, half)
+	var width := maxf(1.0, size * 0.11)
+	draw_line(vertex, at + Vector2(half, half), col, width, true)
+	draw_line(vertex, at + Vector2(half, -half), col, width, true)
 
 ## A bar across the road at the start line, plus an arrow for which way the lap
 ## runs — a painted loop has no inherent direction.
