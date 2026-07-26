@@ -14,30 +14,36 @@ extends SceneTree
 # The original circuit: long straights, fast sweepers, and two climbs. Each
 # climb replaces exactly 6 units of straight (ramp 2 + bridge 2 + ramp 2), so
 # adding elevation did not require re-solving the layout.
+#
+# Every corner states its banking, because nothing anywhere infers it: a corner
+# with no angle on it is flat, in a hand-written layout as much as in the editor.
+# The angles here run up with radius — the sweepers lean most, since they are the
+# corners taken fastest and the only ones with room either side to roll into and
+# out of. Flats is the same circuit's opposite number, banked nowhere at all.
 const HIGHLAND := [
 	["S", "roadStart", 1],
 	["S", "roadStartPositions", 1],
 	["S", "roadStraightLong", 6],
-	["C", "roadCornerLarger", "right"],
+	["C", "roadCornerLarger", "right", 4.0],
 	["S", "roadStraightLong", 4],
-	["C", "roadCornerLarge", "right"],
+	["C", "roadCornerLarge", "right", 2.5],
 	["S", "roadStraightLong", 3],
-	["C", "roadCornerLarge", "left"],
+	["C", "roadCornerLarge", "left", 2.5],
 	["S", "roadStraightLong", 2],
-	["C", "roadCornerLarge", "right"],
+	["C", "roadCornerLarge", "right", 2.5],
 	["S", "roadStraightLong", 3],
 	["S", "roadRampLongCurved", 1, 1],
 	["S", "roadStraightBridge", 2],
 	["S", "roadRampLongCurved", 1, -1],
 	["S", "roadStraightLong", 2],
-	["C", "roadCornerLarger", "right"],
+	["C", "roadCornerLarger", "right", 4.0],
 	["S", "roadStraightLong", 3],
 	["S", "roadRampLongCurved", 1, 1],
 	["S", "roadStraightBridge", 2],
 	["S", "roadRampLongCurved", 1, -1],
 	["S", "roadStraightLong", 1],
 	["S", "roadStraight", 1],
-	["C", "roadCornerLarge", "right"],
+	["C", "roadCornerLarge", "right", 2.5],
 	["S", "roadStraightLong", 4],
 	["S", "roadStraight", 1],
 ]

@@ -62,6 +62,13 @@ func sample_layout() -> TrackLayout:
 	layout.cells = cells
 	layout.start_cell = Vector2i(6, 0)
 	layout.display_name = "Test Circuit"
+
+	# Banked on purpose, and stated rather than inherited — corners are flat by
+	# default now. This is the circuit that gets built into the physics world, so
+	# banking it here is what puts a banked collision surface under a real car for
+	# `test_banked_collision_leans_into_the_corner` to raycast.
+	for corner in layout.compile().corners:
+		layout.corner_banks[corner.cell] = TrackBuilder.MAX_BANK_LEVEL
 	return layout
 
 # --- assertions ---
@@ -999,46 +1006,75 @@ func test_banking_can_be_turned_off() -> void:
 		worst = maxf(worst, absf(b))
 	check_near("a circuit asking for flat corners gets none", rad_to_deg(worst), 0.0, 0.001)
 
-	# And saying nothing is still not the same as saying zero.
+	# And a layout that says nothing at all is flat too. Banking is opt-in
+	# everywhere: nothing infers it from a corner's radius or from anything else,
+	# so a circuit can only lean where its author asked it to.
 	var implied := TrackBuilder.new()
 	var silent := []
-	for seg in tool_script.FLATS:
+	for seg in tool_script.HIGHLAND:
 		silent.append(seg.slice(0, 3) if seg[0] == "C" else seg)
 	implied.measure(silent)
 	var implied_worst := 0.0
 	for b in implied.bank:
 		implied_worst = maxf(implied_worst, absf(b))
-	check_true("the same circuit left unsaid banks by default (%.1f deg)"
-		% rad_to_deg(implied_worst), rad_to_deg(implied_worst) > 1.0)
+	check_near("a layout that never mentions banking gets none",
+		rad_to_deg(implied_worst), 0.0, 0.001)
+
+	# Highland is the same circuit with its angles written in, so the difference
+	# between the two is only ever what the layout asked for.
+	var asked := TrackBuilder.new()
+	asked.measure(tool_script.HIGHLAND)
+	var asked_worst := 0.0
+	for b in asked.bank:
+		asked_worst = maxf(asked_worst, absf(b))
+	check_near("and one that asks for it gets exactly that",
+		rad_to_deg(asked_worst), TrackBuilder.BANK_DEGREES[TrackBuilder.MAX_BANK_LEVEL], 0.01)
 
 ## A painted circuit's per-corner banking has to survive the compiler and the
 ## save file, or the choice is lost the moment the editor is closed.
 func test_corner_banking_is_authored_and_saved() -> void:
 	var layout := _roomy_rectangle()
 	var first := layout.compile()
-	check_true("corners bank by default", first.corners[0].bank > 0)
-
+	# A freshly painted circuit is flat everywhere. Banking is something the
+	# author turns on, corner by corner, and never something a new track has to
+	# be told to stop doing.
 	for corner in first.corners:
-		layout.corner_banks[corner.cell] = 0
-	var flattened := layout.compile()
-	for corner in flattened.corners:
-		check("every corner obeys being set flat", corner.bank, 0)
-	var built := TrackBuilder.new()
-	var result := built.measure(flattened.segments)
+		check("a new corner is flat at %s" % corner.cell, corner.bank, 0)
+	var plain := TrackBuilder.new()
+	var result := plain.measure(first.segments)
 	var worst := 0.0
-	for b in built.bank:
+	for b in plain.bank:
 		worst = maxf(worst, absf(b))
 	check_near("and the built circuit is flat", rad_to_deg(worst), 0.0, 0.001)
 	check_true("a flat-cornered circuit still closes", result.closed)
 
-	# One corner banked hard again, then round-tripped through the save format.
-	var cell: Vector2i = flattened.corners[1].cell
+	# One corner banked, then round-tripped through the save format.
+	var cell: Vector2i = first.corners[1].cell
 	layout.corner_banks[cell] = TrackBuilder.MAX_BANK_LEVEL
 	layout.id = "user_banktest"
+	var banked := layout.compile()
+	for corner in banked.corners:
+		check("only the corner asked for banks, at %s" % corner.cell,
+			corner.bank, TrackBuilder.MAX_BANK_LEVEL if corner.cell == cell else 0)
+	var lean := TrackBuilder.new()
+	lean.measure(banked.segments)
+	var leaned := 0.0
+	for b in lean.bank:
+		leaned = maxf(leaned, absf(b))
+	check_near("and it reaches the angle asked for", rad_to_deg(leaned),
+		TrackBuilder.BANK_DEGREES[TrackBuilder.MAX_BANK_LEVEL], 0.01)
+
 	var back := TrackLayout.from_dict(layout.to_dict()).compile()
 	for corner in back.corners:
 		check("bank survives a save and load at %s" % corner.cell,
 			corner.bank, TrackBuilder.MAX_BANK_LEVEL if corner.cell == cell else 0)
+
+	# A track saved before banking existed has no `corner_banks` at all, and must
+	# come back flat rather than inheriting anything.
+	var old := layout.to_dict()
+	old.erase("corner_banks")
+	for corner in TrackLayout.from_dict(old).compile().corners:
+		check("an older saved track loads flat at %s" % corner.cell, corner.bank, 0)
 
 ## How much the painted road surface of one tile rises across its own width, in
 ## metres. Reads the art's own "road" material rather than the whole tile, so

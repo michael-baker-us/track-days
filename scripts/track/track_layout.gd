@@ -318,13 +318,15 @@ func _fit_corners(occupied: Dictionary, out: Compiled) -> void:
 		if corner_sizes.has(c.cell):
 			c.size = clampi(int(corner_sizes[c.cell]), 1, c.max_size)
 
-	# Banking is settled after the size, because the default follows from it:
-	# shrink a sweeper down to a hairpin and it stops being banked like a sweeper.
+	# Corners are flat unless the author banked them. Nothing about the shape of a
+	# bend implies how much its road should lean, and a circuit that quietly banked
+	# every corner the moment it was painted would be one the author had to notice
+	# and undo — the wrong way round for something that changes how a track drives.
 	for c in out.corners:
 		c.bank = (
 			clampi(int(corner_banks[c.cell]), 0, TrackBuilder.MAX_BANK_LEVEL)
 			if corner_banks.has(c.cell)
-			else int(TrackBuilder.DEFAULT_BANK_LEVEL.get(c.size, 0))
+			else TrackBuilder.DEFAULT_BANK_LEVEL
 		)
 
 	for i in out.runs.size():

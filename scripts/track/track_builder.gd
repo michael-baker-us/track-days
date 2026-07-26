@@ -92,18 +92,19 @@ const BANK_DEGREES: Array[float] = [0.0, 1.5, 2.5, 4.0]
 const MAX_BANK_LEVEL := 3
 const MAX_BANK_DEG := 4.0
 
-## The level a corner gets when nothing has asked for anything, by corner size.
+## The level a corner gets when nothing has asked for anything.
 ##
-## Bank grows with radius, which is the opposite of what "more bank helps you
-## turn" suggests, and it is deliberate on two counts. A size-3 sweeper is the
-## corner taken fastest, so it is the one where leaning the road actually buys
-## grip; and it is the only one with enough road either side to ease the roll in
-## and out of. A hairpin banked this hard is a skate bowl — the tilt arrives in a
-## car length and reads as a glitch rather than as a corner.
+## Flat. A corner banks because someone said so and for no other reason — there
+## is no radius-derived default anywhere, in the editor or in a hand-written
+## layout. Banking changes how a circuit drives, and inheriting it silently is
+## not something a track author should have to notice and undo.
 ##
-## Only a default. Any corner can be set flat, and a tight one can be banked hard
-## if that is the circuit someone wants.
-const DEFAULT_BANK_LEVEL := {1: 1, 2: 2, 3: 3}
+## Suggested angles, when someone does ask, run *up* with radius: a sweeper is the
+## corner taken fastest, so it is where leaning the road actually buys grip, and
+## it is the only one with enough road either side to ease the roll in and out of.
+## A hairpin banked hard is a skate bowl — the tilt arrives in a car length and
+## reads as a glitch rather than as a corner.
+const DEFAULT_BANK_LEVEL := 0
 
 ## Road spent easing bank in and out at each end of a corner, in tile units.
 ##
@@ -390,11 +391,11 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 			var from_idx := _mark()
 			_trace_arc(piece, r[3], r[4], r[2], r[0], height)
 			_record(r[6], from_idx)
-			# A fourth element is an explicit bank in degrees, and zero is a
-			# meaningful answer — so "the layout said nothing" has to be the
-			# absence of the element, not a zero in it.
+			# A fourth element is a bank in degrees. Without one the corner is
+			# flat, so "said nothing" and "said zero" now mean the same thing,
+			# and neither can quietly bank a circuit nobody asked to bank.
 			_note_corner(piece, turn, from_idx,
-				float(seg[3]) if seg.size() > 3 else default_bank_degrees(piece))
+				float(seg[3]) if seg.size() > 3 else 0.0)
 			pos = r[0]
 			height = r[5]
 			heading = new_heading
@@ -607,14 +608,6 @@ func _note_corner(piece: String, turn: String, from_idx: int, degrees: float) ->
 		"to": centreline.size() - 1,
 		"bank": deg_to_rad(clampf(degrees, -MAX_BANK_DEG, MAX_BANK_DEG)) * sign,
 	})
-
-## The bank a corner piece asks for when the layout does not say, in degrees.
-static func default_bank_degrees(piece: String) -> float:
-	var desc: Dictionary = PIECES.get(piece, {})
-	if not desc.has("arc"):
-		return 0.0
-	var size := int((desc["arc"] as Vector2).x)
-	return BANK_DEGREES[DEFAULT_BANK_LEVEL.get(size, 0)]
 
 ## Turns the per-corner requests into a roll angle for every centreline point.
 ##

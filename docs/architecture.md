@@ -147,17 +147,23 @@ Adding a shipped circuit is a layout constant plus an entry in
 The centreline carries a **roll angle per point** as well as a position, and
 everything about banking follows from that one array.
 
-Bank is a **per-corner choice, not something every bend gets**. A layout may end
-a corner with an explicit angle in degrees — `["C", piece, turn, 6.0]` — and zero
-is a meaningful answer, so "said nothing" has to be the *absence* of that element
-rather than a zero in it. Said nothing, a corner banks to suit its radius:
-`DEFAULT_BANK_LEVEL` gives 1.5°/2.5°/4° for sizes 1/2/3. Bank grows with radius,
-which is the opposite of what "more bank helps you turn" suggests, and it is
-deliberate — a sweeper is the corner taken fastest and the only one with enough
-road either side to ease the roll in and out of, while a hairpin banked hard is a
-skate bowl whose tilt arrives in a car length. The two shipped circuits show both
-answers: **Highland** leans into its sweepers, **Flats** states `0.0` on every
-corner and does not lean at all.
+Bank is a **per-corner choice, and corners are flat until someone makes one
+otherwise** — in the editor and in a hand-written layout alike. A layout ends a
+corner with an angle in degrees, `["C", piece, turn, 4.0]`; without one the corner
+is flat, so "said nothing" and "said zero" mean the same thing.
+
+Nothing infers banking from anything. There was a radius-derived default at first
+and it was wrong in the way silent defaults usually are: banking changes how a
+circuit drives, so a track that leaned everywhere the moment it was painted was
+one its author had to notice and undo. The angles *suggested* when someone does
+ask still run up with radius — a sweeper is the corner taken fastest and the only
+one with enough road either side to ease the roll in and out of, while a hairpin
+banked hard is a skate bowl whose tilt arrives in a car length — but they are a
+suggestion in the editor's cycle order, not a value anything applies on its own.
+
+The two shipped circuits show both answers, and both say so out loud:
+**Highland** writes 2.5° on its medium corners and 4° on its sweepers, **Flats**
+writes `0.0` on every corner and does not lean at all.
 
 The profile is built by giving each corner its full angle across its own arc and
 easing to nothing over `BANK_TRANSITION` (1.5 units, 21 m) at each end, then
@@ -312,11 +318,10 @@ top. Banking is a choice, and "no banking" has to be as easy to ask for as any
 other setting — the badge shows a dot for a flat corner precisely so that
 *deliberately flat* is a state you can see rather than infer.
 
-The default when a corner has never been told anything is the one that suits its
-radius, resolved *after* the size is settled: shrink a sweeper to a hairpin and
-it stops being banked like a sweeper. Tracks saved before banking existed have no
-`corner_banks` at all, which lands them on those defaults rather than on a flat
-circuit.
+**A corner that has never been told anything is flat**, which is also what a
+track saved before banking existed gets, since it has no `corner_banks` at all.
+Nothing is inherited, so a circuit only ever leans where its author said it
+should, and reopening an old track cannot silently change how it drives.
 
 ### Elevation, and sustaining it
 

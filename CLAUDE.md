@@ -147,11 +147,12 @@ painted cells  →  TrackShape.walk (the single definition of a valid loop)
   a single edge and nothing emits it any more). Requests that do not fit are
   *reduced, not refused*. The start run is flat and the corner before it is
   pinned to ground, which is what makes height close.
-- **Banking** is a per-corner choice, `["C", piece, turn, degrees]`, where a
-  missing 4th element means "suit the radius" and `0.0` means flat — those are
-  not the same thing. The centreline carries a roll angle per point; both the
-  collision ribbon and the tile meshes are built from that one profile, so they
-  cannot disagree. A banked corner is modelled as an **embankment** (inside edge
+- **Banking** is a per-corner choice, `["C", piece, turn, degrees]`, and corners
+  are **flat by default** everywhere — a missing 4th element and `0.0` mean the
+  same thing, and nothing infers an angle from a corner's radius. The editor
+  cycles a corner flat → 1.5° → 2.5° → 4° and back. The centreline carries a roll
+  angle per point; both the collision ribbon and the tile meshes are built from
+  that one profile, so they cannot disagree. A banked corner is modelled as an **embankment** (inside edge
   at ground level, outside graded back down by the tile edge) because the world
   is one flat plane and a bodily tilted tile clips straight through it.
 

@@ -529,6 +529,15 @@ Transition length 1.5 units (21 m) holds the roll rate to 0.87°/m — near 25°
 racing speed, quick enough to feel like the road taking the car and slow enough
 that the chase camera never snaps. At 1.25 units it was 1.04°/m.
 
+**Banking is off by default**, and the radius-derived default that used to apply
+when a corner said nothing is gone entirely — from the editor and from the layout
+grammar alike. It was wrong in the way silent defaults usually are: banking
+changes how a circuit drives, so a track that leaned everywhere the moment it was
+painted was one its author had to notice and undo. The angles still run up with
+radius as the editor's cycle order, but nothing applies them on its own, and
+Highland now writes its own angles out. A track saved before banking existed
+reopens flat rather than inheriting anything.
+
 **The anti-roll bar was fighting it.** `_apply_antiroll` measured roll against
 world up. On a flat circuit that is the road's up; on a banked one it saw a
 permanently rolled car and spent the corner levelling it against the road. Now
