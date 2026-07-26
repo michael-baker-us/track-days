@@ -1,0 +1,94 @@
+name: Deploy to Pages
+
+# Requires Pages to be enabled on the repo with "GitHub Actions" as the source
+# (Settings -> Pages -> Build and deployment -> Source).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: "4.7"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot
+        run: |
+          BASE="Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/${BASE}.zip"
+          unzip -q godot.zip
+          chmod +x "$BASE"
+          sudo mv "$BASE" /usr/local/bin/godot
+          godot --version
+
+      # The template bundle is ~1.3 GB, so downloading it on every push would
+      # dominate the run time.
+      - name: Cache export templates
+        id: templates
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/godot/export_templates
+          key: godot-export-templates-${{ env.GODOT_VERSION }}
+
+      - name: Install export templates
+        if: steps.templates.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL -o templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mv templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+
+      # Generates .godot/, which holds the global class_name registry. Without
+      # it nothing resolves CarTuning or GameState.
+      - name: Import project
+        run: godot --headless --editor --quit --path .
+
+      - name: Run tests
+        run: godot --headless --path . --script tests/run_tests.gd
+
+      - name: Export web build
+        run: |
+          mkdir -p build/web
+          godot --headless --path . --export-release "Web" build/web/index.html
+          # Godot's exporter can print a configuration error and still exit 0,
+          # so the artifacts have to be checked for directly.
+          for f in index.html index.wasm index.pck index.js; do
+            test -s "build/web/$f" || { echo "::error::missing build/web/$f"; exit 1; }
+          done
+          # Threaded builds need SharedArrayBuffer, which needs COOP/COEP
+          # headers that Pages cannot send. Fail loudly rather than publish a
+          # page that shows "Cross-Origin Isolation" errors to every visitor.
+          grep -q "GODOT_THREADS_ENABLED = false" build/web/index.html \
+            || { echo "::error::threaded web build will not run on Pages"; exit 1; }
+          ls -la build/web
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

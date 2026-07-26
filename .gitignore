@@ -2,9 +2,13 @@
 .godot/
 /android/
 
-# Export artifacts
+# Build output
 export/
-export_presets.cfg
+build/
+
+# export_presets.cfg is deliberately NOT ignored: CI needs it to run the web
+# export. It is safe to commit here because the web preset holds no signing
+# keys or credentials - revisit if a platform that needs them is ever added.
 
 # macOS
 .DS_Store

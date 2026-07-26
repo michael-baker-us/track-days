@@ -10,6 +10,28 @@ See [`docs/architecture.md`](docs/architecture.md) for how it fits together,
 [`docs/tuning-journal.md`](docs/tuning-journal.md) for how the handling numbers
 were arrived at, and [`docs/plan.md`](docs/plan.md) for the milestone plan.
 
+## Web build
+
+```bash
+/path/to/Godot.app/Contents/MacOS/Godot --headless --path . \
+  --export-release "Web" build/web/index.html
+
+# Must be served over HTTP - opening index.html from disk will not work.
+cd build/web && python3 -m http.server 8777
+```
+
+Deployed to GitHub Pages by `.github/workflows/pages.yml` on every push to
+`main`. Enable Pages with **Settings → Pages → Source: GitHub Actions** first.
+
+Two constraints shape this build, both checked in CI:
+
+- **Single-threaded.** Threaded web builds need `SharedArrayBuffer`, which needs
+  COOP/COEP headers that Pages cannot send. `variant/thread_support=false` keeps
+  those checks switched off entirely.
+- **Compatibility renderer.** Web only supports WebGL 2; Forward+ and Mobile are
+  not available. `rendering_method.web` overrides it for web alone, so desktop
+  still runs Forward+.
+
 ## Testing
 
 ```bash

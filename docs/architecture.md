@@ -152,10 +152,39 @@ Handling *feel* is not unit-testable and is not pretended to be. It is measured
 with throwaway `_diag_*.gd` scripts whose findings are recorded in the tuning
 journal, then deleted.
 
+## Web build
+
+The game exports to WebAssembly and is hosted on GitHub Pages. Two platform
+constraints drive the configuration:
+
+**Single-threaded.** Since Godot 4.3 this is the default, and it matters here:
+threaded web builds require `SharedArrayBuffer`, which requires the COOP/COEP
+cross-origin isolation headers, and GitHub Pages cannot send custom headers.
+With `variant/thread_support=false` the loader skips those checks altogether —
+the generated page carries `GODOT_THREADS_ENABLED = false`, which CI asserts so
+a threaded build cannot be published by accident.
+
+**Compatibility renderer.** Web targets WebGL 2 only; Forward+ and Mobile are
+unavailable. Rather than downgrade the whole project, `rendering_method.web`
+overrides the renderer for web alone. Rendering under Compatibility was checked
+before committing to it: the grid shader, gantry, shadows and HUD all survive,
+with slightly brighter tonemapping.
+
+`export_presets.cfg` is committed (not gitignored as Godot suggests by default)
+because CI needs it. That is safe while web is the only target — it holds no
+signing keys — and should be revisited if a platform that needs credentials is
+added.
+
+> Godot's exporter can print a configuration error and still **exit 0**. The
+> workflow therefore checks the artifacts exist rather than trusting the exit
+> code.
+
 ## Known gaps
 
 - No audio, and no skid particles.
 - Guardrails exist behind a flag but clip the racing line at corners; polyline
   offsetting needs proper mitring.
 - Grass has the same friction as tarmac, so leaving the circuit costs only time.
-- No export preset or release build yet.
+- No tagged release build yet; web deploys straight from `main`.
+- Physics runs at 120 Hz, which is the main CPU cost in a single-threaded web
+  build. Unmeasured on real hardware in a browser.

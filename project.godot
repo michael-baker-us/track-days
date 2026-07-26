@@ -65,3 +65,10 @@ toggle_debug={
 [physics]
 
 common/physics_ticks_per_second=120
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+; Web only supports WebGL 2, i.e. the Compatibility renderer - Forward+ and
+; Mobile are not available there. Desktop keeps Forward+; only web drops down.
+renderer/rendering_method.web="gl_compatibility"
