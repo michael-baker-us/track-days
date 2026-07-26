@@ -394,118 +394,52 @@ unrelated reasons — a car with no steering leaves the circuit long before it
 reaches a hill — whereas casting a ray at each gate tests the surface itself,
 independently of anyone's ability to drive to it.
 
-## Hills: why the car got away from you, and what fixed it
+### Tried and rejected: downforce and airborne stabilisation
 
-Reported as "the car has issues going up and down the slopes — at speed it gets
-out of control and easy to spin". Two separate causes, and measuring them apart
-mattered, because the obvious fix was the wrong one.
+The car getting away from you over the hills was investigated and a fix was
+built, measured, and then **reverted because it did not feel right**. Recorded
+here so it is not re-derived from scratch.
 
-### What was actually happening
+What the measurements said. Launched at Highland's first climb at 150 km/h, a
+crest throws the car up at road speed times the grade — 5.5 m/s over Kenney's
+12.5% ramp, which matches the arithmetic — and `VehicleBody3D` offers no help in
+the air, so it lands crooked. Adding downforce plus a levelling torque while
+airborne took airtime from 1.48 s to 0.71 s and sideslip on landing from 18.6 deg
+to 1.1 deg, for about 4% more cornering grip and 1 km/h of top speed.
 
-Launched at Highland's first climb at 150 km/h:
+So the numbers were good and the feel was not, which is the whole reason this
+journal exists: feel is the deliverable and no measurement substitutes for
+driving it. Worth knowing before trying again that the numbers alone will look
+convincing.
 
-| | before |
-|---|---|
-| airborne over the crest | **1.48 s** |
-| sideslip on landing, having steered while airborne | **18.6 deg** |
-| sideslip from a light steering input at 150 km/h | **34.5 deg — a spin** |
+Two things were also built and thrown out *before* the revert, on measurement
+alone, and those are worth not repeating:
 
-A crest throws the car upward at road speed times the grade. Kenney's ramp is
-12.5%, so at 41.7 m/s that is 5.2 m/s of vertical velocity the road stops
-supplying the instant the ramp ends — measured at 5.5 m/s, which is close enough
-to confirm the arithmetic. `VehicleBody3D` then offers no help at all in the air:
-the anti-roll bar keeps applying torque with no grip to react against, and
-whatever rotation the car took off with, it keeps. It lands crooked and spins.
+- A yaw stability assist meant to engage only past 14 deg of sideslip. Ordinary
+  cornering already exceeds that, so it engaged constantly and doubled apparent
+  grip, 2.54 g to 5.40 g.
+- Landing yaw damping for a moment after touchdown. Measured identical to two
+  decimal places in every test.
 
-The second row is not a hill problem at all. The same input on the flat gave the
-same 34.5 deg, because at 150 km/h even a gentle steering angle asks for about
-3.7 g — right at the grip limit — while full throttle is already spending the
-rear tyres' grip on traction. It only *felt* like a hill problem because that is
-where the two coincided.
+Rounding the ramp gradients in the collision ribbon was also tried and reverted:
+airtime bottomed out at six smoothing passes and then got *worse*, while the
+driving surface drifted more than 20 cm from the painted road — further than the
+suspension travel. Fixing the track was the wrong answer to a car problem.
 
-### The fix that was tried and thrown away
-
-The first instinct was to round the gradient: build the collision ribbon from a
-vertically smoothed copy of the centreline so the grade changes over a few metres
-instead of instantly. It was measured before being believed, and it did not earn
-its place:
-
-| smoothing passes | worst grade step | ribbon off the painted road | airborne |
-|---|---|---|---|
-| 0 | 12.50% | 0 cm | 1.52 s |
-| 4 | 3.72% | 12.8 cm | 0.97 s |
-| 6 | 3.14% | 15.8 cm | 0.86 s |
-| 12 | 2.36% | 22.6 cm | 1.02 s |
-| 18 | 2.01% | 27.7 cm | 1.07 s |
-
-Airtime bottoms out around six passes and then gets *worse*, while the driving
-surface drifts ever further from the road the player can see — past 20 cm, more
-than the suspension travel. Reverted in full. Fixing the track was the wrong
-answer to a car problem, and the numbers said so before anyone had to argue it.
-
-### What was kept
-
-**Downforce** (`downforce_coefficient = 9.0`), a force straight down growing with
-speed squared. Straight down in *world* space, not along the chassis: over a
-crest the chassis is pitched nose-up, which is exactly when aligning to it would
-push the car forwards instead of into the road.
-
-**Airborne stabilisation** (`air_level_torque = 6.0`,
-`air_angular_damping = 3.5`): torque back towards level plus damping on the car's
-own rotation, applied only while no wheel is in contact. The anti-roll bar is now
-faded out by the number of wheels still down, so the two never fight.
-
-Isolated, each does one job and neither substitutes for the other:
-
-| | grip | airborne | landing slip | spin |
-|---|---|---|---|---|
-| before | 2.45 g | 1.46 s | 18.6 deg | 34.5 deg |
-| air stabilisation only | 2.49 g | 1.45 s | **4.3 deg** | 34.5 deg |
-| downforce only | 2.54 g | **0.66 s** | 1.1 deg | **3.4 deg** |
-| both | 2.58 g | 0.70 s | 1.1 deg | 2.0 deg |
-
-### What was thrown away for not earning its place
-
-- **A yaw stability assist**, correcting sideslip past a 14 deg threshold. It was
-  supposed to do nothing in ordinary cornering. It did not: measured mean grip at
-  110 km/h went from 2.54 g to **5.40 g**, because a steady corner already
-  exceeds 14 deg of slip, so the assist was engaging constantly and doubling
-  apparent grip. Downforce had already fixed the spin it was written for. Deleted.
-- **Landing yaw damping** for a moment after touchdown. Measured identical to
-  without it, to two decimal places, in every test. Deleted.
-
-Both are worth remembering as things that *sounded* right. Neither survived being
-measured.
-
-### What it cost
-
-Loading the tyres harder costs top speed through the wheels' own resistance:
-164 km/h down to 156. Paid for out of drag (`drag_coefficient` 5.0 to 4.2), which
-dominates at the top end and is negligible low down, so 0-100 barely moved.
-
-| | before | after | journal target |
-|---|---|---|---|
-| top speed | 164 km/h | 163 km/h | 165 km/h |
-| 0-100 | 3.08 s | 3.05 s | 3.4 s |
-| 100-0 | 29.0 m | 24.8 m | 24 m |
-| cornering grip at 110 km/h | 2.49 g | 2.58 g | — |
-| airborne over the crest | 1.48 s | **0.71 s** | — |
-| sideslip on landing | 18.6 deg | **1.1 deg** | — |
-| spin from a light input at 150 km/h | 34.5 deg | **2.0 deg** | — |
-
-Braking improved towards the documented figure rather than away from it, which is
-downforce doing what downforce does. Flat-road feel is otherwise within a few
-percent, so this is a slope fix and not a re-tune.
-
-> Two measurement traps cost time here, both worth writing down. `accelerate`
-> outranks `brake` in the controller, so a braking test that forgets to release
-> the throttle reports a 290 m stopping distance and looks like a physics bug.
-> And a per-frame `(v - v_prev) / dt` peak reads several g of suspension jitter —
-> lateral grip has to be a mean over a settled window, or every configuration
-> looks like it has 7 g of grip.
+> Two measurement traps, both of which cost time. `accelerate` outranks `brake`
+> in the controller, so a braking test that forgets to release the throttle
+> reports a 290 m stopping distance and looks like a physics bug. And a per-frame
+> `(v - v_prev) / dt` *peak* reads several g of suspension jitter — lateral grip
+> has to be a mean over a settled window, or every configuration appears to have
+> 7 g of grip.
 
 ### Still open
 
+- The hills are still the hardest part of the circuit to drive: 0.84 s airborne
+  over a crest at 150 km/h in a straight line, and the car keeps whatever
+  rotation it took off with. Open deliberately, not overlooked — the fix above
+  worked on paper and was rejected on feel, so the next attempt wants a different
+  approach rather than a retune of that one.
 - Steering is still linear with a speed-based falloff; no countersteer assist.
 - Grass has the same friction as tarmac — going off-track costs nothing but
   time, since collision is one flat plane under both. With guardrails off there
@@ -515,13 +449,6 @@ percent, so this is a slope fix and not a re-tune.
 - Rear wheels sit at skid 0.66 under full throttle at 100 km/h — the car is
   power-sliding slightly in a straight line. Not obviously wrong for an arcade
   racer, but it has not been deliberately tuned.
-- The car still leaves the ground over a crest for 0.7 s at 150 km/h. It now
-  lands flat and straight, so it is controllable, but it is not planted. More
-  downforce buys less airtime at more cost in top speed; the trade has not been
-  pushed further because the handling complaint is answered.
-- Nothing distinguishes "airborne because of a crest" from "airborne because the
-  car is upside down in a field". The stabiliser helps in both, which is
-  forgiving rather than correct.
 - The grid shader aliases badly toward the horizon; wants a distance fade.
 - The circuit has no chicane: `roadCurved` always offsets the same way relative
   to travel, so mirroring it needs a negative scale rather than a Y rotation.

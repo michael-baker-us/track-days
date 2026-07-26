@@ -133,14 +133,6 @@ the ground, so the running height always returns to where it began. Circuits are
 screen with their own lap records and an **Edit** button, so a saved track can
 always be reopened — including one left too unfinished to drive.
 
-M6 — the hills made drivable. A crest was throwing the car up at road speed times
-the grade and `VehicleBody3D` does nothing to help in the air, so it landed
-crooked and spun. Downforce plus a levelling torque while airborne cut the airtime
-from 1.48 s to 0.71 s and sideslip on landing from 18.6° to 1.1°, and the flat-road
-numbers moved by a few percent — this is a slope fix, not a re-tune. Rounding the
-ramps was tried first and reverted: measured, it barely helped and pulled the
-driving surface 20 cm off the painted road.
-
 See [`docs/tuning-journal.md`](docs/tuning-journal.md) for how the handling
 numbers were arrived at and what is still open.
 

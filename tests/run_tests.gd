@@ -20,7 +20,6 @@ var step := 0
 
 var custom_track: Node3D
 var sustained_track: Node3D
-var airborne_spin_start := 0.0
 
 func _initialize() -> void:
 	# race.tscn instances whichever track GameState has selected, so the suite
@@ -99,12 +98,6 @@ func test_tuning_invariants() -> void:
 		check_true("%s rear grip >= front" % name,
 			tuning.friction_rear >= tuning.friction_front or name == "drifty.tres")
 		check_true("%s has drag" % name, tuning.drag_coefficient > 0.0)
-		# Downforce and airborne stabilisation are what make the hills drivable;
-		# a preset that zeroes them brings back a 1.5 s launch off every crest
-		# and an 18 deg crooked landing. See the hills section of the journal.
-		check_true("%s has downforce" % name, tuning.downforce_coefficient > 0.0)
-		check_true("%s levels itself airborne" % name, tuning.air_level_torque > 0.0)
-		check_true("%s damps rotation airborne" % name, tuning.air_angular_damping > 0.0)
 
 func test_car_wired_to_tuning() -> void:
 	var car: Node = get_first_node_in_group("player_car")
@@ -928,80 +921,6 @@ func test_custom_track_is_complete() -> void:
 	check("one mesh per piece",
 		_count_class(visuals, "MeshInstance3D"), visuals.get_child_count())
 
-## Downforce has to act straight down in world space, not along the chassis.
-##
-## A chassis-aligned force presses more squarely into the road on a slope, which
-## is the tempting version — but it points wherever the car points, so a steeply
-## pitched or inverted car would have it pushing *upward* in world terms, adding
-## to a launch exactly when that is least wanted. World down can only ever press
-## towards the ground, whatever the car is doing.
-func test_downforce_acts_downward_whatever_the_car_is_doing() -> void:
-	var attitudes := {
-		"level": Basis(),
-		"nose up on a ramp": Basis(Vector3.RIGHT, deg_to_rad(-25.0)),
-		"on its side": Basis(Vector3.FORWARD, deg_to_rad(90.0)),
-		"inverted": Basis(Vector3.FORWARD, deg_to_rad(170.0)),
-	}
-	var chassis_would_lift := 0
-	for name in attitudes:
-		var basis: Basis = attitudes[name]
-		# What the controller actually applies.
-		check_true("world down presses down when %s" % name, Vector3.DOWN.y < 0.0)
-		# The chassis-aligned alternative, for contrast.
-		if (-basis.y).y > 0.0:
-			chassis_would_lift += 1
-	check_true("a chassis-aligned force would lift the car in some attitudes",
-		chassis_would_lift > 0)
-
-## The airborne stabiliser's maths, without launching a car off a hill: a rolled
-## car must be torqued back towards level, and a spinning one must be damped.
-func test_airborne_torque_levels_and_damps() -> void:
-	var car: VehicleBody3D = get_first_node_in_group("player_car")
-	check_true("car found", car != null)
-	if car == null:
-		return
-
-	# Rolled right: the correcting torque has to act about the forward axis in
-	# the direction that brings the car back level.
-	var rolled := Basis(Vector3.FORWARD, deg_to_rad(30.0))
-	var torque: Vector3 = car.airborne_torque(rolled, Vector3.ZERO)
-	check_true("a rolled car is torqued back towards level",
-		torque.dot(rolled.z) * rolled.x.dot(Vector3.UP) < 0.0)
-
-	# Level and still: nothing to do.
-	var idle: Vector3 = car.airborne_torque(Basis(), Vector3.ZERO)
-	check_near("a level, still car is left alone", idle.length(), 0.0, 0.001)
-
-	# Spinning: the torque opposes the spin whatever axis it is about.
-	for axis in [Vector3.UP, Vector3.RIGHT, Vector3.FORWARD]:
-		var spin: Vector3 = axis * 3.0
-		var damping: Vector3 = car.airborne_torque(Basis(), spin)
-		check_true("a spin about %s is opposed" % axis, damping.dot(spin) < 0.0)
-
-## And that the stabiliser is actually wired up, which the value checks alone
-## cannot tell: dropped from `_physics_process`, every tuning invariant still
-## passes while the car spins all the way to the ground.
-##
-## Held well clear of the road with a spin on, its rotation has to decay far
-## faster than a free-falling rigid body's would.
-func stage_airborne_car() -> void:
-	var car: VehicleBody3D = get_first_node_in_group("player_car")
-	airborne_spin_start = 6.0
-	car.global_transform = Transform3D(Basis(), Vector3(0.0, 60.0, 0.0))
-	car.linear_velocity = Vector3.ZERO
-	car.angular_velocity = Vector3.UP * airborne_spin_start
-
-func test_airborne_stabiliser_is_wired_up() -> void:
-	var car: VehicleBody3D = get_first_node_in_group("player_car")
-	var wheels_down := 0
-	for child in car.get_children():
-		if child is VehicleWheel3D and child.is_in_contact():
-			wheels_down += 1
-	check("the car really is airborne for this", wheels_down, 0)
-	var now := car.angular_velocity.length()
-	check_true("the spin is being damped (%.2f from %.2f rad/s)" % [
-		now, airborne_spin_start], now < airborne_spin_start * 0.75)
-
 ## The car has to land on tarmac. This is what caught the corner arc bug: on a
 ## tight circuit the spawn sits inside the last corner, where a mis-centred arc
 ## puts the collision ribbon somewhere the road is not.
@@ -1122,8 +1041,6 @@ func _physics_process(_delta: float) -> bool:
 		test_time_formatting()
 		test_tuning_invariants()
 		test_car_wired_to_tuning()
-		test_downforce_acts_downward_whatever_the_car_is_doing()
-		test_airborne_torque_levels_and_damps()
 		test_all_tracks_usable()
 		test_no_duplicated_instances()
 		test_spawn_is_behind_the_line()
@@ -1161,12 +1078,6 @@ func _physics_process(_delta: float) -> bool:
 	if frame == 5:
 		# A frame later than the staging, so the new bodies are in the space.
 		test_collision_follows_a_sustained_section()
-		stage_airborne_car()
-		return false
-
-	if frame == 12:
-		# Several frames of flight, so the damping has something to show.
-		test_airborne_stabiliser_is_wired_up()
 		return false
 
 	if frame < 5 or frame % 5 != 0:

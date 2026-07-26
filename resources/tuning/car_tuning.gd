@@ -23,12 +23,7 @@ extends Resource
 @export var brake_force: float = 32.0
 ## Aerodynamic drag. Force grows with speed squared, so this sets top speed
 ## (where engine force balances it) and makes acceleration taper naturally.
-##
-## Trimmed from 5.0 to pay for downforce. Loading the tyres harder costs top
-## speed through the wheels' own resistance — measured at 8 km/h, 164 down to
-## 156 — and drag is the right place to win it back because it dominates at the
-## top end and is negligible at low speed: 0-100 moved by 0.03 s.
-@export var drag_coefficient: float = 4.2
+@export var drag_coefficient: float = 5.0
 
 @export_group("Grip")
 ## Grip only limits cornering here, not braking: brake_force sits below its
@@ -68,31 +63,6 @@ extends Resource
 ## wheels. This resists body roll without reducing grip.
 @export var antiroll_stiffness: float = 15.0
 @export var antiroll_damping: float = 4.0
-
-## Downforce: a force straight down, growing with speed squared.
-##
-## The single most effective thing for the hills, and it fixed two complaints at
-## once. A crest throws the car up at road speed times the grade — 5.5 m/s at
-## 150 km/h over Kenney's 12.5% ramp — and this cut the resulting airtime from
-## 1.46 s to 0.67 s. It also stopped the car spinning under power at speed:
-## sideslip from a light steering input at 150 km/h fell from 34.5 deg to 3.4 deg.
-##
-## The cost is small and was measured, not assumed: mean cornering grip at
-## 110 km/h rose only 2.45 g to 2.54 g, so the car on the flat feels as it did.
-## Halving it to 5.0 gave back most of the airtime (1.10 s), so 9.0 it is.
-@export var downforce_coefficient: float = 9.0
-
-@export_group("Airborne")
-## What the car does with no wheels on the ground, which is where the hills lost
-## it. `VehicleBody3D` gives no help here: the anti-roll bar still applies torque
-## with no grip to react against, and whatever rotation the car took off with it
-## keeps — so a twitch before the crest becomes a crooked landing and a spin.
-##
-## Measured over Highland's first climb at 150 km/h, steering hard while airborne:
-## sideslip on landing went from 18.6 deg to 4.3 deg with these, at no cost to
-## cornering grip.
-@export var air_level_torque: float = 6.0
-@export var air_angular_damping: float = 3.5
 
 @export_group("Camera")
 ## Camera lives here too: swapping a feel preset should swap how the car is

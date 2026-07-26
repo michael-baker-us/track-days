@@ -8,7 +8,6 @@ const DEFAULT_TUNING := "res://resources/tuning/grippy.tres"
 
 var _front_wheels: Array[VehicleWheel3D] = []
 var _rear_wheels: Array[VehicleWheel3D] = []
-var _wheels: Array[VehicleWheel3D] = []
 
 func _ready() -> void:
 	add_to_group("player_car")
@@ -23,7 +22,6 @@ func _ready() -> void:
 			else:
 				_rear_wheels.append(child)
 
-	_wheels = _front_wheels + _rear_wheels
 	_apply_tuning_to_wheels()
 
 func _apply_tuning_to_wheels() -> void:
@@ -79,70 +77,24 @@ func _physics_process(delta: float) -> void:
 	for wheel in _rear_wheels:
 		wheel.wheel_friction_slip = rear_friction
 
-	var grounded := _wheels_on_ground()
 	_apply_drag()
-	_apply_downforce()
-	_apply_antiroll(grounded)
-	if grounded == 0:
-		_stabilise_airborne()
+	_apply_antiroll()
 
 	if Input.is_action_just_pressed("reset_car"):
 		_reset()
 
-func _wheels_on_ground() -> int:
-	var count := 0
-	for wheel in _wheels:
-		if wheel.is_in_contact():
-			count += 1
-	return count
-
 func _apply_drag() -> void:
 	apply_central_force(-linear_velocity * linear_velocity.length() * tuning.drag_coefficient)
 
-## Straight down in world space, not along the chassis.
-##
-## Aligning it to the chassis would press more squarely into the road on a slope,
-## which is tempting — but it points wherever the car does, and a car that is
-## pitched steeply or inverted would then have the force pushing it *upward* in
-## world terms, adding to a launch at the exact moment it least helps. World down
-## is unconditionally safe: it can only ever press towards the ground.
-func _apply_downforce() -> void:
-	var speed := linear_velocity.length()
-	apply_central_force(Vector3.DOWN * speed * speed * tuning.downforce_coefficient)
-
-## The anti-roll bar needs grip to react against. Airborne it just rotates the
-## body, so it is faded out with the number of wheels still down and the airborne
-## stabiliser takes over.
-func _apply_antiroll(grounded: int) -> void:
-	if grounded == 0:
-		return
+func _apply_antiroll() -> void:
 	var basis := global_transform.basis
 	# basis.x . basis.y is always 0 for an orthonormal basis; the car's right
 	# vector against world up is the actual signed roll (sin of the roll angle).
 	var tilt := basis.x.dot(Vector3.UP)
 	var roll_rate := angular_velocity.dot(basis.z)
-	var authority := float(grounded) / float(maxi(1, _wheels.size()))
 	apply_torque(
-		-basis.z * (tilt * tuning.antiroll_stiffness + roll_rate * tuning.antiroll_damping)
-		* mass * authority
+		-basis.z * (tilt * tuning.antiroll_stiffness + roll_rate * tuning.antiroll_damping) * mass
 	)
-
-## Keeps the car flat and pointing where it was while it has nothing to push
-## against, so a crest does not decide the landing for it.
-func _stabilise_airborne() -> void:
-	apply_torque(airborne_torque(global_transform.basis, angular_velocity) * mass)
-
-## Split out from the applying so the maths can be tested without launching a car
-## off a hill: given an attitude and a rotation, the torque that levels it.
-func airborne_torque(basis: Basis, ang_vel: Vector3) -> Vector3:
-	# Roll and pitch both measured against world up, then corrected about the
-	# axis each one turns around.
-	var roll := basis.x.dot(Vector3.UP)
-	var pitch := basis.z.dot(Vector3.UP)
-	var levelling := (-basis.z * roll + basis.x * pitch) * tuning.air_level_torque
-	# Bleed off whatever rotation it took off with, yaw included, so it does not
-	# arrive sideways.
-	return levelling - ang_vel * tuning.air_angular_damping
 
 func _reset() -> void:
 	global_transform.basis = Basis()
