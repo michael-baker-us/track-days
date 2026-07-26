@@ -1,0 +1,35 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/game/race.gd" id="1_cd6ng"]
+[ext_resource type="PackedScene" path="res://scenes/car/car.tscn" id="2_h861m"]
+[ext_resource type="Script" path="res://scripts/car/car_controller.gd" id="3_ut87i"]
+[ext_resource type="Resource" path="res://resources/tuning/grippy.tres" id="4_el7e3"]
+[ext_resource type="PackedScene" path="res://scenes/camera/chase_camera.tscn" id="5_kidlu"]
+[ext_resource type="Script" path="res://scripts/camera/chase_camera.gd" id="6_jy6vs"]
+[ext_resource type="Script" path="res://scripts/track/lap_tracker.gd" id="7_hs220"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="8_fgssi"]
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="9_lfsx4"]
+[ext_resource type="PackedScene" path="res://scenes/ui/debug_overlay.tscn" id="10_s34ic"]
+[ext_resource type="Script" path="res://scripts/ui/debug_overlay.gd" id="11_vn7n4"]
+
+[node name="Race" type="Node3D" unique_id=2043221335]
+script = ExtResource("1_cd6ng")
+
+[node name="Car" type="VehicleBody3D" parent="." unique_id=1573721948 instance=ExtResource("2_h861m")]
+mass = 1200.0
+center_of_mass_mode = 1
+script = ExtResource("3_ut87i")
+tuning = ExtResource("4_el7e3")
+
+[node name="ChaseCamera" type="Camera3D" parent="." unique_id=2122466852 instance=ExtResource("5_kidlu")]
+current = true
+script = ExtResource("6_jy6vs")
+
+[node name="LapTracker" type="Node" parent="." unique_id=2768107]
+script = ExtResource("7_hs220")
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=2021212989 instance=ExtResource("8_fgssi")]
+script = ExtResource("9_lfsx4")
+
+[node name="DebugOverlay" type="CanvasLayer" parent="." unique_id=1595088290 instance=ExtResource("10_s34ic")]
+script = ExtResource("11_vn7n4")

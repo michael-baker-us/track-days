@@ -7,20 +7,32 @@ runtime.
 ```bash
 GODOT=/path/to/Godot.app/Contents/MacOS/Godot
 
-# Rebuild the circuit after editing LAYOUT in build_track.gd.
-# Prints the closure gap: it must be (0, 0) with net turns +/-4, or the loop
-# does not join up. Adjust straight counts until it closes.
+# Rebuild every circuit after editing a layout in build_track.gd.
+# Prints a closure gap per track: it must be (0, 0) with net turns +/-4 and
+# height back to 0, or the loop does not join up. Adjust straight counts until
+# it closes; the script exits non-zero if any track fails to close.
 "$GODOT" --headless --path . --script tools/build_track.gd
 
 # Rebuild the HUD after editing build_ui.gd. Node names there must match the
 # @onready paths in scripts/ui/hud.gd.
 "$GODOT" --headless --path . --script tools/build_ui.gd
 
-# Regenerate main.tscn (wires circuit + car + camera + overlay together).
-# Always regenerate rather than hand-editing: instance overrides in main.tscn
-# silently beat values in car.tscn, which has bitten this project once already.
-"$GODOT" --headless --path . --script tools/build_main.gd
+# Rebuild the title screen (track list comes from GameState at runtime).
+"$GODOT" --headless --path . --script tools/build_title.gd
+
+# Regenerate race.tscn (car + camera + HUD + tracker; the track is instanced at
+# runtime from whatever the title screen selected).
+# Always regenerate rather than hand-editing: instance overrides in a scene
+# silently beat values in the sub-scene it instances, which has bitten this
+# project once already.
+"$GODOT" --headless --path . --script tools/build_race.gd
 ```
 
-Run `build_track.gd` and `build_ui.gd` before `build_main.gd` — the last one
-reads the circuit's `SpawnPoint` to place the car and instances `hud.tscn`.
+Run `build_track.gd` and `build_ui.gd` before `build_race.gd`, which instances
+`hud.tscn`.
+
+**Owner rule.** When packing a scene, set `owner` on nodes you created and on
+instanced sub-scene *roots*, but never on an instance's internal nodes — those
+then serialise on top of the instance and everything appears twice. This shipped
+a car with eight wheels and two of every road tile; `tests/run_tests.gd` now
+counts both.

@@ -9,7 +9,8 @@ extends Node
 signal lap_completed(lap_number: int, time: float, is_best: bool)
 signal timing_started
 
-const SAVE_PATH := "user://records.cfg"
+## Which track's record to read and write. Set before the first physics frame.
+var track_id: String = "highland"
 
 var checkpoint_count: int = 0
 var lap_number: int = 0
@@ -22,20 +23,31 @@ var timing: bool = false
 ## skips a gate has to go back for it.
 var _next_required: int = 0
 
+var _bound: bool = false
+
 func _ready() -> void:
 	add_to_group("lap_tracker")
-	_load_best()
-
-	var checkpoints := get_tree().get_nodes_in_group("checkpoint")
-	checkpoint_count = checkpoints.size()
-	for cp in checkpoints:
-		cp.passed.connect(_on_checkpoint_passed)
 
 ## Accumulated on the physics step, not _process: the physics delta is fixed, so
 ## lap times track the simulation rather than the render framerate.
 func _physics_process(delta: float) -> void:
+	if not _bound:
+		_bind()
 	if timing:
 		lap_time += delta
+
+## Binding is deferred rather than done in _ready(): the track is instanced at
+## runtime by the race scene, and child _ready() runs before the parent's, so
+## the checkpoints do not exist yet when this node is readied.
+func _bind() -> void:
+	var checkpoints := get_tree().get_nodes_in_group("checkpoint")
+	if checkpoints.is_empty():
+		return
+	checkpoint_count = checkpoints.size()
+	for cp in checkpoints:
+		cp.passed.connect(_on_checkpoint_passed)
+	_load_best()
+	_bound = true
 
 func _on_checkpoint_passed(index: int) -> void:
 	if checkpoint_count == 0:
@@ -76,12 +88,9 @@ static func format_time(seconds: float) -> String:
 	return "%d:%06.3f" % [minutes, seconds - minutes * 60.0]
 
 func _load_best() -> void:
-	var cfg := ConfigFile.new()
-	if cfg.load(SAVE_PATH) == OK:
-		best_lap = cfg.get_value("records", "best_lap", 0.0)
+	best_lap = GameState.best_lap_for(track_id)
 
 func _save_best() -> void:
-	var cfg := ConfigFile.new()
-	cfg.load(SAVE_PATH)
-	cfg.set_value("records", "best_lap", best_lap)
-	cfg.save(SAVE_PATH)
+	# Records are per track, so a quick lap on one circuit cannot look like a
+	# record on another.
+	GameState.save_best_lap(track_id, best_lap)

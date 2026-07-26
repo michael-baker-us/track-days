@@ -19,7 +19,14 @@ var frame := 0
 var step := 0
 
 func _initialize() -> void:
-	root.add_child(load("res://scenes/main.tscn").instantiate())
+	# race.tscn instances whichever track GameState has selected, so the suite
+	# exercises the same path the title screen uses.
+	GameState.selected_index = 0
+	# Never write to the player's real records; the suite completes laps, which
+	# would otherwise leave a bogus best time on the title screen.
+	GameState.records_path = "user://test_records.cfg"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(GameState.records_path))
+	root.add_child(load("res://scenes/race.tscn").instantiate())
 
 # --- assertions ---
 
@@ -72,6 +79,57 @@ func test_car_wired_to_tuning() -> void:
 				wheel.suspension_stiffness, car.tuning.suspension_stiffness, 0.01)
 			break
 
+## Every entry the title screen offers must actually load and be a usable
+## circuit. A broken entry here is a dead button on the menu.
+func test_all_tracks_usable() -> void:
+	check_true("track list not empty", GameState.TRACKS.size() > 0)
+	var ids := {}
+	for info in GameState.TRACKS:
+		var id: String = info["id"]
+		check_true("track %s has unique id" % id, not ids.has(id))
+		ids[id] = true
+		check_true("track %s has a name" % id, not String(info["name"]).is_empty())
+
+		var packed: PackedScene = load(info["scene"])
+		check_true("track %s scene loads" % id, packed != null)
+		if packed == null:
+			continue
+		var inst: Node3D = packed.instantiate()
+		check_true("track %s has a spawn point" % id, inst.has_node("SpawnPoint"))
+		check_true("track %s has a road surface" % id, inst.has_node("RoadSurface"))
+		var gate_count := 0
+		for cp in inst.get_node("Checkpoints").get_children():
+			gate_count += 1
+		check("track %s gate count" % id, gate_count, 16)
+		inst.free()
+
+## Guards against a PackedScene trap: giving the *internal* nodes of an
+## instanced sub-scene an owner makes them serialise on top of the instance, so
+## everything appears twice. It shipped a car with eight wheels and two of every
+## road tile, and is invisible unless counted.
+func test_no_duplicated_instances() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	var wheels := 0
+	for child in car.get_children():
+		if child is VehicleWheel3D:
+			wheels += 1
+	check("car wheel count", wheels, 4)
+
+	for info in GameState.TRACKS:
+		var inst: Node3D = load(info["scene"]).instantiate()
+		var visuals: Node = inst.get_node("RoadVisuals")
+		# One road piece per holder, one mesh per piece.
+		var holders := visuals.get_child_count()
+		check("track %s one mesh per piece" % info["id"],
+			_count_class(visuals, "MeshInstance3D"), holders)
+		inst.free()
+
+func _count_class(n: Node, cls: String) -> int:
+	var total := 1 if n.is_class(cls) else 0
+	for c in n.get_children():
+		total += _count_class(c, cls)
+	return total
+
 func test_checkpoints() -> void:
 	check("checkpoint count", gates.size(), 16)
 	var seen := {}
@@ -120,6 +178,8 @@ func _physics_process(_delta: float) -> bool:
 		test_time_formatting()
 		test_tuning_invariants()
 		test_car_wired_to_tuning()
+		test_all_tracks_usable()
+		test_no_duplicated_instances()
 		test_checkpoints()
 		test_road_surface_follows_elevation()
 		return false
@@ -147,6 +207,11 @@ func _physics_process(_delta: float) -> bool:
 			check("lap recorded", laps.size(), 1)
 			check_true("first lap is best", laps[0][2])
 			check_true("best stored", tracker.best_lap > 0.0)
+			# Records are keyed per track, so a time on one circuit must not
+			# show up as a record on another.
+			check_near("best persisted for this track",
+				GameState.best_lap_for("highland"), tracker.best_lap, 0.001)
+			check("other track unaffected", GameState.best_lap_for("flats"), 0.0)
 			gates[1].passed.emit(1)
 			gates[2].passed.emit(2)
 			gates[9].passed.emit(9)  # skip ahead - a cut

@@ -1,0 +1,60 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/title_screen.gd" id="1_4ignj"]
+
+[node name="Title" type="Control" unique_id=1614194694]
+layout_mode = 3
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_4ignj")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1379693826]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.11, 0.13, 0.15, 1)
+
+[node name="Rows" type="VBoxContainer" parent="." unique_id=340087220]
+custom_minimum_size = Vector2(460, 0)
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -230.0
+offset_top = -190.0
+offset_right = -230.0
+offset_bottom = -190.0
+theme_override_constants/separation = 10
+
+[node name="Heading" type="Label" parent="Rows" unique_id=44616942]
+layout_mode = 2
+theme_override_font_sizes/font_size = 60
+text = "RACING"
+horizontal_alignment = 1
+
+[node name="Sub" type="Label" parent="Rows" unique_id=1652530733]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "select a circuit"
+horizontal_alignment = 1
+
+[node name="@Control@2" type="Control" parent="Rows" unique_id=2028325374]
+custom_minimum_size = Vector2(0, 18)
+layout_mode = 2
+
+[node name="Tracks" type="VBoxContainer" parent="Rows" unique_id=1306858796]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="@Control@3" type="Control" parent="Rows" unique_id=207296374]
+custom_minimum_size = Vector2(0, 18)
+layout_mode = 2
+
+[node name="Hint" type="Label" parent="Rows" unique_id=158931546]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "esc returns here from a race"
+horizontal_alignment = 1

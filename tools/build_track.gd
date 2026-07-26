@@ -99,13 +99,28 @@ const PIECES := {
 	},
 }
 
-# ["S", piece, repeat] straight | ["S", piece, repeat, rise_sign] for ramps,
-# where rise_sign picks the climbing (+1) or descending (-1) orientation of the
-# same mesh | ["C", piece, "left"|"right"] corner.
+# Layout grammar:
+#   ["S", piece, repeat]              straight run
+#   ["S", piece, repeat, rise_sign]   ramp; +1 climbs, -1 descends, same mesh
+#   ["C", piece, "left"|"right"]      corner
 #
-# The climb replaces exactly 6 units of straight (ramp 2 + bridge 2 + ramp 2),
-# so the loop still closes without re-solving the layout.
-const LAYOUT := [
+# Every layout must close: the builder prints a closure gap that has to be
+# (0, 0) with net +/-4 turns and height back to 0, or the loop does not join up.
+const TRACKS := {
+	"highland": {
+		"file": "res://scenes/track/track_highland.tscn",
+		"layout": [],  # filled from HIGHLAND below
+	},
+	"flats": {
+		"file": "res://scenes/track/track_flats.tscn",
+		"layout": [],  # filled from FLATS below
+	},
+}
+
+# The original circuit: long straights, fast sweepers, and two climbs. Each
+# climb replaces exactly 6 units of straight (ramp 2 + bridge 2 + ramp 2), so
+# adding elevation did not require re-solving the layout.
+const HIGHLAND := [
 	["S", "roadStart", 1],
 	["S", "roadStartPositions", 1],
 	["S", "roadStraightLong", 6],
@@ -133,11 +148,48 @@ const LAYOUT := [
 	["S", "roadStraight", 1],
 ]
 
+# A flat, tighter circuit: no elevation, shorter straights, and two left-hand
+# turns so it does not read as another clockwise oval.
+const FLATS := [
+	["S", "roadStart", 1],
+	["S", "roadStartPositions", 1],
+	["S", "roadStraightLong", 4],
+	["C", "roadCornerLarger", "right"],
+	["S", "roadStraightLong", 3],
+	["C", "roadCornerLarge", "right"],
+	["S", "roadStraightLong", 4],
+	["C", "roadCornerLarge", "left"],
+	["S", "roadStraightLong", 3],
+	["C", "roadCornerLarger", "right"],
+	["S", "roadStraightLong", 7],
+	["C", "roadCornerLarge", "right"],
+	["S", "roadStraightLong", 5],
+	["C", "roadCornerLarge", "right"],
+	["S", "roadStraightLong", 2],
+	["C", "roadCornerLarge", "left"],
+	["S", "roadStraightLong", 2],
+	["C", "roadCornerLarge", "right"],
+	["S", "roadStraightLong", 3],
+]
+
 var centreline: Array[Vector3] = []
 
 func _initialize() -> void:
+	var ok := true
+	for name in ["highland", "flats"]:
+		var layout: Array = HIGHLAND if name == "highland" else FLATS
+		var path: String = TRACKS[name]["file"]
+		if not _build_one(name, layout, path):
+			ok = false
+	quit(0 if ok else 1)
+
+## Returns false if the layout does not close, so a bad layout fails loudly
+## rather than silently shipping a circuit with a gap in it.
+func _build_one(track_name: String, layout: Array, out_path: String) -> bool:
+	centreline = []
+
 	var root_node := Node3D.new()
-	root_node.name = "Track02"
+	root_node.name = "Track_%s" % track_name
 
 	var roads := Node3D.new()
 	roads.name = "RoadVisuals"
@@ -150,7 +202,7 @@ func _initialize() -> void:
 	var turn_total := 0
 	var peak := 0.0
 
-	for seg in LAYOUT:
+	for seg in layout:
 		var kind: String = seg[0]
 		var piece: String = seg[1]
 		if kind == "S":
@@ -171,10 +223,14 @@ func _initialize() -> void:
 			height = r[5]
 			heading = new_heading
 
-	print("closure gap = (%.2f, %.2f) height %.2f | heading %s | net turns %d" % [
-		pos.x, pos.y, height, heading, turn_total
+	var closed := (
+		is_zero_approx(pos.x) and is_zero_approx(pos.y) and is_zero_approx(height)
+		and absi(turn_total) == 4
+	)
+	print("[%s] closure gap = (%.2f, %.2f) height %.2f | net turns %d | %s" % [
+		track_name, pos.x, pos.y, height, turn_total,
+		"CLOSED" if closed else "*** DOES NOT CLOSE ***"
 	])
-	print("peak elevation %.1f m" % (peak * SCALE * VERT))
 
 	if BARRIERS_ENABLED:
 		_build_walls(root_node)
@@ -193,16 +249,17 @@ func _initialize() -> void:
 	_set_owner(root_node, root_node)
 	var packed := PackedScene.new()
 	packed.pack(root_node)
-	var err := ResourceSaver.save(packed, "res://scenes/track/track_02.tscn")
+	var err := ResourceSaver.save(packed, out_path)
 
 	var length := 0.0
 	for i in centreline.size() - 1:
 		length += centreline[i].distance_to(centreline[i + 1])
-	print("saved track_02.tscn: %s | centreline pts %d | lap length %.0f m" % [
-		"ok" if err == OK else "FAILED %s" % err, centreline.size(), length
+	print("       %s | lap %.0f m | peak %.1f m | %s" % [
+		out_path.get_file(), length, peak * SCALE * VERT,
+		"saved" if err == OK else "SAVE FAILED %s" % err
 	])
 	root_node.free()
-	quit(0)
+	return closed and err == OK
 
 # Returns [exit_pos, exit_heading, entry_pos, origin, theta, exit_height]
 func _place(
@@ -522,6 +579,10 @@ func _build_lighting(root_node: Node3D) -> void:
 
 func _set_owner(n: Node, owner_node: Node) -> void:
 	for c in n.get_children():
-		if c != owner_node:
-			c.owner = owner_node
-		_set_owner(c, owner_node)
+		c.owner = owner_node
+		# Do not descend into instanced sub-scenes. Owning their internal nodes
+		# makes PackedScene write those nodes out explicitly *on top of* the
+		# instance, duplicating every mesh in the file - the circuit was
+		# carrying two of every road tile.
+		if c.scene_file_path.is_empty():
+			_set_owner(c, owner_node)
