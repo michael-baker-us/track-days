@@ -478,6 +478,8 @@ func _offset_line(side: float) -> Array[Vector3]:
 
 ## Position and horizontal tangent at a given arc length along the centreline.
 func _point_at_arc(target: float) -> Array:
+	if centreline.is_empty():
+		return [Vector3.ZERO, Vector2(0, 1)]
 	var travelled := 0.0
 	for i in centreline.size() - 1:
 		var a := centreline[i]
@@ -497,7 +499,10 @@ func _point_at_arc(target: float) -> Array:
 ## [point, horizontal tangent].
 func _resample(line: Array[Vector3], step: float) -> Array:
 	var out := []
-	if line.size() < 2:
+	# A zero step would advance the walk by nothing and spin forever. The tool
+	# could never reach that, but a player's half-painted loop can compile to a
+	# degenerate centreline, and the editor recompiles on every mouse move.
+	if line.size() < 2 or step <= 0.0:
 		return out
 	var carry := 0.0
 	for i in line.size() - 1:
