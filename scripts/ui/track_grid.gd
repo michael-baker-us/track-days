@@ -23,8 +23,9 @@ extends Control
 ## refuses any drag that would not leave a valid ring — so loose ends and
 ## junctions are simply not reachable.
 ##
-## Free painting is still there on Shift, for detail work the handles cannot
-## express.
+## Drawing is still a first-class tool, not an afterthought: `draw_mode` gives it
+## the whole canvas, with the handles hidden so a stroke cannot be mistaken for a
+## drag. Shift is a temporary override for a quick fix without leaving shaping.
 ##
 ## ## Why the compiled centreline is drawn over the cells
 ##
@@ -66,6 +67,10 @@ enum Hit { NONE, CORNER, EDGE, RADIUS, CLIMB, START }
 var layout: TrackLayout
 var compiled: TrackLayout.Compiled
 
+## When set, the canvas is a drawing surface: left-drag lays road, right-drag
+## erases, and no handles are shown or hit-tested.
+var draw_mode := false
+
 var _cell_px := BASE_CELL
 var _origin := Vector2.ZERO
 var _hover_cell := Vector2i.ZERO
@@ -82,6 +87,8 @@ var _drag_index := -1
 ## Set while a drag is being refused, so the road can be drawn red instead of
 ## silently snapping back and looking broken.
 var _drag_refused := false
+## Corner count when the drag began; the drag may not go below it.
+var _drag_floor := 0
 
 ## Free painting, on Shift. +1 laying road, -1 erasing, 0 not painting.
 var _stroke := 0
@@ -169,7 +176,7 @@ func focus_on(cell: Vector2i) -> void:
 ## and sit on top of the road, so they have to win over the straight beneath.
 func _hit_test(pos: Vector2) -> Array:
 	var at := screen_to_cell_f(pos)
-	if _corners.is_empty():
+	if draw_mode or _corners.is_empty():
 		return [Hit.NONE, -1]
 
 	if compiled != null and compiled.ok:
@@ -253,9 +260,9 @@ func _button(event: InputEventMouseButton) -> void:
 	grab_focus()
 	var cell := screen_to_cell(event.position)
 
-	# Shift is the escape hatch into freehand painting, for anything the handles
-	# cannot express.
-	if event.shift_pressed:
+	# Shift is a temporary override, so a stroke can be laid without leaving
+	# shaping mode.
+	if draw_mode or event.shift_pressed:
 		_stroke = -1 if event.button_index == MOUSE_BUTTON_RIGHT else 1
 		_last_painted = cell
 		_has_last_painted = true
@@ -291,6 +298,7 @@ func _button(event: InputEventMouseButton) -> void:
 		Hit.CORNER, Hit.EDGE:
 			_drag = kind
 			_drag_index = index
+			_drag_floor = _corners.size()
 		_:
 			status.emit(
 				"Grab a corner or a straight to reshape the circuit."
@@ -352,71 +360,86 @@ func _apply_drag(cell: Vector2i) -> void:
 		TrackShape.move_corner(_corners, _drag_index, cell) if _drag == Hit.CORNER
 		else TrackShape.move_edge(_corners, _drag_index, cell)
 	)
-	if moved.is_empty():
-		# Refused: the drag would tear or fold the loop. Say so rather than
-		# letting the road sit still for no visible reason.
-		if not _drag_refused:
+
+	# Dragging a bend from one side of its straight to the other has to pass
+	# through the flat position, where the bend momentarily has no depth and gets
+	# pruned away. Stopping there strands the drag at exactly the point the
+	# player is trying to cross — the bend could only ever be pushed back to
+	# flat, never through to the inside. So the flat position is stepped over,
+	# in whichever direction the drag is already going.
+	if _drag == Hit.EDGE and moved.size() < _drag_floor:
+		var past := _step_past_flat(cell)
+		if past != cell:
+			moved = TrackShape.move_edge(_corners, _drag_index, past)
+	# A drag reshapes; it never changes how many corners there are. Letting a
+	# prune dissolve the handle mid-gesture would renumber the list under the
+	# drag, and a new bend dragged back through flat would die on the way rather
+	# than continuing out the other side. Corners are added by double-clicking
+	# and removed by right-clicking, and only there.
+	if moved.is_empty() or moved.size() < _drag_floor:
+		# A bend crossing its own straight is refused for a cell or two either
+		# side, because a bend shallower than MIN_EDGE cannot be represented.
+		# That is a normal part of the gesture, so it stalls quietly — colouring
+		# the road red mid-crossing reads as an error when nothing is wrong.
+		# A corner dragged somewhere impossible does warn, because there the
+		# player has genuinely asked for something that cannot be built.
+		if _drag == Hit.CORNER and not _drag_refused:
 			_drag_refused = true
 			status.emit("Cannot go there — the circuit would cross itself.")
 			queue_redraw()
 		return
 
 	_drag_refused = false
-	var was := _corners.size()
 	layout.cells = TrackShape.cells_from_corners(moved)
-	# Pruning can dissolve the handle being dragged, which would leave the drag
-	# pointing at the wrong corner for every later event.
-	if moved.size() != was:
-		_end_drag_index(moved, cell)
 	_corners = moved
 	layout_touched.emit()
 
-## Re-finds the dragged corner after a prune renumbered the list.
-func _end_drag_index(moved: Array[Vector2i], cell: Vector2i) -> void:
-	if _drag != Hit.CORNER:
-		_drag = Hit.NONE
-		_drag_index = -1
-		return
-	var best := -1
-	var best_d := 1e9
-	for i in moved.size():
-		var d := Vector2(moved[i]).distance_to(Vector2(cell))
-		if d < best_d:
-			best_d = d
-			best = i
-	_drag_index = best
-
-## Pushes a section of a straight sideways, adding a bend the player can then
-## drag. Tries outwards first — growing the circuit is what is usually wanted,
-## and it cannot collide with anything — then inwards, then shallower, so a
-## double-click on a cramped straight still does something rather than nothing.
+## Pushes a new bend out of a straight. Without this the handles could only move
+## and remove corners, so a circuit could never gain one.
+##
+## The bend is created at the shallowest depth that fits and then handed straight
+## to the drag, so it follows the mouse — out or in, whichever way the player
+## moves. An earlier version picked outward for them, which meant the circuit
+## could only ever grow.
 func _insert_bend(index: int, cell: Vector2i) -> void:
-	var outward := _outward_sign(index)
-	for depth in [6, 4, 3, 2]:
-		for sign_ in [outward, -outward]:
-			var out := TrackShape.insert_bump(_corners, index, cell, depth * sign_)
+	for depth in [TrackShape.MIN_EDGE, 3, 4]:
+		for towards in [_outward_sign(index), -_outward_sign(index)]:
+			var out := TrackShape.insert_bump(_corners, index, cell, depth * towards)
 			if out.is_empty():
 				continue
 			layout.cells = TrackShape.cells_from_corners(out)
 			_corners = out
-			status.emit("Added a bend — drag it into shape.")
-			layout_edited.emit()
+			# The bump contributed four corners after `index`; the outer edge of
+			# it is the middle pair, which is what the player wants to be holding.
+			_drag = Hit.EDGE
+			_drag_index = (index + 2) % _corners.size()
+			_drag_floor = _corners.size()
+			status.emit("New bend — drag it in or out.")
+			layout_touched.emit()
 			return
 	status.emit("No room for a bend here — try a longer straight.")
 
-## Which way is away from the middle of the circuit, along the axis the given
-## straight can move in.
-func _outward_sign(index: int) -> int:
-	var centre := Vector2.ZERO
-	for c in layout.cells:
-		centre += Vector2(c)
-	centre /= maxf(1.0, float(layout.cells.size()))
+## The target nudged one cell further along the direction of travel, so a bend
+## being dragged across its own straight lands on the far side instead of on the
+## line. Returns `cell` unchanged when there is no direction to infer.
+func _step_past_flat(cell: Vector2i) -> Vector2i:
+	var n := _corners.size()
+	var a := _corners[_drag_index]
+	var b := _corners[(_drag_index + 1) % n]
+	if a.y == b.y:
+		var step := signi(cell.y - a.y)
+		return cell if step == 0 else cell + Vector2i(0, step)
+	var step_x := signi(cell.x - a.x)
+	return cell if step_x == 0 else cell + Vector2i(step_x, 0)
 
+## Which way is away from the middle of the circuit, along the axis the given
+## straight can move in. Only used to pick which side to *try* first.
+func _outward_sign(index: int) -> int:
 	var n := _corners.size()
 	var a := _corners[index]
 	var b := _corners[(index + 1) % n]
 	var mid := (Vector2(a) + Vector2(b)) * 0.5
-	var off: float = (mid.y - centre.y) if a.y == b.y else (mid.x - centre.x)
+	var off: float = (mid.y - _centre.y) if a.y == b.y else (mid.x - _centre.x)
 	return 1 if off >= 0.0 else -1
 
 func _straighten(index: int) -> void:
@@ -433,6 +456,7 @@ func _end_drag() -> void:
 	_drag = Hit.NONE
 	_drag_index = -1
 	_drag_refused = false
+	_drag_floor = 0
 	var painted := _painted_any
 	_stroke = 0
 	_has_last_painted = false
@@ -445,10 +469,16 @@ func _end_drag() -> void:
 
 ## Fills in every cell between the last one and this one.
 ##
-## Without this a drag paints only the cells the mouse happened to be sampled
-## over: at any normal speed that skips most of them, leaving a dotted line the
-## validator then correctly reports as full of holes. It made the paint tool
-## feel broken, because it was.
+## Two things this has to get right, and the first version got neither:
+##
+## Without any fill, a drag paints only the cells the mouse happened to be
+## sampled over. At any normal speed that skips most of them, leaving a dotted
+## line the validator then correctly reports as full of holes — the paint tool
+## read as broken because it was.
+##
+## And the fill has to move one axis at a time, which is why it defers to
+## `TrackShape.orthogonal_path` — see there for why a diagonal fill breaks the
+## road.
 func _paint_to(cell: Vector2i) -> void:
 	if not _has_last_painted:
 		_paint(cell)
@@ -456,14 +486,8 @@ func _paint_to(cell: Vector2i) -> void:
 		_has_last_painted = true
 		return
 
-	var from := _last_painted
-	var delta := cell - from
-	var steps := maxi(absi(delta.x), absi(delta.y))
-	for i in range(1, steps + 1):
-		var t := float(i) / float(steps)
-		_paint(Vector2i(
-			from.x + roundi(delta.x * t), from.y + roundi(delta.y * t)
-		))
+	for step in TrackShape.orthogonal_path(_last_painted, cell):
+		_paint(step)
 	_last_painted = cell
 
 func _paint(cell: Vector2i) -> void:
@@ -511,10 +535,11 @@ func _draw() -> void:
 	if compiled != null:
 		_draw_problems()
 		_draw_centreline()
-		if compiled.ok:
+		if compiled.ok and not draw_mode:
 			_draw_badges()
 			_draw_start()
-	_draw_handles()
+	if not draw_mode:
+		_draw_handles()
 	_draw_hover()
 
 func _draw_grid() -> void:
@@ -650,8 +675,9 @@ func _draw_hover() -> void:
 	if not _has_hover or _drag != Hit.NONE:
 		return
 	# Only highlight a bare cell when there is nothing more specific under the
-	# cursor; otherwise the handle or badge is the thing being pointed at.
-	if _hot != Hit.NONE:
+	# cursor; otherwise the handle or badge is the thing being pointed at. While
+	# drawing there is nothing else, and the square is the brush tip.
+	if _hot != Hit.NONE and not draw_mode:
 		return
 	draw_rect(
 		Rect2(cell_to_screen(Vector2(_hover_cell)), Vector2.ONE * _cell_px),

@@ -270,6 +270,90 @@ static func _accept(corners: Array[Vector2i]) -> Array[Vector2i]:
 	var empty: Array[Vector2i] = []
 	return pruned if corners_valid(pruned) else empty
 
+## Joins the two loose ends of a half-drawn loop with a right-angled path.
+##
+## Drawing a circuit freehand almost always ends with the two ends near each
+## other but not touching, and closing that last stretch by hand is the fiddliest
+## part of the whole job. Returns the cells to add, or empty if the ends cannot
+## be joined without running into road that is already there.
+static func close_gap(cells: Array[Vector2i]) -> Array[Vector2i]:
+	var empty: Array[Vector2i] = []
+	if cells.size() < 4:
+		return empty
+
+	var occupied := {}
+	for c in cells:
+		occupied[c] = true
+	var ends: Array[Vector2i] = []
+	for c in cells:
+		var n := neighbour_count(occupied, c)
+		if n == 0:
+			return empty  # an isolated cell is not an end to join
+		if n == 1:
+			ends.append(c)
+	if ends.size() != 2:
+		return empty
+
+	# Two right-angled routes join any pair of cells; take whichever lands on no
+	# existing road, so closing the gap cannot create a junction.
+	for corner in [Vector2i(ends[1].x, ends[0].y), Vector2i(ends[0].x, ends[1].y)]:
+		var path := _leg(ends[0], corner) + _leg(corner, ends[1])
+		var ok := true
+		var added: Array[Vector2i] = []
+		var seen := {}
+		for cell in path:
+			if cell == ends[0] or cell == ends[1]:
+				continue
+			if occupied.has(cell) or seen.has(cell):
+				ok = false
+				break
+			seen[cell] = true
+			added.append(cell)
+		if not ok:
+			continue
+		var merged: Array[Vector2i] = cells.duplicate()
+		merged.append_array(added)
+		if not walk(merged).is_empty():
+			return added
+	return empty
+
+## A path of cells from `from` to `to`, one orthogonal step at a time and
+## excluding `from`.
+##
+## Stepping one axis at a time is the whole point. A straight interpolation
+## towards the target lays a *diagonal* staircase, and two cells that meet only
+## at their corners are not neighbours here — so every diagonal step is a break
+## in the road. One sloppy freehand stroke produced six loose ends that way.
+static func orthogonal_path(from: Vector2i, to: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var at := from
+	# Bounded so a wild jump cannot walk a very long way.
+	var guard := 0
+	while at != to and guard < 4096:
+		guard += 1
+		var d := to - at
+		# Take the axis with further to go, so the staircase tracks the stroke.
+		if d.x != 0 and absi(d.x) >= absi(d.y):
+			at += Vector2i(signi(d.x), 0)
+		else:
+			at += Vector2i(0, signi(d.y))
+		out.append(at)
+	return out
+
+## Cells from `a` to `b` inclusive along one axis.
+static func _leg(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var d := b - a
+	var step := Vector2i(signi(d.x), signi(d.y))
+	if step == Vector2i.ZERO:
+		return [a]
+	var at := a
+	while at != b:
+		out.append(at)
+		at += step
+	out.append(b)
+	return out
+
 # --- hit testing ---
 
 ## Index of the straight a cell lies on, or -1. Corners belong to no straight,

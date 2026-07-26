@@ -70,11 +70,30 @@ func _initialize() -> void:
 	picker.name = "Picker"
 	panel.add_child(picker)
 
+	# Drawing and shaping are peers, so the switch between them is a visible
+	# toggle rather than a modifier key nobody discovers.
+	var draw_button := _button("DrawButton", "Draw road  (D)")
+	draw_button.toggle_mode = true
+	panel.add_child(draw_button)
+
 	# What to do next. Deliberately the most prominent thing after the heading -
 	# it is the only answer to "the editor is open, now what".
 	var guide := _wrapped("Guide", 15)
 	guide.custom_minimum_size = Vector2(PANEL_W - PAD * 2.0, 54.0)
 	panel.add_child(guide)
+
+	panel.add_child(_rule())
+
+	# The live verdict sits above the legend: it is feedback wanted on every
+	# single edit, where the legend is reference the player stops needing. Below
+	# the legend it fell under the fold of a 720p window.
+	var readout := _wrapped("Readout", 15)
+	readout.custom_minimum_size = Vector2(PANEL_W - PAD * 2.0, 92.0)
+	panel.add_child(readout)
+
+	var status := _wrapped("Status", 13)
+	status.custom_minimum_size = Vector2(PANEL_W - PAD * 2.0, 32.0)
+	panel.add_child(status)
 
 	panel.add_child(_rule())
 
@@ -86,30 +105,28 @@ func _initialize() -> void:
 	legend.add_theme_constant_override("separation", 3)
 	panel.add_child(legend)
 	for row in [
-		"drag a green dot — move that corner",
-		"drag the road — slide that straight",
-		"double-click the road — add a bend",
-		"right-click a green dot — remove that corner",
-		"click a numbered badge — corner radius",
-		"click a badge inside the loop — climb",
-		"drag the flag — move the start line",
+		"DRAW ON",
+		"  drag lays road · right-drag erases",
+		"DRAW OFF",
+		"  drag a green dot — move a corner",
+		"  drag the road — slide a straight",
+		"  double-click it — add a bend, then",
+		"     drag that bend in or out",
+		"  right-click a dot — remove a corner",
+		"  numbered badge — corner radius",
+		"  badge inside the loop — climb",
+		"  drag the flag — move the start",
 	]:
 		legend.add_child(_label("LegendRow", row, 13))
-
-	panel.add_child(_rule())
-
-	var readout := _wrapped("Readout", 15)
-	readout.custom_minimum_size = Vector2(PANEL_W - PAD * 2.0, 96.0)
-	panel.add_child(readout)
-
-	var status := _wrapped("Status", 13)
-	status.custom_minimum_size = Vector2(PANEL_W - PAD * 2.0, 32.0)
-	panel.add_child(status)
 
 	var actions := VBoxContainer.new()
 	actions.name = "Actions"
 	actions.add_theme_constant_override("separation", 5)
 	side.add_child(actions)
+	# Shown only when the drawn road actually has two ends to join.
+	var close_button := _button("CloseButton", "Join the ends up")
+	close_button.visible = false
+	actions.add_child(close_button)
 	actions.add_child(_button("UndoButton", "Undo  (ctrl+Z)"))
 	actions.add_child(_button("SaveButton", "Save  (ctrl+S)"))
 	actions.add_child(_button("TestButton", "Test drive"))
@@ -117,7 +134,7 @@ func _initialize() -> void:
 	actions.add_child(_button("BackButton", "Back to menu  (esc)"))
 
 	var keys := _wrapped("Keys", 12)
-	keys.text = "wheel zooms · middle-drag pans · F refits · shift-drag paints freehand"
+	keys.text = "wheel zooms · middle-drag pans · F refits · shift-drag draws"
 	side.add_child(keys)
 
 	_set_owner(root_ctrl, root_ctrl)

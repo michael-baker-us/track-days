@@ -408,6 +408,126 @@ func test_shape_rejects_bad_rings() -> void:
 		two.append(Vector2i(405, y))
 	check_true("two separate rings do not walk", TrackShape.walk(two).is_empty())
 
+## A bend has to be draggable clean through its own straight and out the other
+## side. It could once only be pushed back as far as flat, where it collapsed and
+## the drag died — so a circuit could grow outward but never inward.
+func test_bend_can_cross_its_straight() -> void:
+	var square: Array[Vector2i] = [
+		Vector2i(0, 0), Vector2i(18, 0), Vector2i(18, 12), Vector2i(0, 12),
+	]
+	# Outward on the top straight is negative y; inward is positive.
+	var outward := TrackShape.insert_bump(square, 0, Vector2i(9, 0), -TrackShape.MIN_EDGE)
+	check_true("a bend can be added outward", not outward.is_empty())
+	var inward := TrackShape.insert_bump(square, 0, Vector2i(9, 0), TrackShape.MIN_EDGE)
+	check_true("a bend can be added inward", not inward.is_empty())
+
+	# From an outward bend, the outer edge must reach positions on the far side.
+	var reached_inward := 0
+	for target in [3, 5, 8]:
+		var moved := TrackShape.move_edge(outward, 2, Vector2i(9, target))
+		if moved.is_empty():
+			continue
+		var depth := 0
+		for c in moved:
+			depth = maxi(depth, c.y if c.y < 12 else 0)
+		if depth > 0:
+			reached_inward += 1
+		check_true("bend dragged to y=%d stays a loop" % target,
+			not TrackShape.walk(TrackShape.cells_from_corners(moved)).is_empty())
+	check_true("an outward bend can be dragged inward", reached_inward > 0)
+
+	# And the resulting inward circuit is drivable, not merely well-formed.
+	var probe := TrackLayout.new()
+	probe.cells = TrackShape.cells_from_corners(
+		TrackShape.move_edge(outward, 2, Vector2i(9, 8))
+	)
+	probe.start_cell = probe.cells[0]
+	var compiled := probe.compile()
+	check_true("an inward bend compiles", compiled.ok)
+	check_true("an inward bend closes",
+		TrackBuilder.new().measure(compiled.segments).closed)
+
+## Joining up a half-drawn loop. Drawing freehand nearly always ends with two
+## ends close but not touching, and closing that by hand is the fiddliest part of
+## the job.
+func test_close_gap() -> void:
+	var full := sample_layout().cells
+	check("a complete loop needs nothing added",
+		TrackShape.close_gap(full).size(), 0)
+
+	for cut in [1, 3, 7]:
+		var partial: Array[Vector2i] = []
+		partial.assign(full.slice(0, full.size() - cut))
+		var added := TrackShape.close_gap(partial)
+		check_true("gap of %d can be joined" % cut, not added.is_empty())
+		var joined: Array[Vector2i] = partial.duplicate()
+		joined.append_array(added)
+		check_true("gap of %d closes into a ring" % cut,
+			not TrackShape.walk(joined).is_empty())
+		var probe := TrackLayout.new()
+		probe.cells = joined
+		probe.start_cell = joined[0]
+		check_true("gap of %d yields a drivable circuit" % cut, probe.compile().ok)
+
+	# A hole in the middle of a straight, rather than a missing tail.
+	var holed: Array[Vector2i] = []
+	for c in full:
+		if c.y == 0 and c.x >= 4 and c.x <= 8:
+			continue
+		holed.append(c)
+	var patch := TrackShape.close_gap(holed)
+	check_true("a hole mid-straight can be joined", not patch.is_empty())
+	var repaired: Array[Vector2i] = holed.duplicate()
+	repaired.append_array(patch)
+	check_true("and closes into a ring",
+		not TrackShape.walk(repaired).is_empty())
+
+	# Nothing sensible to do with a branch, so it must decline rather than guess.
+	var spurred: Array[Vector2i] = full.duplicate()
+	spurred.append(full[4] + Vector2i(0, -1))
+	check("a branched loop is declined", TrackShape.close_gap(spurred).size(), 0)
+
+## The fill between two mouse samples. Painting only the sampled cells left a
+## dotted line; filling diagonally left cells touching at their corners only,
+## which are not neighbours, so the road was still broken at every step.
+func test_stroke_fill_is_orthogonal() -> void:
+	for pair in [
+		[Vector2i(0, 0), Vector2i(12, 0)],
+		[Vector2i(0, 0), Vector2i(0, 9)],
+		[Vector2i(4, 10), Vector2i(0, 7)],
+		[Vector2i(0, 0), Vector2i(7, 7)],
+		[Vector2i(5, 5), Vector2i(-6, -3)],
+		[Vector2i(3, 3), Vector2i(3, 3)],
+	]:
+		var from: Vector2i = pair[0]
+		var to: Vector2i = pair[1]
+		var path := TrackShape.orthogonal_path(from, to)
+		var label := "%s to %s" % [from, to]
+		if from == to:
+			check("%s needs no fill" % label, path.size(), 0)
+			continue
+		check("%s ends at the target" % label, path[path.size() - 1], to)
+		# Every step exactly one cell, along exactly one axis.
+		var at := from
+		var orthogonal := true
+		for cell in path:
+			var d := cell - at
+			if absi(d.x) + absi(d.y) != 1:
+				orthogonal = false
+			at = cell
+		check_true("%s steps orthogonally" % label, orthogonal)
+		# No gaps: the whole stroke has to be one connected run of cells.
+		var cells: Array[Vector2i] = [from]
+		cells.append_array(path)
+		var occupied := {}
+		for c in cells:
+			occupied[c] = true
+		var connected := true
+		for c in cells:
+			if c != from and c != to and TrackShape.neighbour_count(occupied, c) < 2:
+				connected = false
+		check_true("%s leaves no break" % label, connected)
+
 ## Custom tracks are JSON on disk, so the whole shape has to survive the trip.
 func test_layout_round_trip() -> void:
 	var layout := sample_layout()
@@ -590,6 +710,9 @@ func _physics_process(_delta: float) -> bool:
 		test_shape_add_and_remove()
 		test_shape_prunes_non_corners()
 		test_shape_rejects_bad_rings()
+		test_bend_can_cross_its_straight()
+		test_close_gap()
+		test_stroke_fill_is_orthogonal()
 		return false
 
 	if frame == 4:

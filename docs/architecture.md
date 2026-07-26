@@ -201,6 +201,31 @@ hand-built Highland layout does. A run is given a *level*; each level costs a
 in the run's spare cells. Because every plateau returns to zero within its own
 run, height closes for the same structural reason position does.
 
+### Drawing and shaping are peers
+
+There are two ways to build a circuit and neither is the poor relation.
+**Drawing** (the `Draw road` toggle, or `D`) gives the canvas over to laying road
+freehand; the handles hide so a stroke cannot be mistaken for a drag. **Shaping**
+drags the loop around by its corners. Shift is a temporary drawing override, for
+a quick fix without leaving shaping.
+
+An earlier version demoted drawing to a Shift-only escape hatch, which was the
+wrong call: drawing is how you get a shape that is not a rectangle in the first
+place.
+
+Freehand drawing almost always ends with the two ends near each other but not
+touching, and closing that last stretch by hand is the fiddliest part of the
+whole job. `TrackShape.close_gap` routes a right-angled path between the two
+loose ends, and the editor offers it as **Join the ends up** — but only when there
+are exactly two ends and a route that lands on no existing road, so the button
+never appears unless it will work.
+
+> Filling between mouse samples has to step **one axis at a time**. Interpolating
+> straight towards the cursor lays a diagonal staircase, and two cells meeting
+> only at their corners are not neighbours here — so every diagonal step is a
+> break in the road. One sloppy stroke produced six loose ends that way.
+> `TrackShape.orthogonal_path` is the fix and the suite pins it.
+
 ### Editing is direct manipulation, not tool modes
 
 The first version had four modes — paint, start line, corners, elevation — and a
@@ -225,7 +250,17 @@ the jog it belongs to.
 
 Every one of those goes through `_accept`, which prunes redundant vertices and
 then refuses the edit outright unless the resulting cells still walk as one
-simple ring. So the failure modes that made painting miserable — loose ends,
+simple ring.
+
+A drag never changes *how many* corners there are — corners are added by
+double-clicking and removed by right-clicking, and only there. That keeps the
+dragged handle's index stable for the whole gesture, which is what lets a new
+bend be dragged from outside the loop, through flat, and out the other side into
+the interior. Letting the prune dissolve it mid-drag stranded the gesture at
+exactly the point the player was trying to cross, so a circuit could only ever
+grow outward. A bend crossing its own straight is stepped over the flat position
+rather than stopping on it, and the crossing stalls quietly instead of colouring
+the road red, because nothing is actually wrong. So the failure modes that made painting miserable — loose ends,
 junctions, a loop folded onto itself — are not reachable by dragging at all. A
 refused drag says so rather than silently doing nothing.
 
@@ -241,7 +276,8 @@ edits and freehand painting mix freely.
 > cell under each motion event, with no interpolation. A drag across thirteen
 > cells painted four of them. Every normal-speed stroke laid a dotted line, the
 > validator then correctly reported loose ends, and the tool read as broken
-> because it was. Any grid painter needs to fill in between samples.
+> because it was. Any grid painter needs to fill in between samples — and to do
+> it orthogonally, per the note above.
 
 ### The canvas draws the compiled circuit, not the cells
 
@@ -347,6 +383,9 @@ added.
   size; a diff-based command stack would be the move if layouts grow.
 - Dragging a corner cannot move it *past* an adjacent one — the edit is refused
   rather than reordering the ring — so some reshapes need two drags.
+- A bend cannot be shallower than two cells, so dragging one across its own
+  straight is refused for a cell either side of flat. Structural, not a bug, but
+  it does mean the crossing has a little resistance in it.
 - No tagged release build yet; web deploys straight from `main`.
 - Physics runs at 120 Hz, which is the main CPU cost in a single-threaded web
   build. Unmeasured on real hardware in a browser.

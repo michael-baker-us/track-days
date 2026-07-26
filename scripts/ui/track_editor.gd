@@ -21,9 +21,11 @@ const UNDO_LIMIT := 64
 @onready var _grid: TrackGrid = $Split/Grid
 @onready var _name_edit: LineEdit = $Split/Side/Scroll/Panel/NameEdit
 @onready var _picker: OptionButton = $Split/Side/Scroll/Panel/Picker
+@onready var _draw_button: Button = $Split/Side/Scroll/Panel/DrawButton
 @onready var _guide: Label = $Split/Side/Scroll/Panel/Guide
 @onready var _status: Label = $Split/Side/Scroll/Panel/Status
 @onready var _readout: Label = $Split/Side/Scroll/Panel/Readout
+@onready var _close_button: Button = $Split/Side/Actions/CloseButton
 @onready var _undo_button: Button = $Split/Side/Actions/UndoButton
 @onready var _save_button: Button = $Split/Side/Actions/SaveButton
 @onready var _test_button: Button = $Split/Side/Actions/TestButton
@@ -54,6 +56,8 @@ func _ready() -> void:
 	_grid.elevation_clicked.connect(_cycle_elevation)
 	_grid.status.connect(_flash)
 
+	_draw_button.toggled.connect(_set_draw_mode)
+	_close_button.pressed.connect(_close_gap)
 	_name_edit.text_changed.connect(func(t): _layout.display_name = t)
 	_picker.item_selected.connect(_on_picked)
 	_undo_button.pressed.connect(_undo_last)
@@ -98,10 +102,37 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key_event := event as InputEventKey
 	if key_event.keycode == KEY_F:
 		_grid.fit_view()
+	elif key_event.keycode == KEY_D:
+		_draw_button.button_pressed = not _draw_button.button_pressed
 	elif key_event.keycode == KEY_Z and key_event.ctrl_pressed:
 		_undo_last()
 	elif key_event.keycode == KEY_S and key_event.ctrl_pressed:
 		_on_save()
+
+## Drawing and shaping are the two ways to build a circuit, and which one is
+## active has to be unmistakable — the canvas hides its handles while drawing, so
+## a stroke can never be mistaken for a drag.
+func _set_draw_mode(on: bool) -> void:
+	_grid.draw_mode = on
+	_grid.queue_redraw()
+	_flash(
+		"Drawing: drag to lay road, right-drag to erase."
+		if on else "Shaping: drag corners and straights."
+	)
+	_update_panel()
+
+## Joins up a half-drawn loop. This is the fiddliest part of drawing a circuit by
+## hand, and it is entirely mechanical, so the editor should just do it.
+func _close_gap() -> void:
+	var added := TrackShape.close_gap(_layout.cells)
+	if added.is_empty():
+		_flash("Cannot join those ends up — try drawing them closer together.")
+		_update_panel()
+		return
+	_layout.cells.append_array(added)
+	_flash("Joined the ends up with %d cells." % added.size())
+	_on_edited()
+	_grid.fit_view()
 
 # --- editing ---
 
@@ -193,6 +224,12 @@ func _cycle_elevation(cell: Vector2i) -> void:
 
 func _update_panel() -> void:
 	_test_button.disabled = not _compiled.ok
+	# Offered only when there is actually a gap to close, so it cannot look like
+	# a thing that failed to work.
+	var closeable: bool = (
+		not _compiled.ok and not TrackShape.close_gap(_layout.cells).is_empty()
+	)
+	_close_button.visible = closeable
 	_guide.text = _guidance()
 	_readout.text = _summary()
 	# A message from the last action outlives one repaint, then gives way to the
@@ -203,10 +240,20 @@ func _update_panel() -> void:
 ## What to do next, in one line. This is the only place that answers "I have
 ## opened the editor, now what", so it always names a concrete next action.
 func _guidance() -> String:
+	if _grid.draw_mode:
+		if _compiled.ok:
+			return (
+				"Drawing. Drag to lay road, right-drag to erase. Turn Draw off "
+				+ "to drag the shape around instead."
+			)
+		return (
+			"Drawing. Keep going until the road is one closed loop — "
+			+ "then Join the ends up, or switch Draw off to drag it into shape."
+		)
 	if not _compiled.ok:
 		return "Fix the circuit first — see below."
 	if not _grid.has_handles():
-		return "Drag the green corner dots to reshape the circuit."
+		return "Turn Draw on to lay road, or drag the green dots to reshape."
 	var raised := 0
 	for run in _compiled.runs:
 		if run.level > 0:
@@ -226,9 +273,11 @@ func _guidance() -> String:
 	return "Happy with it? Test drive, then Save."
 
 func _standing_hint() -> String:
+	if _grid.draw_mode:
+		return "drag lays road · right-drag erases · D leaves drawing"
 	if not _compiled.ok:
-		return "Shift-drag lays road · shift-right-drag erases"
-	return "Drag corners and straights · right-click a corner removes it"
+		return "shift-drag lays road · shift-right-drag erases · D to draw"
+	return "drag corners and straights · right-click a corner removes it"
 
 ## The live verdict: what the circuit *is*, since closure is guaranteed by the
 ## shape editing rather than being something to check.
@@ -238,7 +287,7 @@ func _summary() -> String:
 		lines.append("")
 		lines.append(
 			"A circuit is one closed loop of road, one cell wide. "
-			+ "Undo (ctrl+Z) is usually the quickest way back."
+			+ "Join the ends up below, or undo with ctrl+Z."
 		)
 		return "\n".join(lines)
 

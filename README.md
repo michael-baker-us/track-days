@@ -70,21 +70,30 @@ instead.
 
 ### Track editor
 
-Reshape the circuit by dragging the road itself — there are no tool modes, and
-an edit that would break the loop is refused rather than accepted and flagged.
+Two ways to build, switched with the **Draw road** toggle (or `D`).
+
+**Draw on** — lay road freehand. Handles hide so a stroke is never mistaken for a
+drag. Left off a closed loop? **Join the ends up** routes the last stretch for you.
+
+| Action | Control |
+|---|---|
+| Lay road / erase | Drag / right-drag |
+
+**Draw off** — drag the loop around by its shape. An edit that would break the
+circuit is refused, so loose ends and crossings cannot be made this way.
 
 | Action | Control |
 |---|---|
 | Move a corner | Drag a green dot |
 | Slide a straight | Drag the road |
-| Add a bend | Double-click a straight |
+| Add a bend | Double-click a straight, then drag it in or out |
 | Remove a corner | Right-click a green dot |
 | Corner radius / climb | Click the badge outside / inside the loop |
 | Move the start line | Drag the flag |
-| Freehand paint / erase | Shift-drag / shift-right-drag |
-| Undo | Ctrl+Z |
-| Zoom / pan / refit | Wheel · middle-drag · F |
-| Save | Ctrl+S |
+| Lay road without leaving shaping | Shift-drag / shift-right-drag |
+
+Always available: **Ctrl+Z** undo · **Ctrl+S** save · wheel zooms · middle-drag
+pans · **F** refits.
 
 ## Status
 
@@ -103,9 +112,9 @@ sessions. Laps only count if every gate is crossed in sequence, so corners
 cannot be cut. The car starts just behind the line, so timing begins about two
 seconds in rather than after an out lap.
 
-M5 — a track editor. A new circuit opens as a driveable rectangle; drag its
-corners and straights into the shape you want and the game compiles that into a
-real track — Kenney tiles, a seamless collision ribbon, and sixteen ordered
+M5 — a track editor. Draw a circuit freehand, or take the driveable rectangle a
+new track opens with and drag its corners and straights into shape. Either way
+the game compiles the result into a real track — Kenney tiles, a seamless collision ribbon, and sixteen ordered
 gates, identical in kind to the shipped ones. Closure, which the shipped layouts
 had to be hand-solved into, comes free, and because every drag is refused unless
 it leaves a valid loop, a broken circuit cannot be built in the first place.
