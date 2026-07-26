@@ -23,6 +23,12 @@ extends RefCounted
 ## along the centreline and used as a ConcavePolygonShape3D: smooth, seamless
 ## for the raycast wheels, and it follows elevation. The flat ground plane
 ## underneath is only the grass.
+##
+## Banking: the centreline carries a roll angle per point as well as a position,
+## and the ribbon's lateral offsets are rolled about the track tangent by it, so
+## corners lean into the turn. The tile meshes are deformed to match — see
+## `_bank_tiles`. Bank rolls about the centreline, so the racing line's *height*
+## is untouched and elevation still closes exactly.
 
 # 1 tile unit -> this many metres. Sets road width, corner radii and lap length
 # together, since Kenney has no wider road tiles. The car does not scale, so
@@ -46,6 +52,117 @@ const WALL_GAP := 0.7 * SCALE
 const WALL_H := 2.8
 const WALL_T := 0.6
 const ARC_STEPS := 8
+
+## How finely straights are sampled into the centreline, in tile units.
+##
+## Used to be one point per tile — 14 m, or 28 m for the long tile. That is
+## plenty for a flat straight, where two points describe it exactly, but bank
+## transitions and the eased ramp profile are *curves* laid along the straight,
+## and a curve sampled every 14 m is a set of facets the wheels can feel. At
+## 0.2 units the ribbon carries a sample every 2.8 m, which keeps the roll change
+## from one sample to the next under 2.5 degrees.
+const TRACE_STEP := 0.2
+
+## Extra samples across a ramp tile, on top of `TRACE_STEP`. The eased profile
+## does most of its climbing in the middle third, so it wants resolving finer
+## than a flat straight does: at 16 the gradient never changes by more than about
+## 4% between samples, against the 25% cliff the flat wedge had at each end.
+const RAMP_STEPS := 16
+
+## Bank angle by level, in degrees. Level 0 is a flat corner, and is always
+## available — banking is a choice per corner, not something every bend gets.
+##
+## The ceiling is set by what happens when you run wide, not by taste.
+##
+## A banked corner is an embankment, so the outside of the road stands above the
+## grass around it by twice `BANK_FULL_HALF * tan(angle)` — and all of that has to
+## be shed again over the 2.1 m of verge between the tarmac and the edge of the
+## tile. At 6 degrees that is a metre of road edge and a 26 degree apron: a car
+## drifting a hand's width wide drops off it, which measured as the car being
+## thrown and is exactly what banking should not do. At 4 it is 0.69 m and 18
+## degrees, which the suspension can follow.
+##
+## Measured, not guessed: launched along the road at 30 m/s from points all round
+## the lap, banked corners average 0.7 airborne frames against 23 for the hills
+## and 13 for plain flat road. On the road, banking is the most planted part of
+## the circuit; it was only ever the edge that threw anything.
+##
+## NASCAR's 24 to 33 is out of reach without wider tiles to land the apron on.
+const BANK_DEGREES: Array[float] = [0.0, 1.5, 2.5, 4.0]
+const MAX_BANK_LEVEL := 3
+const MAX_BANK_DEG := 4.0
+
+## The level a corner gets when nothing has asked for anything, by corner size.
+##
+## Bank grows with radius, which is the opposite of what "more bank helps you
+## turn" suggests, and it is deliberate on two counts. A size-3 sweeper is the
+## corner taken fastest, so it is the one where leaning the road actually buys
+## grip; and it is the only one with enough road either side to ease the roll in
+## and out of. A hairpin banked this hard is a skate bowl — the tilt arrives in a
+## car length and reads as a glitch rather than as a corner.
+##
+## Only a default. Any corner can be set flat, and a tight one can be banked hard
+## if that is the circuit someone wants.
+const DEFAULT_BANK_LEVEL := {1: 1, 2: 2, 3: 3}
+
+## Road spent easing bank in and out at each end of a corner, in tile units.
+##
+## 1.5 units is 21 m, about three quarters of a second at racing speed, which
+## puts the peak roll rate near 25 degrees a second — quick enough to feel like
+## the road is taking the car, slow enough that the chase camera never snaps.
+## Shorter reads as a flick; much longer and a short straight between two bends
+## never gets back to flat.
+const BANK_TRANSITION := 1.5
+
+## Below this the roll is not worth deforming a mesh for, in radians. Roughly a
+## tenth of a degree.
+const BANK_EPSILON := 0.002
+
+## How far the bank is carried across the road before it grades back to ground
+## level, in metres either side of the centreline.
+##
+## The world outside the road is one flat plane 4 km across, and it cannot be
+## banked to meet a banked corner. Tilting a whole tile bodily therefore puts its
+## outer edge into the air as a grass cliff and its inner edge *under* the ground
+## plane, where the grass clips straight through the road.
+##
+## So the corner is built the way a real banked one is: as an embankment. The
+## inside edge stays at ground level, the road climbs across its width, and the
+## outside grades back down to ground by the edge of the tile. Nothing ever sits
+## below the grass, so nothing can clip through it, whatever the angle.
+##
+## `BANK_FULL_HALF` must cover the whole painted road, and that is not a
+## preference — it is the difference between banking and a bump.
+##
+## It was 0.25 units (3.5 m) first, chosen to leave a long, gentle verge to shed
+## the height on. But the tarmac reaches 0.345 units (4.83 m), so the two places
+## where the cross-section changes gradient — the apex of the climb on one side,
+## the start of the flat apron on the other — both landed *on the driving
+## surface*. The result was a ridge running along the road at 3.5 m out and a kink
+## at 3.5 m in, and the car hopped every time a wheel crossed one. It measured as
+## a perfect 10 degree bank the whole time, because along the racing line it was.
+##
+## At 0.35 units the banked strip is one unbroken plane across the entire road and
+## every gradient change is on grass. The price is a steeper apron, since the same
+## height is shed over less verge, which is what caps the angle below.
+const BANK_FULL_HALF := 0.35 * SCALE
+const BANK_FADE_HALF := 0.5 * SCALE
+
+## How far either side of each break in the cross-section the corner is rounded
+## off, in metres.
+##
+## Without this the road meets its apron at a sharp convex crest, and a sharp
+## convex crest throws the car *however slowly it is crossed*: the vertical
+## acceleration a surface demands is its curvature times the square of the speed
+## across it, and at a corner the curvature is infinite. Drifting a wheel a
+## hand's width off the tarmac was enough to launch the car, which is not what
+## banking is supposed to do to anyone.
+##
+## Rounded over 0.7 m either side, the crest has a radius of a couple of metres.
+## What crosses it is the car's *lateral* drift, not its speed down the road, so
+## a couple of metres is enough: at 3 m/s sideways it asks for well under a g and
+## the wheels stay down.
+const BANK_FILLET := 0.05 * SCALE
 
 # Lap checkpoints. Index 0 sits on the start line; a lap only counts if all of
 # them are crossed in order.
@@ -106,11 +223,22 @@ const PIECES := {
 		"cell": Vector2(1.0, 1.0), "shift": Vector2(0.35, 1.65),
 		"conns": {"N": Vector2(0.5, 0.0), "S": Vector2(0.5, 1.0)},
 	},
-	# Climbs 0.5 units over its 2 units of length.
+	# Climbs 0.5 units over its 2 units of length, as a flat wedge: 8 vertices,
+	# so the grade arrives and leaves at a hard crease. Kept because it is a
+	# valid piece, but nothing emits it any more — see `roadRampLongCurved`.
 	"roadRampLong": {
 		"cell": Vector2(1.0, 2.0), "shift": Vector2(0.35, 2.65),
 		"conns": {"N": Vector2(0.5, 0.0), "S": Vector2(0.5, 2.0)},
 		"conn_y": {"N": 0.5, "S": 0.0},
+	},
+	# Same rise, same footprint, same connections — but the surface eases into
+	# the grade and out of it instead of breaking into it, so a crest is a crest
+	# rather than a ridge. `RAMP_PROFILE` reproduces its shape for collision.
+	"roadRampLongCurved": {
+		"cell": Vector2(1.0, 2.0), "shift": Vector2(0.35, 2.65),
+		"conns": {"N": Vector2(0.5, 0.0), "S": Vector2(0.5, 2.0)},
+		"conn_y": {"N": 0.5, "S": 0.0},
+		"eased": true,
 	},
 	# Flat, but sits at ramp-top height.
 	"roadStraightBridge": {
@@ -186,14 +314,29 @@ class BuildResult extends RefCounted:
 		]
 
 var centreline: Array[Vector3] = []
+## Roll angle at each centreline point, in radians, positive where the road
+## leans into a left-hand turn. Always the same length as `centreline`.
+var bank := PackedFloat32Array()
 
 var _triangles := 0
 var _gate_spacing := 0.0
+## One entry per placed tile: its node, and the centreline index range it spans.
+## Filled during the walk and consumed by `_bank_tiles`, which cannot run until
+## the whole loop is known — a corner's bank reaches back into the straight
+## before it, which has already been placed by the time the corner is reached.
+var _placed: Array = []
+## Centreline index ranges that sit inside a corner arc, with the bank that
+## corner asks for. Turned into a continuous profile by `_build_bank_profile`.
+var _corner_spans: Array = []
+## The road's lateral direction at each centreline point; see `_side_vectors`.
+var _sides: Array[Vector3] = []
 
 ## Layout grammar:
 ##   ["S", piece, repeat]              straight run
 ##   ["S", piece, repeat, rise_sign]   ramp; +1 climbs, -1 descends, same mesh
-##   ["C", piece, "left"|"right"]      corner
+##   ["C", piece, "left"|"right"]      corner, banked to suit its radius
+##   ["C", piece, turn, bank_degrees]  corner banked by an explicit amount; 0 is
+##                                     flat, and is not the same as saying nothing
 ##
 ## A layout only makes a circuit if it closes: gap (0, 0), net turns +/-4, and
 ## height back to 0. Callers must check `BuildResult.closed` — the builder still
@@ -203,8 +346,12 @@ var _gate_spacing := 0.0
 ## see `measure()`.
 func build(track_name: String, layout: Array, with_geometry := true) -> BuildResult:
 	centreline = []
+	bank = PackedFloat32Array()
 	_triangles = 0
 	_gate_spacing = 0.0
+	_placed = []
+	_corner_spans = []
+	_sides = []
 
 	var root_node: Node3D = null
 	var roads: Node3D = null
@@ -229,7 +376,9 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 			var rise_sign: int = seg[3] if seg.size() > 3 else 0
 			for i in int(seg[2]):
 				var r := _place(roads, piece, pos, heading, heading, height, rise_sign)
-				_trace_straight(r[2], height, r[0], r[5])
+				var from_idx := _mark()
+				_trace_straight(piece, r[2], height, r[0], r[5])
+				_record(r[6], from_idx)
 				pos = r[0]
 				height = r[5]
 				peak = maxf(peak, height)
@@ -238,16 +387,28 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 			var new_heading := _rotate(heading, 90.0 if turn == "left" else -90.0)
 			turn_total += (1 if turn == "left" else -1)
 			var r := _place(roads, piece, pos, heading, new_heading, height, 0)
+			var from_idx := _mark()
 			_trace_arc(piece, r[3], r[4], r[2], r[0], height)
+			_record(r[6], from_idx)
+			# A fourth element is an explicit bank in degrees, and zero is a
+			# meaningful answer — so "the layout said nothing" has to be the
+			# absence of the element, not a zero in it.
+			_note_corner(piece, turn, from_idx,
+				float(seg[3]) if seg.size() > 3 else default_bank_degrees(piece))
 			pos = r[0]
 			height = r[5]
 			heading = new_heading
+
+	_build_bank_profile()
 
 	var total := 0.0
 	for i in centreline.size() - 1:
 		total += centreline[i].distance_to(centreline[i + 1])
 
 	if with_geometry:
+		# After the whole loop, because a corner's bank reaches back into the
+		# straight before it and forward into the one after.
+		_bank_tiles()
 		if BARRIERS_ENABLED:
 			_build_walls(root_node)
 		_build_road_collision(root_node)
@@ -289,7 +450,7 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 func measure(layout: Array) -> BuildResult:
 	return build("measure", layout, false)
 
-# Returns [exit_pos, exit_heading, entry_pos, origin, theta, exit_height]
+# Returns [exit_pos, exit_heading, entry_pos, origin, theta, exit_height, holder]
 func _place(
 	parent: Node3D, piece: String, pos: Vector2, heading: Vector2,
 	want_heading: Vector2, height: float, rise_sign: int
@@ -327,8 +488,9 @@ func _place(
 				# No parent means a measuring walk: the arithmetic is all that is
 				# wanted, and instancing a few hundred GLB tiles is by far the
 				# most expensive thing the builder does.
+				var holder: Node3D = null
 				if parent != null:
-					var holder := Node3D.new()
+					holder = Node3D.new()
 					# Lift the piece so its entry connection meets the running height.
 					holder.position = Vector3(origin.x, height - y_in, origin.y)
 					holder.rotation.y = deg_to_rad(theta)
@@ -341,12 +503,12 @@ func _place(
 					inst.position = Vector3(shift.x, 0.0, shift.y)
 					holder.add_child(inst)
 
-				return [exit_pos, want_heading, pos, origin, theta, height + rise]
+				return [exit_pos, want_heading, pos, origin, theta, height + rise, holder]
 
 	push_error("no placement for %s heading %s -> %s rise_sign %d" % [
 		piece, heading, want_heading, rise_sign
 	])
-	return [pos, heading, pos, Vector2.ZERO, 0.0, height]
+	return [pos, heading, pos, Vector2.ZERO, 0.0, height, null]
 
 func _rotate(v: Vector2, deg: float) -> Vector2:
 	var a := deg_to_rad(deg)
@@ -358,17 +520,57 @@ func _rotate(v: Vector2, deg: float) -> Vector2:
 func _world(p: Vector2, h: float) -> Vector3:
 	return Vector3(p.x * SCALE, h * SCALE * VERT, p.y * SCALE)
 
-func _trace_straight(from: Vector2, from_h: float, to: Vector2, to_h: float) -> void:
+## The index the next traced point will extend from, so a tile can be given the
+## span it occupies. Zero on the first piece, whose entry point does not exist
+## yet — the tracer appends it.
+func _mark() -> int:
+	return maxi(centreline.size() - 1, 0)
+
+func _record(holder: Node3D, from_idx: int) -> void:
+	if holder == null:
+		return
+	_placed.append({"holder": holder, "from": from_idx, "to": centreline.size() - 1})
+
+## Height of the eased ramp's surface a fraction `t` of the way along it, as a
+## fraction of its total rise.
+##
+## This is `roadRampLongCurved`'s own profile, recovered from the mesh: it is
+## smootherstep, matching the art to under a centimetre at every one of its 25
+## rows of vertices. It is reproduced here rather than sampled from the GLB
+## because `measure()` traces the centreline without loading a single mesh, and
+## the editor measures on every mouse move.
+##
+## The point of it is that the derivative is zero at both ends, so the ramp
+## meets the flat road it joins at a matched gradient. The plain `roadRampLong`
+## wedge meets it at 25%, and that step in gradient is a bump the wheels find
+## even though nothing about the road looks raised.
+static func _ease(t: float) -> float:
+	return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
+
+## Samples a straight into the centreline. Flat straights only need their two
+## ends, but bank transitions and ramp profiles are curves drawn along the
+## straight, so it is subdivided finely enough to carry them.
+func _trace_straight(
+	piece: String, from: Vector2, from_h: float, to: Vector2, to_h: float
+) -> void:
 	if centreline.is_empty():
 		centreline.append(_world(from, from_h))
-	centreline.append(_world(to, to_h))
+
+	var eased: bool = PIECES.get(piece, {}).get("eased", false)
+	var steps := maxi(1, int(ceil(from.distance_to(to) / TRACE_STEP)))
+	if eased:
+		steps = maxi(steps, RAMP_STEPS)
+	for i in range(1, steps + 1):
+		var t := float(i) / float(steps)
+		var h := lerpf(from_h, to_h, _ease(t) if eased else t)
+		centreline.append(_world(from.lerp(to, t), h))
 
 func _trace_arc(
 	piece: String, origin: Vector2, theta: float, from: Vector2, to: Vector2, h: float
 ) -> void:
 	var desc: Dictionary = PIECES[piece]
 	if not desc.has("arc"):
-		_trace_straight(from, h, to, h)
+		_trace_straight(piece, from, h, to, h)
 		return
 	if centreline.is_empty():
 		centreline.append(_world(from, h))
@@ -385,6 +587,442 @@ func _trace_arc(
 		var a: float = a0 + delta * (float(i) / ARC_STEPS)
 		centreline.append(_world(centre + Vector2(cos(a), sin(a)) * radius, h))
 
+# --- banking ---
+
+## Records that the arc just traced wants banking, and how much.
+##
+## `degrees` comes from the layout when it says, and from the corner's own radius
+## when it does not: a size-N corner is an NxN block, so `arc` is (N, N) and N
+## picks the default level. That also means the bridge corners default the same
+## way as the flat ones, which is what you want — an elevated sweeper is exactly
+## where you least want the road to go level.
+func _note_corner(piece: String, turn: String, from_idx: int, degrees: float) -> void:
+	if is_zero_approx(degrees):
+		return
+	# Positive rolls the outside of a left-hander up; a right-hander is its
+	# mirror, so it simply carries the opposite sign all the way through.
+	var sign := 1.0 if turn == "left" else -1.0
+	_corner_spans.append({
+		"from": from_idx,
+		"to": centreline.size() - 1,
+		"bank": deg_to_rad(clampf(degrees, -MAX_BANK_DEG, MAX_BANK_DEG)) * sign,
+	})
+
+## The bank a corner piece asks for when the layout does not say, in degrees.
+static func default_bank_degrees(piece: String) -> float:
+	var desc: Dictionary = PIECES.get(piece, {})
+	if not desc.has("arc"):
+		return 0.0
+	var size := int((desc["arc"] as Vector2).x)
+	return BANK_DEGREES[DEFAULT_BANK_LEVEL.get(size, 0)]
+
+## Turns the per-corner requests into a roll angle for every centreline point.
+##
+## Each corner holds its full bank across its own arc and eases to nothing over
+## `BANK_TRANSITION` of road at each end, and the contributions are *summed*.
+## Summing is what makes an S-bend work: a left immediately followed by a right
+## has overlapping transitions of opposite sign, which cancel through the middle,
+## so the road rolls from one way to the other through flat exactly where the car
+## changes hands. Taking the strongest instead would hold one corner's bank right
+## up to the other's and put a step between them.
+##
+## Two corners the same way round that close together do reinforce, which is why
+## the total is clamped.
+func _build_bank_profile() -> void:
+	bank.resize(centreline.size())
+	bank.fill(0.0)
+	_sides = _side_vectors()
+	if _corner_spans.is_empty() or centreline.size() < 2:
+		return
+
+	# Arc length at each point, and the loop's total, so transitions can be
+	# measured in metres of road rather than in points — the sampling is not
+	# uniform, and an arc step is a third of a straight's step.
+	var arc := PackedFloat32Array()
+	arc.resize(centreline.size())
+	arc[0] = 0.0
+	for i in range(1, centreline.size()):
+		arc[i] = arc[i - 1] + centreline[i - 1].distance_to(centreline[i])
+	var total: float = arc[arc.size() - 1]
+	if total <= 0.0:
+		return
+
+	var transition := BANK_TRANSITION * SCALE
+	var limit := deg_to_rad(MAX_BANK_DEG)
+	for span in _corner_spans:
+		var a: float = arc[span["from"]]
+		var b: float = arc[span["to"]]
+		var amount: float = span["bank"]
+		for i in centreline.size():
+			var d := _arc_distance_outside(arc[i], a, b, total)
+			if d >= transition:
+				continue
+			bank[i] += amount * _ease(1.0 - d / transition)
+	for i in bank.size():
+		bank[i] = clampf(bank[i], -limit, limit)
+
+	# Ride the centreline up onto the embankment, so it goes on describing the
+	# middle of the road. Height still closes: bank is zero at the start line, so
+	# the lift is zero there too, and the walker's own running height — which is
+	# what closure is measured from — is not touched at all.
+	for i in centreline.size():
+		centreline[i].y += _bank_lift(bank[i])
+
+## How far a point is from the span [a, b], measured the short way round the
+## loop; zero inside it.
+##
+## Wrapping matters: the corner before the start line has its exit transition
+## running off the end of the centreline and onto the beginning, and without the
+## wrap that corner alone would snap flat at the start/finish line.
+static func _arc_distance_outside(s: float, a: float, b: float, total: float) -> float:
+	var from_a := fposmod(s - a, total)
+	var span := fposmod(b - a, total)
+	if from_a <= span:
+		return 0.0
+	return minf(from_a - span, total - from_a)
+
+## The centreline's lateral direction at each point — the car's right — averaged
+## across the two segments meeting there.
+##
+## Averaging is the point. Taking each quad's own perpendicular leaves the two
+## quads at a shared point disagreeing by the turn between them, which on an arc
+## step is over a metre of overlap at the ribbon's edge. Flat, that is invisible;
+## banked, the two quads also disagree about which way is up, and the seam
+## becomes a step the wheels drop off.
+func _side_vectors() -> Array[Vector3]:
+	var sides: Array[Vector3] = []
+	sides.resize(centreline.size())
+	var dirs: Array[Vector2] = []
+	for i in centreline.size() - 1:
+		var d := centreline[i + 1] - centreline[i]
+		var flat := Vector2(d.x, d.z)
+		dirs.append(flat.normalized() if flat.length() > 0.001 else Vector2.ZERO)
+	for i in centreline.size():
+		var before: Vector2 = dirs[i - 1] if i > 0 else dirs[dirs.size() - 1]
+		var after: Vector2 = dirs[i] if i < dirs.size() else dirs[dirs.size() - 1]
+		var avg := before + after
+		if avg.length() < 0.001:
+			avg = after if after != Vector2.ZERO else before
+		avg = avg.normalized()
+		sides[i] = Vector3(-avg.y, 0.0, avg.x)
+	return sides
+
+## How far the middle of a banked road stands above the ground it is built on.
+##
+## The embankment rises from its inside edge, so the centre of the road ends up
+## half the total climb above ground level. `_build_bank_profile` adds this to the
+## centreline itself, which keeps "the centreline is the middle of the road" true
+## for the things that rely on it — where the grid sits, where the timing gates
+## hang — through a banked corner as much as through a flat one.
+static func _bank_lift(roll: float) -> float:
+	return absf(tan(roll)) * BANK_FULL_HALF
+
+## The road's cross-section: how far the surface sits above the centreline at a
+## lateral offset of `lateral` metres, under a roll of `roll` radians.
+##
+## Purely vertical — the point does not move sideways. A rigid roll would also
+## pull it inwards by cos(roll), which at 10 degrees is 1.5% of the road's width
+## for no visible gain, and it would leave the deformation unable to reproduce a
+## point exactly where the bank is zero. Vertical-only is exact there, which is
+## what lets a tile that is banked at one end and flat at the other stay welded to
+## the tiles either side of it.
+##
+## Shape, from the inside of the corner outwards: flat apron at ground level, a
+## straight climb across the whole width of the road, then a straight grade back
+## down to ground by the edge of the tile — with every join between those rounded
+## off over `BANK_FILLET`.
+##
+## The straights are straight rather than eased because an eased grade peaks at
+## nearly twice its average slope, and it is the peak that decides whether a car
+## running wide is turned back or thrown. The rounding is what stops the joins
+## between them doing the throwing instead.
+static func _bank_rise(lateral: float, roll: float) -> float:
+	if is_zero_approx(roll):
+		return 0.0
+	var climb := absf(tan(roll))
+	var lift := climb * BANK_FULL_HALF
+	# Measured towards the high side, so one set of cases covers both hands.
+	var out := lateral * signf(roll)
+
+	var ground := -lift
+	var road := climb * out
+	var apron := (
+		climb * 2.0 * BANK_FULL_HALF
+		* (BANK_FADE_HALF - out) / (BANK_FADE_HALF - BANK_FULL_HALF)
+		- lift
+	)
+
+	if out < -BANK_FULL_HALF - BANK_FILLET:
+		return ground
+	if out < -BANK_FULL_HALF + BANK_FILLET:
+		return lerpf(ground, road, _bank_blend(out, -BANK_FULL_HALF))
+	if out < BANK_FULL_HALF - BANK_FILLET:
+		return road
+	if out < BANK_FULL_HALF + BANK_FILLET:
+		return lerpf(road, apron, _bank_blend(out, BANK_FULL_HALF))
+	if out < BANK_FADE_HALF - BANK_FILLET:
+		return apron
+	if out < BANK_FADE_HALF + BANK_FILLET:
+		return lerpf(apron, ground, _bank_blend(out, BANK_FADE_HALF))
+	return ground
+
+## Rounds one join. Zero slope at both ends of the window, so the blended curve
+## leaves each straight at exactly the straight's own gradient and the profile has
+## no corner left in it anywhere.
+static func _bank_blend(out: float, at: float) -> float:
+	return smoothstep(-1.0, 1.0, (out - at) / BANK_FILLET)
+
+## The same cross-section's gradient, for turning normals with the surface.
+##
+## Differentiated numerically rather than by hand. The rounded profile has six
+## cases and the normals have to agree with the shape exactly — a hand-derived
+## twin would be one more thing to keep in step, for a saving of nothing that
+## matters at build time.
+static func _bank_slope(lateral: float, roll: float) -> float:
+	const STEP := 0.05
+	return (
+		_bank_rise(lateral + STEP, roll) - _bank_rise(lateral - STEP, roll)
+	) / (2.0 * STEP)
+
+## A point on the driving surface: `lateral` metres to the side of a centreline
+## point, lifted by the bank's cross-section there.
+static func _ribbon_point(
+	at: Vector3, side: Vector3, roll: float, lateral: float
+) -> Vector3:
+	return at + side * lateral + Vector3.UP * _bank_rise(lateral, roll)
+
+## Lateral offsets at which the collision ribbon is sampled across its width.
+##
+## The straight parts of the cross-section need a cut only at each end, because a
+## strip reproduces a straight exactly. The rounded joins have to be sampled
+## *through*, and the join between the road and its apron gets the most: it is
+## the convex one, so it is the only place where the corners left between samples
+## can still throw the car. Sampling it coarsely would just replace one sharp
+## crest with a handful of smaller ones.
+##
+## A single quad edge to edge, which is what this used to be, would interpolate
+## straight across the whole cross-section and give the car a flat road under a
+## banked one.
+static func _ribbon_cuts() -> Array[float]:
+	var cuts: Array[float] = [-RIBBON_HALF, 0.0, RIBBON_HALF]
+	for side in [-1.0, 1.0]:
+		# Three samples through each rounded join is enough to keep the shape
+		# without the ribbon getting expensive: it is a static shape, but it is
+		# also serialised into the committed scene files, and finer sampling was
+		# measured to buy nothing at all — nine samples across the crest left the
+		# car exactly as planted as three.
+		for k in range(-1, 2):
+			cuts.append(side * (BANK_FULL_HALF + BANK_FILLET * k))
+			cuts.append(side * (BANK_FADE_HALF + BANK_FILLET * k))
+	cuts.sort()
+
+	var out: Array[float] = []
+	for c in cuts:
+		if c < -RIBBON_HALF or c > RIBBON_HALF:
+			continue
+		if out.is_empty() or c - out[out.size() - 1] > 0.001:
+			out.append(c)
+	return out
+
+## Rebuilds the tiles that sit on banked road so the art agrees with what the
+## wheels are driving on.
+##
+## There is no banked corner in the Kenney kit, and there is no rigid rotation
+## that would make one: a corner held at a constant bank is a slice of a cone,
+## so the roll has to be applied per vertex, about the arc, not to the tile as a
+## whole. Rolling the tile bodily instead leaves its two ends tilted across the
+## straights they join, which shows up as a step at every corner entry.
+##
+## So each affected tile's mesh is rebuilt vertex by vertex. The Kenney art is
+## kept exactly — same surfaces, same materials, same kerbs and markings — and
+## only the shape changes. Everything on the tile rolls, the verge included,
+## which is what makes the road read as banked rather than as a flat road with a
+## tilted stripe on it.
+##
+## Tiles on flat road are left alone, so they keep sharing one imported mesh;
+## only corners and the road either side of them pay for a unique one.
+func _bank_tiles() -> void:
+	if _corner_spans.is_empty():
+		return
+	for entry in _placed:
+		# A segment of margin at each end, so a vertex on the seam between two
+		# tiles projects onto the same centreline segment whichever tile it
+		# belongs to, and the two stay welded instead of tearing open.
+		var lo: int = maxi(int(entry["from"]) - 1, 0)
+		var hi: int = mini(int(entry["to"]) + 1, centreline.size() - 1)
+		if not _span_is_banked(lo, hi):
+			continue
+		_bank_tile(entry["holder"], lo, hi)
+
+func _span_is_banked(lo: int, hi: int) -> bool:
+	for i in range(lo, hi + 1):
+		if absf(bank[i]) > BANK_EPSILON:
+			return true
+	return false
+
+## Swaps a tile's imported scene for a single `MeshInstance3D` carrying a baked,
+## banked copy of its geometry.
+##
+## Replacing the instance rather than overriding the mesh inside it is
+## deliberate. A property written onto a node *inside* an instanced sub-scene is
+## the same mechanism that has already shipped a car with eight wheels here, and
+## it would leave the shipped `.tscn` files depending on override behaviour for
+## something as load-bearing as the shape of the road. A node this builder owns
+## outright packs and reloads with no such subtlety.
+##
+## The replacement keeps the holder's "one mesh per piece" shape and sits at
+## identity, with its vertices baked into holder space.
+func _bank_tile(holder: Node3D, lo: int, hi: int) -> void:
+	var holder_to_track := (holder.get_parent() as Node3D).transform * holder.transform
+	var track_to_holder := holder_to_track.affine_inverse()
+
+	var sources: Array = []
+	for mi in _mesh_instances(holder):
+		if mi.mesh != null:
+			sources.append([mi.mesh, holder_to_track * _relative_transform(mi, holder)])
+	if sources.is_empty():
+		return
+
+	for child in holder.get_children():
+		holder.remove_child(child)
+		child.free()
+
+	for src in sources:
+		var mi := MeshInstance3D.new()
+		mi.mesh = _bank_mesh(
+			src[0], src[1], holder_to_track, track_to_holder, lo, hi
+		)
+		holder.add_child(mi)
+
+## A copy of `src` with every vertex rolled about the centreline, expressed in
+## the holder's own space.
+func _bank_mesh(
+	src: Mesh, local_to_track: Transform3D, holder_to_track: Transform3D,
+	track_to_holder: Transform3D, lo: int, hi: int
+) -> ArrayMesh:
+	# Normals do not transform like positions under a non-uniform scale, and
+	# `RoadVisuals` carries one — VERT squashes y to half. The inverse transpose
+	# is what keeps them perpendicular to the surface through that squash.
+	var normals_to_track := local_to_track.basis.inverse().transposed()
+	var normals_from_track := holder_to_track.basis.transposed()
+
+	var out := ArrayMesh.new()
+	for s in src.get_surface_count():
+		var arrays: Array = src.surface_get_arrays(s)
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		var has_normals := normals != null and normals.size() == verts.size()
+
+		var new_verts := PackedVector3Array()
+		new_verts.resize(verts.size())
+		var new_normals := PackedVector3Array()
+		if has_normals:
+			new_normals.resize(verts.size())
+
+		for i in verts.size():
+			var at := local_to_track * verts[i]
+			var frame := _frame_at(at, lo, hi)
+			if frame.is_empty():
+				new_verts[i] = track_to_holder * at
+				if has_normals:
+					new_normals[i] = normals[i]
+				continue
+			new_verts[i] = track_to_holder * _roll_point(at, frame)
+			if has_normals:
+				new_normals[i] = (
+					normals_from_track * _roll_direction(
+						(normals_to_track * normals[i]).normalized(), frame
+					)
+				).normalized()
+
+		arrays[Mesh.ARRAY_VERTEX] = new_verts
+		if has_normals:
+			arrays[Mesh.ARRAY_NORMAL] = new_normals
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		out.surface_set_material(s, src.surface_get_material(s))
+	return out
+
+## Where a point sits relative to the road: the centreline point directly below
+## it, the roll there, and its own offset from it split into lateral,
+## along-track and vertical parts.
+##
+## The search is horizontal, and restricted to the tile's own stretch of
+## centreline. Both matter. Projecting in 3D would fold the road's gradient into
+## the lateral offset, so a vertex on a ramp would slide along the road as well
+## as across it; and searching the whole loop would be a few hundred segments per
+## vertex, on tiles with hundreds of vertices, at runtime.
+func _frame_at(w: Vector3, lo: int, hi: int) -> Dictionary:
+	var p := Vector2(w.x, w.z)
+	var best := INF
+	var out := {}
+	for i in range(lo, hi):
+		var a := centreline[i]
+		var b := centreline[i + 1]
+		var base := Vector2(a.x, a.z)
+		var seg := Vector2(b.x - a.x, b.z - a.z)
+		var len2 := seg.length_squared()
+		if len2 < 0.000001:
+			continue
+		var t := clampf((p - base).dot(seg) / len2, 0.0, 1.0)
+		var foot := base + seg * t
+		var d := foot.distance_squared_to(p)
+		if d >= best:
+			continue
+		best = d
+		var tangent := seg / sqrt(len2)
+		var side: Vector3 = _sides[i].lerp(_sides[i + 1], t)
+		side = side.normalized() if side.length() > 0.001 else _sides[i]
+		out = {
+			"side": side,
+			"tangent": Vector3(tangent.x, 0.0, tangent.y),
+			"roll": lerpf(bank[i], bank[i + 1], t),
+			"lateral": (p - foot).dot(Vector2(side.x, side.z)),
+		}
+	return out
+
+## Lifts a point onto the banked cross-section. Purely vertical, and exactly the
+## same function the collision ribbon is built from, which is what makes the road
+## the car drives on the road the player can see.
+##
+## The lift is added back here because a tile is placed at the height the walker
+## reached, which is the ground the embankment is built on, while the ribbon is
+## measured from a centreline that has already been raised onto it.
+static func _roll_point(w: Vector3, frame: Dictionary) -> Vector3:
+	var roll: float = frame["roll"]
+	return w + Vector3.UP * (_bank_rise(frame["lateral"], roll) + _bank_lift(roll))
+
+## The matching rotation for a normal: the surface has been tilted by its own
+## local gradient, which is the full bank across the tarmac and the opposite way
+## across the verge that grades back down.
+static func _roll_direction(v: Vector3, frame: Dictionary) -> Vector3:
+	var angle := atan(_bank_slope(frame["lateral"], frame["roll"]))
+	var side: Vector3 = frame["side"]
+	var tangent: Vector3 = frame["tangent"]
+	var cs := cos(angle)
+	var sn := sin(angle)
+	var lateral := v.dot(side)
+	return (
+		side * (lateral * cs - v.y * sn)
+		+ Vector3.UP * (lateral * sn + v.y * cs)
+		+ tangent * v.dot(tangent)
+	).normalized()
+
+static func _mesh_instances(root_node: Node) -> Array[MeshInstance3D]:
+	var out: Array[MeshInstance3D] = []
+	if root_node is MeshInstance3D:
+		out.append(root_node)
+	for c in root_node.get_children():
+		out.append_array(_mesh_instances(c))
+	return out
+
+static func _relative_transform(node: Node3D, ancestor: Node3D) -> Transform3D:
+	var out := Transform3D()
+	var at := node
+	while at != null and at != ancestor:
+		out = at.transform * out
+		at = at.get_parent() as Node3D
+	return out
+
 ## The driving surface: a ribbon of quads along the centreline, as one concave
 ## shape. Seamless for the raycast wheels, and it follows the elevation changes
 ## that the flat ground plane cannot.
@@ -393,22 +1031,23 @@ func _build_road_collision(root_node: Node3D) -> void:
 	body.name = "RoadSurface"
 	root_node.add_child(body)
 
+	var cuts := _ribbon_cuts()
 	var faces := PackedVector3Array()
 	for i in centreline.size() - 1:
 		var a := centreline[i]
 		var b := centreline[i + 1]
-		var dir := b - a
-		var flat := Vector2(dir.x, dir.z)
-		if flat.length() < 0.001:
+		if Vector2(b.x - a.x, b.z - a.z).length() < 0.001:
 			continue
-		var n := Vector2(-flat.y, flat.x).normalized() * RIBBON_HALF
-		var offset := Vector3(n.x, 0.0, n.y)
-		var a_l := a + offset
-		var a_r := a - offset
-		var b_l := b + offset
-		var b_r := b - offset
-		faces.append_array([a_l, b_l, b_r])
-		faces.append_array([a_l, b_r, a_r])
+		# Each end carries its own roll, so a strip inside a bank transition is
+		# twisted rather than flat, and consecutive strips share their edges
+		# exactly.
+		for k in cuts.size() - 1:
+			var a_in := _ribbon_point(a, _sides[i], bank[i], cuts[k])
+			var a_out := _ribbon_point(a, _sides[i], bank[i], cuts[k + 1])
+			var b_in := _ribbon_point(b, _sides[i + 1], bank[i + 1], cuts[k])
+			var b_out := _ribbon_point(b, _sides[i + 1], bank[i + 1], cuts[k + 1])
+			faces.append_array([a_in, b_in, b_out])
+			faces.append_array([a_in, b_out, a_out])
 
 	var shape := ConcavePolygonShape3D.new()
 	shape.set_faces(faces)

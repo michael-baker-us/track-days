@@ -703,7 +703,7 @@ func test_sustained_elevation_across_corners() -> void:
 	for seg in raised.segments:
 		if String(seg[1]).begins_with("roadCornerBridge"):
 			bridge_corners += 1
-		if seg[1] == "roadRampLong":
+		if seg[1] == "roadRampLongCurved":
 			ramps += int(seg[2])
 	check("one bridge corner is used", bridge_corners, 1)
 	# Two ramps of two levels: up once at the start, down once at the end. A
@@ -824,6 +824,325 @@ func test_plateau_inside_one_straight_still_works() -> void:
 ## the same one-sided-collision trap the shipped circuits have a test for, but on
 ## geometry only the editor can produce.
 ##
+# --- banking ---
+
+## The bank profile the builder hands the rest of the game.
+##
+## Checks the shape of it rather than exact numbers: full bank in the corners,
+## flat down the straights, the right sign for the direction of turn, and no step
+## anywhere. The step is the one that matters — a discontinuity in roll is a
+## surface the wheels drop off, and it would not be visible in a screenshot.
+func test_corners_are_banked() -> void:
+	var builder := TrackBuilder.new()
+	builder.measure(load("res://tools/build_track.gd").HIGHLAND)
+	check("a bank angle per centreline point",
+		builder.bank.size(), builder.centreline.size())
+
+	var peak := 0.0
+	var flat := 0
+	for b in builder.bank:
+		peak = maxf(peak, absf(b))
+		if absf(b) <= TrackBuilder.BANK_EPSILON:
+			flat += 1
+	# Highland's biggest corners are size 3, so they set the peak.
+	check_near("the widest corners reach their full bank",
+		rad_to_deg(peak), TrackBuilder.BANK_DEGREES[3], 0.01)
+	check_true("and nothing exceeds the ceiling",
+		rad_to_deg(peak) <= TrackBuilder.MAX_BANK_DEG + 0.001)
+	# Banking the whole lap would mean the transitions never resolve, which is
+	# how a too-long transition or a broken wrap would show up.
+	check_true("the straights come back to flat (%d of %d points)"
+		% [flat, builder.bank.size()], flat > builder.bank.size() / 3)
+
+	# Which way each point is turning, read off the centreline itself rather than
+	# taken from the layout, so the test cannot inherit a sign error from the
+	# thing it is checking. Highland turns both ways, so this covers both.
+	var wrong_way := 0
+	var tested := 0
+	for i in range(1, builder.centreline.size() - 1):
+		if absf(builder.bank[i]) < deg_to_rad(2.0):
+			continue
+		var back: Vector3 = builder.centreline[i] - builder.centreline[i - 1]
+		var on: Vector3 = builder.centreline[i + 1] - builder.centreline[i]
+		var a := Vector2(back.x, back.z).normalized()
+		var b := Vector2(on.x, on.z).normalized()
+		var turn := a.x * b.y - a.y * b.x
+		if absf(turn) < 0.01:
+			continue  # a transition running along a straight, with nothing to turn
+		tested += 1
+		# A left turn is negative here, and the road banks positive for it: the
+		# outside edge, on the right, is the one that lifts.
+		if signf(builder.bank[i]) == signf(turn):
+			wrong_way += 1
+	check_true("there are banked corners to check (%d points)" % tested, tested > 20)
+	check("every corner banks the way it turns", wrong_way, 0)
+
+	# No step. The profile wraps, so the join at the start line is checked too —
+	# that is where a corner's exit transition runs off the end of the array.
+	var worst := 0.0
+	for i in builder.bank.size():
+		var next: int = (i + 1) % builder.bank.size()
+		var span: float = builder.centreline[i].distance_to(
+			builder.centreline[next if next > 0 else i]
+		)
+		if span < 0.01:
+			continue
+		worst = maxf(worst, absf(builder.bank[next] - builder.bank[i]) / span)
+	check_true("the roll never steps (worst %.2f deg/m)" % rad_to_deg(worst),
+		rad_to_deg(worst) < 1.5)
+
+## The collision the car actually drives on has to lean by the angle the builder
+## says, and lean *into* the corner.
+##
+## This is the test that ties the two halves together. Banking is applied twice
+## over — once to the ribbon and once to the tile meshes — from one profile, and
+## nothing about a wrong sign or a missed roll on the collision side is visible
+## from behind the wheel, because the car would simply grip a road that looks
+## banked and is not.
+func test_banked_collision_leans_into_the_corner() -> void:
+	if custom_track == null:
+		return
+	var builder := TrackBuilder.new()
+	builder.measure(sample_layout().compile().segments)
+
+	var at := 0
+	for i in builder.bank.size() - 1:
+		if absf(builder.bank[i]) > absf(builder.bank[at]):
+			at = i
+	var roll: float = (builder.bank[at] + builder.bank[at + 1]) * 0.5
+	check_true("the sample circuit banks somewhere (%.1f deg)" % rad_to_deg(roll),
+		absf(rad_to_deg(roll)) > 1.0)
+
+	# Mid-quad rather than on a sample point, so the ray lands on one face
+	# instead of the seam between two.
+	var a: Vector3 = builder.centreline[at]
+	var b: Vector3 = builder.centreline[at + 1]
+	var mid: Vector3 = custom_track.position + (a + b) * 0.5
+
+	# The lateral direction is worked out here from the centreline rather than
+	# taken from the builder, so the test cannot agree with itself about which
+	# way is sideways.
+	var along := Vector2(b.x - a.x, b.z - a.z).normalized()
+	var side := Vector3(-along.y, 0.0, along.x)
+
+	var space: PhysicsDirectSpaceState3D = custom_track.get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(
+		mid + Vector3(0, 20, 0), mid - Vector3(0, 20, 0)
+	)
+	var hit: Dictionary = space.intersect_ray(query)
+	check_true("there is road under the banked corner", not hit.is_empty())
+	if hit.is_empty():
+		return
+
+	# The ribbon collides from both sides, so a normal may come back inverted.
+	var normal: Vector3 = hit["normal"]
+	if normal.dot(Vector3.UP) < 0.0:
+		normal = -normal
+
+	check_near("the surface leans by the banked angle",
+		rad_to_deg(acos(clampf(normal.dot(Vector3.UP), -1.0, 1.0))),
+		absf(rad_to_deg(roll)), 1.5)
+	# A surface rolled about the tangent has its normal tipped the opposite way
+	# to the raised edge, so this is what says the outside of the corner is the
+	# high side and not the low one.
+	check_near("and leans towards the inside of the corner",
+		normal.dot(side), -sin(roll), 0.05)
+
+## The banked tile meshes have to survive being packed into a `.tscn` and loaded
+## back, or the shipped circuits drive banked and look flat.
+##
+## Worth its own test because the failure is silent and one-sided: collision is
+## generated from the same profile either way, so the car would corner correctly
+## on a road that had visibly reverted to being level.
+func test_shipped_tracks_keep_their_banked_meshes() -> void:
+	# Highland banks its sweepers and Flats is deliberately flat, so the two
+	# shipped circuits between them check that banking survives being packed
+	# *and* that asking for none actually gets none.
+	var want_banked := {"highland": true, "flats": false}
+	for info in GameState.TRACKS:
+		var inst: Node3D = load(info["scene"]).instantiate()
+		var visuals: Node3D = inst.get_node("RoadVisuals")
+		var banked := 0
+		var steepest := 0.0
+		for holder in visuals.get_children():
+			var spread := _road_height_spread(holder, visuals)
+			if spread > 0.5:
+				banked += 1
+			steepest = maxf(steepest, spread)
+
+		if not want_banked.get(info["id"], false):
+			# A flat tile's road surface is level to within its own thickness.
+			check("track %s stays flat" % info["id"], banked, 0)
+			check_true("track %s is level across the road (%.2f m)"
+				% [info["id"], steepest], steepest < 0.1)
+			inst.free()
+			continue
+
+		check_true("track %s has banked tiles (%d of %d)"
+			% [info["id"], banked, visuals.get_child_count()], banked >= 4)
+		check_true("track %s banks by a visible amount (%.2f m across the road)"
+			% [info["id"], steepest], steepest > 0.5)
+		inst.free()
+
+## Banking is a choice, and "flat" has to be one of the answers.
+##
+## The zero matters twice over: a layout that says nothing about a corner gets
+## the default for its radius, and one that says zero gets a flat corner. Those
+## have to stay different, or a circuit could never be made flat.
+func test_banking_can_be_turned_off() -> void:
+	var tool_script := load("res://tools/build_track.gd")
+
+	var flat := TrackBuilder.new()
+	flat.measure(tool_script.FLATS)
+	var worst := 0.0
+	for b in flat.bank:
+		worst = maxf(worst, absf(b))
+	check_near("a circuit asking for flat corners gets none", rad_to_deg(worst), 0.0, 0.001)
+
+	# And saying nothing is still not the same as saying zero.
+	var implied := TrackBuilder.new()
+	var silent := []
+	for seg in tool_script.FLATS:
+		silent.append(seg.slice(0, 3) if seg[0] == "C" else seg)
+	implied.measure(silent)
+	var implied_worst := 0.0
+	for b in implied.bank:
+		implied_worst = maxf(implied_worst, absf(b))
+	check_true("the same circuit left unsaid banks by default (%.1f deg)"
+		% rad_to_deg(implied_worst), rad_to_deg(implied_worst) > 1.0)
+
+## A painted circuit's per-corner banking has to survive the compiler and the
+## save file, or the choice is lost the moment the editor is closed.
+func test_corner_banking_is_authored_and_saved() -> void:
+	var layout := _roomy_rectangle()
+	var first := layout.compile()
+	check_true("corners bank by default", first.corners[0].bank > 0)
+
+	for corner in first.corners:
+		layout.corner_banks[corner.cell] = 0
+	var flattened := layout.compile()
+	for corner in flattened.corners:
+		check("every corner obeys being set flat", corner.bank, 0)
+	var built := TrackBuilder.new()
+	var result := built.measure(flattened.segments)
+	var worst := 0.0
+	for b in built.bank:
+		worst = maxf(worst, absf(b))
+	check_near("and the built circuit is flat", rad_to_deg(worst), 0.0, 0.001)
+	check_true("a flat-cornered circuit still closes", result.closed)
+
+	# One corner banked hard again, then round-tripped through the save format.
+	var cell: Vector2i = flattened.corners[1].cell
+	layout.corner_banks[cell] = TrackBuilder.MAX_BANK_LEVEL
+	layout.id = "user_banktest"
+	var back := TrackLayout.from_dict(layout.to_dict()).compile()
+	for corner in back.corners:
+		check("bank survives a save and load at %s" % corner.cell,
+			corner.bank, TrackBuilder.MAX_BANK_LEVEL if corner.cell == cell else 0)
+
+## How much the painted road surface of one tile rises across its own width, in
+## metres. Reads the art's own "road" material rather than the whole tile, so
+## the answer is about the driving surface and not about scenery.
+##
+## The height cut is not decoration. `roadStart` paints its gantry banner with
+## the same "road" material as the tarmac, 0.65 units up, and without this the
+## start tile reports a 4.5 m "bank" on every circuit ever built — which is how
+## this first passed on a track that has no banking at all. The deck sits at
+## 0.01, and the steepest banking moves it by under 0.1, so 0.3 separates them
+## with room to spare.
+const DECK_MAX_Y := 0.3
+
+func _road_height_spread(holder: Node3D, visuals: Node3D) -> float:
+	var mi := _first_mesh_in(holder)
+	if mi == null or mi.mesh == null:
+		return 0.0
+	var lo := INF
+	var hi := -INF
+	for s in mi.mesh.get_surface_count():
+		var mat: Material = mi.mesh.surface_get_material(s)
+		if mat == null or mat.resource_name != "road":
+			continue
+		for v in mi.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]:
+			var local: Vector3 = mi.transform * v
+			if local.y > DECK_MAX_Y:
+				continue
+			var world: Vector3 = visuals.transform * (holder.transform * local)
+			lo = minf(lo, world.y)
+			hi = maxf(hi, world.y)
+	return 0.0 if lo == INF else hi - lo
+
+## Hills have to arrive gradually.
+##
+## The old `roadRampLong` was a wedge of eight vertices: the road went from level
+## to a 25% grade at a single edge, and back again at the far end. Nothing about
+## it looked raised, and the car found both creases. `roadRampLongCurved` eases
+## in and out, and the collision ribbon reproduces its profile, so the measure of
+## success is that the gradient never changes sharply anywhere on the lap.
+func test_slopes_are_eased() -> void:
+	var builder := TrackBuilder.new()
+	builder.measure(load("res://tools/build_track.gd").HIGHLAND)
+	var line := builder.centreline
+
+	var worst := 0.0
+	var climbs := false
+	for i in range(1, line.size() - 1):
+		var back: Vector3 = line[i] - line[i - 1]
+		var on: Vector3 = line[i + 1] - line[i]
+		var back_flat := Vector2(back.x, back.z).length()
+		var on_flat := Vector2(on.x, on.z).length()
+		if back_flat < 0.01 or on_flat < 0.01:
+			continue
+		if absf(on.y) > 0.01:
+			climbs = true
+		worst = maxf(worst, absf(on.y / on_flat - back.y / back_flat))
+	check_true("the circuit actually has hills", climbs)
+	# The wedge's own grade was 25%, so it broke into the slope by that much in
+	# one step. Anything near that here means the eased profile is not reaching
+	# the collision ribbon.
+	check_true("no crease at the foot of a hill (worst %.1f%%)" % (worst * 100.0),
+		worst < 0.10)
+
+## Nothing may emit the wedge ramp any more, on any circuit the game can build.
+func test_hills_use_the_eased_ramp() -> void:
+	var tool_script := load("res://tools/build_track.gd")
+	var layouts := {
+		"highland": tool_script.HIGHLAND,
+		"flats": tool_script.FLATS,
+		"custom": _raised_sample_layout(),
+	}
+	for name in layouts:
+		var wedges := 0
+		var eased := 0
+		for seg in layouts[name]:
+			if seg[1] == "roadRampLong":
+				wedges += int(seg[2])
+			elif seg[1] == "roadRampLongCurved":
+				eased += int(seg[2])
+		check("%s uses no wedge ramps" % name, wedges, 0)
+		if name != "flats":
+			check_true("%s ramps at all" % name, eased > 0)
+
+## A player-painted circuit with a hill on it, as a segment list. The roomy
+## rectangle, because its straights are long enough to actually afford ramps.
+func _raised_sample_layout() -> Array:
+	var layout := _roomy_rectangle()
+	var first := layout.compile()
+	layout.elevation[first.runs[1].cells[0]] = 2
+	return layout.compile().segments
+
+## The anti-roll bar has to measure the car against the road, not against the
+## world, or it spends every banked corner trying to level the car out of the
+## banking. On flat ground the two answers are the same, which is exactly why
+## this went unnoticed until there was banking to notice it with.
+func test_antiroll_reads_the_road() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	check_true("car exists for the anti-roll check", car != null)
+	if car == null:
+		return
+	var up: Vector3 = car._surface_up()
+	check_true("finds a surface under the car on the grid", up.dot(Vector3.UP) > 0.9)
+	check_near("and it is a unit vector", up.length(), 1.0, 0.001)
+
 ## Split in two because the raycasts need the bodies to have had a physics step:
 ## `await` cannot be used here, since it would turn the staged `_physics_process`
 ## into a coroutine and its return value would stop driving the runner.
@@ -1170,12 +1489,20 @@ func _physics_process(_delta: float) -> bool:
 		test_start_line_stays_on_the_ground()
 		test_elevation_requests_are_reduced_not_broken()
 		test_plateau_inside_one_straight_still_works()
+		test_corners_are_banked()
+		test_shipped_tracks_keep_their_banked_meshes()
+		test_banking_can_be_turned_off()
+		test_corner_banking_is_authored_and_saved()
+		test_slopes_are_eased()
+		test_hills_use_the_eased_ramp()
+		test_antiroll_reads_the_road()
 		stage_sustained_track()
 		return false
 
 	if frame == 4:
 		test_custom_track_is_complete()
 		test_custom_spawn_is_on_the_road()
+		test_banked_collision_leans_into_the_corner()
 		return false
 
 	if frame == 5:

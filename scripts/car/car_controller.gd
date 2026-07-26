@@ -86,15 +86,51 @@ func _physics_process(delta: float) -> void:
 func _apply_drag() -> void:
 	apply_central_force(-linear_velocity * linear_velocity.length() * tuning.drag_coefficient)
 
+## How far below the car to look for the road when deciding which way is up, and
+## how far the surface may lean before the reading is rejected as a wall.
+const GROUND_PROBE := 3.0
+const GROUND_MAX_LEAN := 0.5
+
 func _apply_antiroll() -> void:
 	var basis := global_transform.basis
-	# basis.x . basis.y is always 0 for an orthonormal basis; the car's right
-	# vector against world up is the actual signed roll (sin of the roll angle).
-	var tilt := basis.x.dot(Vector3.UP)
+	var up := _surface_up()
+	# basis.x . up is always 0 for an orthonormal basis measured against its own
+	# y; against the road's up it is the actual signed roll (sin of the angle)
+	# of the car relative to the surface it is standing on.
+	var tilt := basis.x.dot(up)
 	var roll_rate := angular_velocity.dot(basis.z)
 	apply_torque(
 		-basis.z * (tilt * tuning.antiroll_stiffness + roll_rate * tuning.antiroll_damping) * mass
 	)
+
+## Which way is up as far as the suspension is concerned: the road's normal.
+##
+## This used to be world up, which is the same thing on a flat circuit and
+## quietly wrong on a banked one. The anti-roll bar reads the angle between the
+## car and "up" as body roll to be resisted, so on a 10 degree banking it saw a
+## permanently rolled car and spent the whole corner trying to level it against
+## the road — the car fought the banking instead of settling into it, which is
+## exactly the opposite of what banking is for.
+##
+## Airborne, or over something too steep to be road, it falls back to world up.
+## That is the right answer there too: with no surface to align to, levelling out
+## is what a car in the air should do.
+func _surface_up() -> Vector3:
+	var space := get_world_3d().direct_space_state
+	var from := global_transform.origin
+	var query := PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * GROUND_PROBE)
+	query.exclude = [get_rid()]
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		return Vector3.UP
+	var normal: Vector3 = hit["normal"]
+	# The collision ribbon is two-sided, so a hit from underneath reports an
+	# inverted normal; and a near-vertical one is scenery, not road.
+	if normal.dot(Vector3.UP) < 0.0:
+		normal = -normal
+	if normal.dot(Vector3.UP) < GROUND_MAX_LEAN:
+		return Vector3.UP
+	return normal
 
 func _reset() -> void:
 	global_transform.basis = Basis()

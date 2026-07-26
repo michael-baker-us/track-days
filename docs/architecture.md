@@ -142,6 +142,109 @@ shipped silently.
 Adding a shipped circuit is a layout constant plus an entry in
 `GameState.TRACKS`.
 
+### Banked corners
+
+The centreline carries a **roll angle per point** as well as a position, and
+everything about banking follows from that one array.
+
+Bank is a **per-corner choice, not something every bend gets**. A layout may end
+a corner with an explicit angle in degrees — `["C", piece, turn, 6.0]` — and zero
+is a meaningful answer, so "said nothing" has to be the *absence* of that element
+rather than a zero in it. Said nothing, a corner banks to suit its radius:
+`DEFAULT_BANK_LEVEL` gives 1.5°/2.5°/4° for sizes 1/2/3. Bank grows with radius,
+which is the opposite of what "more bank helps you turn" suggests, and it is
+deliberate — a sweeper is the corner taken fastest and the only one with enough
+road either side to ease the roll in and out of, while a hairpin banked hard is a
+skate bowl whose tilt arrives in a car length. The two shipped circuits show both
+answers: **Highland** leans into its sweepers, **Flats** states `0.0` on every
+corner and does not lean at all.
+
+The profile is built by giving each corner its full angle across its own arc and
+easing to nothing over `BANK_TRANSITION` (1.5 units, 21 m) at each end, then
+**summing** the contributions. Summing is what makes an S-bend work: a left
+followed immediately by a right has overlapping transitions of opposite sign, so
+the road rolls through flat exactly where the car changes hands. The distance
+measure wraps, or the corner before the start line would snap flat at the line.
+
+Two things then consume the profile, and they must not disagree:
+
+- **The collision ribbon**, whose lateral offsets are lifted by the bank's
+  cross-section. The ribbon is now cut into six strips across its width rather
+  than one quad edge to edge — a single quad would interpolate straight across
+  the cross-section and give the car a flat road under a banked one.
+- **The tile meshes.** There is no banked corner in the Kenney kit and no rigid
+  rotation that would make one — a corner held at constant bank is a slice of a
+  cone — so each affected tile's mesh is rebuilt vertex by vertex against the
+  same cross-section function. The art is kept exactly: same surfaces, same
+  materials, same kerbs and markings. Tiles on flat road keep sharing one
+  imported mesh; only corners and the road either side pay for a unique one
+  (19 of 46 holders on Highland).
+
+> **The banked tile replaces the glb instance rather than overriding the mesh
+> inside it.** Writing a property onto a node *inside* an instanced sub-scene is
+> the same mechanism that once shipped a car with eight wheels, and it would
+> leave the committed `.tscn` files depending on override behaviour for something
+> as load-bearing as the shape of the road. The replacement is a plain
+> `MeshInstance3D` this builder owns, at identity, with its vertices baked into
+> holder space — which also keeps the holder's "one mesh per piece" invariant and
+> leaves `_gantry_position` in the suite walking the same path it always did.
+> Cost: the shipped scenes grow from 38 KB to about 190 KB.
+
+#### A banked corner is an embankment, not a tilted tile
+
+The world outside the road is one flat plane 4 km across and cannot be banked to
+meet a banked corner. Rolling a whole tile bodily therefore puts its outer edge
+into the air as a grass cliff and its inner edge *under* the ground plane, where
+the grass clips straight through the road — which is exactly what the first
+version did, and it looked broken.
+
+So the cross-section is built the way a real banked corner is. The inside edge
+stays at ground level, the road climbs across its whole width, and the outside
+grades back down to ground by the edge of the tile. Nothing ever sits below the
+grass, so nothing can clip through it at any angle. The grades are **straight,
+not eased** — an eased one peaks at nearly twice its average slope, and it is the
+peak that decides whether a car running wide is turned back or thrown — but every
+join between them is **rounded** over `BANK_FILLET`, because a sharp convex crest
+throws the car however slowly it is crossed: the vertical acceleration a surface
+demands is its curvature times the square of the speed across it, and at a corner
+the curvature is infinite.
+
+Three consequences worth knowing:
+
+- **`BANK_FULL_HALF` must cover the whole painted road.** It was set inside the
+  tarmac at first, to leave a longer, gentler verge — which put both of the
+  cross-section's gradient changes *on the driving surface*, as a ridge 3.5 m out
+  and a kink 3.5 m in. The car hopped whenever a wheel crossed one, while
+  measuring as a perfect 10° bank the whole time, because along the racing line
+  it was.
+- **The bank ceiling is set by the road edge, not by taste.** The outside of the
+  road stands above the surrounding grass by twice `BANK_FULL_HALF × tan(angle)`,
+  and all of that is shed again over 2.1 m of verge. At 6° that is a metre of
+  edge and a 26° apron, and drifting a hand's width wide drops the car off it. 4°
+  is 0.69 m and 18°, which the suspension follows. NASCAR's 24–33° is out of
+  reach without wider tiles to land the apron on.
+- Because the road climbs from its inside edge, its middle ends up above the
+  ground it is built on. `_build_bank_profile` adds that lift to the centreline
+  itself, so "the centreline is the middle of the road" stays true for the things
+  that rely on it — where the grid sits, where the timing gates hang. Height
+  still closes: bank is zero at the start line, and the walker's own running
+  height, which is what closure is measured from, is never touched.
+
+Straights are sampled into the centreline every 0.2 units (2.8 m) rather than
+once per tile, because bank transitions and ramp profiles are curves laid along a
+straight and a curve sampled every 14 m is a set of facets the wheels can feel.
+That holds the roll change under 2.5° between samples, about 0.9°/m — roughly 25°
+a second at racing speed.
+
+> **The anti-roll bar had to learn about this.** `car_controller` measured body
+> roll against *world* up, which is the same thing as the road's up on a flat
+> circuit and quietly wrong on a banked one: it saw a permanently rolled car and
+> spent the whole corner trying to level it against the road, so the car fought
+> the banking instead of settling into it. It now takes the road's normal from a
+> single downward ray, falling back to world up when airborne or over something
+> too steep to be road — which is the right answer there too, since a car in the
+> air should level out.
+
 > **Corner arcs are filleted, not centred on the corner.** A corner tile's arc
 > centre is the *outer* corner of its NxN block, not the point where the two
 > centre lines cross. Both give a quarter circle through the same two
@@ -196,6 +299,25 @@ hairpin or long sweeper, paid for in straight.
 A corner also may not pave over road it does not own, so an oversized sweeper is
 rejected where the circuit doubles back close to itself.
 
+### Banking is the one per-corner choice that cannot fail
+
+Radius and height are both negotiations with the circuit: a corner can be too
+wide for the straights either side, a straight too short for the ramps it needs,
+and the compiler has to shave requests until they fit. Banking is not like that.
+It spends no cells and cannot stop the loop closing, so every corner can have any
+of the four levels and the editor never has to refuse the click.
+
+That is why cycling **wraps back round through flat** rather than stopping at the
+top. Banking is a choice, and "no banking" has to be as easy to ask for as any
+other setting — the badge shows a dot for a flat corner precisely so that
+*deliberately flat* is a state you can see rather than infer.
+
+The default when a corner has never been told anything is the one that suits its
+radius, resolved *after* the size is settled: shrink a sweeper to a hairpin and
+it stops being banked like a sweeper. Tracks saved before banking existed have no
+`corner_banks` at all, which lands them on those defaults rather than on a flat
+circuit.
+
 ### Elevation, and sustaining it
 
 Every segment — each straight and each corner — carries an absolute *level*, and
@@ -214,8 +336,19 @@ the corner simply sits a few metres proud of the straights it joins.
 Height can only *change* inside a straight, because a corner tile has the same
 deck height at both ends. So a run reconciles three numbers — the level of the
 corner before it, its own, and the level of the corner after — ramping from the
-first to its own, holding, then ramping to the third. One `roadRampLong` per
-level of difference, two cells each.
+first to its own, holding, then ramping to the third. One `roadRampLongCurved`
+per level of difference, two cells each.
+
+That piece, not the plain `roadRampLong`, and the difference is the whole point.
+`roadRampLong` is a wedge of eight vertices: the surface goes from level to a 25%
+grade at a single edge and back again at the far end. Nothing about it reads as a
+hill, and the car finds both creases. `roadRampLongCurved` has 377 vertices and
+eases in and out — and its profile, recovered from the mesh, is **smootherstep**
+(`6t⁵ − 15t⁴ + 10t³`) to within a centimetre at all 25 of its vertex rows. The
+builder reproduces that curve analytically in the collision ribbon rather than
+sampling the GLB, because `measure()` traces a centreline without loading a
+single mesh and the editor measures on every mouse move. Worst gradient change
+between collision samples went from a 25% cliff to about 4%.
 
 Two rules make it safe:
 
@@ -271,10 +404,17 @@ click on a cell meant whichever the toolbar last said. The player had to keep th
 current mode in their head, and the canvas gave no clue what a click would do.
 
 Now every action has its own thing on screen to hit: a corner handle, a radius
-badge, a climb badge, the start flag, the body of a straight. What a click does
-is decided by what is under it, which is visible. Badges are drawn *off* the
-road — corner badges outside the loop, climb badges inside — because a badge
-sitting on the road steals clicks meant for the road beneath it.
+badge, a bank badge, a climb badge, the start flag, the body of a straight. What
+a click does is decided by what is under it, which is visible. Badges are drawn
+*off* the road — corner badges outside the loop, climb badges inside — because a
+badge sitting on the road steals clicks meant for the road beneath it.
+
+The bank badge sits directly beyond the radius badge on the same ray out of the
+corner. Radius and bank are both answers to "what shape is this bend", so they
+read as a pair; putting the second further out rather than beside it keeps them
+apart where two corners are close together. It is tinted differently from the
+climb badge so leaning and climbing can be told apart without reading either
+number.
 
 Freehand painting survives on Shift, for anything the handles cannot express.
 

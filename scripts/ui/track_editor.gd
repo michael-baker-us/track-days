@@ -53,6 +53,7 @@ func _ready() -> void:
 	_grid.layout_edited.connect(_on_edited)
 	_grid.layout_touched.connect(_on_touched)
 	_grid.corner_clicked.connect(_cycle_corner)
+	_grid.bank_clicked.connect(_cycle_bank)
 	_grid.elevation_clicked.connect(_cycle_elevation)
 	_grid.status.connect(_flash)
 
@@ -201,6 +202,25 @@ func _cycle_corner(cell: Vector2i) -> void:
 
 func _corner_word(size: int) -> String:
 	return ["", "tight", "medium", "sweeping"][clampi(size, 0, 3)]
+
+## Steps a corner's banking up and wraps back round to flat.
+##
+## Wrapping through zero rather than stopping at it is what makes a flat corner
+## reachable in one obvious way: banking is a choice, and "no banking" has to be
+## as easy to ask for as any other setting. Nothing here can fail, so unlike
+## radius and height there is no case where the click has to be refused —
+## banking costs no cells and cannot stop the circuit closing.
+func _cycle_bank(cell: Vector2i) -> void:
+	for corner in _compiled.corners:
+		if corner.cell != cell:
+			continue
+		var next := (corner.bank + 1) % (TrackBuilder.MAX_BANK_LEVEL + 1)
+		_layout.corner_banks[cell] = next
+		_flash("Corner %s." % (
+			"flat" if next == 0 else "banked %.0f degrees" % TrackBuilder.BANK_DEGREES[next]
+		))
+		_on_edited()
+		return
 
 ## Raises or lowers whichever segment was clicked. A corner is keyed by its own
 ## bend cell, a straight by any cell along it, and bend cells never belong to a

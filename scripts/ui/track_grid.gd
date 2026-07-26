@@ -37,6 +37,7 @@ extends Control
 signal layout_edited            ## a committed change, worth an undo entry
 signal layout_touched           ## live during a drag; recompile but do not record
 signal corner_clicked(cell: Vector2i)
+signal bank_clicked(cell: Vector2i)
 signal elevation_clicked(cell: Vector2i)
 signal start_clicked(cell: Vector2i)
 signal status(text: String)
@@ -59,6 +60,9 @@ const COL_ROAD := Color(0.29, 0.31, 0.35)
 const COL_ROAD_HOT := Color(0.38, 0.41, 0.47)
 const COL_LINE := Color(0.55, 0.80, 0.45)
 const COL_HIGH := Color(0.95, 0.72, 0.30)
+## Distinct from the climb badge's amber, so a glance tells leaning apart from
+## climbing without reading either number.
+const COL_BANK := Color(0.45, 0.78, 0.95)
 const COL_PROBLEM := Color(0.85, 0.30, 0.30)
 const COL_START := Color(0.95, 0.95, 0.98)
 const COL_TEXT := Color(0.88, 0.90, 0.93)
@@ -67,7 +71,7 @@ const COL_HANDLE_HOT := Color(1.0, 1.0, 1.0)
 const COL_BADGE := Color(0.16, 0.18, 0.22)
 const COL_REFUSED := Color(0.85, 0.30, 0.30)
 
-enum Hit { NONE, CORNER, EDGE, RADIUS, CLIMB, CORNER_CLIMB, START }
+enum Hit { NONE, CORNER, EDGE, RADIUS, BANK, CLIMB, CORNER_CLIMB, START }
 
 var layout: TrackLayout
 var compiled: TrackLayout.Compiled
@@ -189,6 +193,10 @@ func _hit_test(pos: Vector2) -> Array:
 			var corner: TrackLayout.Bend = compiled.corners[i]
 			if at.distance_to(_radius_badge_at(corner)) < GRAB:
 				return [Hit.RADIUS, i]
+		for i in compiled.corners.size():
+			var corner: TrackLayout.Bend = compiled.corners[i]
+			if at.distance_to(_bank_badge_at(corner)) < GRAB:
+				return [Hit.BANK, i]
 		for i in compiled.runs.size():
 			var run: TrackLayout.Run = compiled.runs[i]
 			if run.cells.is_empty() or run.max_level <= 0:
@@ -228,6 +236,17 @@ func _radius_badge_at(corner: TrackLayout.Bend) -> Vector2:
 	if away.dot(at - _centre) < 0.0:
 		away = -away
 	return at + away * 1.7
+
+## The bank badge sits directly beyond the radius badge, on the same ray out of
+## the corner. Radius and bank are both answers to "what shape is this bend", so
+## they read as a pair, and putting the second one further out rather than beside
+## it keeps them apart on a tight circuit where two corners are close together.
+func _bank_badge_at(corner: TrackLayout.Bend) -> Vector2:
+	var at := Vector2(corner.cell) + Vector2(0.5, 0.5)
+	var away := (Vector2(corner.in_dir) - Vector2(corner.out_dir)).normalized()
+	if away.dot(at - _centre) < 0.0:
+		away = -away
+	return at + away * 2.9
 
 ## A corner's climb badge sits inside the loop, opposite its radius badge, so the
 ## two never collide and which is which is obvious from the side it is on.
@@ -335,6 +354,8 @@ func _button(event: InputEventMouseButton) -> void:
 	match kind:
 		Hit.RADIUS:
 			corner_clicked.emit(compiled.corners[index].cell)
+		Hit.BANK:
+			bank_clicked.emit(compiled.corners[index].cell)
 		Hit.CLIMB:
 			elevation_clicked.emit(_climb_cell(index))
 		Hit.CORNER_CLIMB:
@@ -389,7 +410,7 @@ func _update_cursor() -> void:
 	match _hot:
 		Hit.CORNER, Hit.EDGE, Hit.START:
 			mouse_default_cursor_shape = Control.CURSOR_DRAG
-		Hit.RADIUS, Hit.CLIMB, Hit.CORNER_CLIMB:
+		Hit.RADIUS, Hit.BANK, Hit.CLIMB, Hit.CORNER_CLIMB:
 			mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		_:
 			mouse_default_cursor_shape = Control.CURSOR_ARROW
@@ -670,6 +691,10 @@ func _draw_badges() -> void:
 			_radius_badge_at(corner), str(corner.size), COL_TEXT,
 			_hot == Hit.RADIUS and _hot_index == i
 		)
+		_bank_badge(
+			_bank_badge_at(corner), corner.bank,
+			_hot == Hit.BANK and _hot_index == i
+		)
 	# Straights and corners both carry a height, so both get a badge — raising a
 	# corner is what lets an elevated stretch carry on round the bend instead of
 	# dropping back down for it.
@@ -688,6 +713,20 @@ func _draw_badges() -> void:
 		_climb_badge(
 			_corner_climb_badge_at(corner), corner.level,
 			_hot == Hit.CORNER_CLIMB and _hot_index == i
+		)
+
+## A banked corner shows how hard it leans; a flat one shows a faint dot, so the
+## option is there to be found without a mode or a tooltip — and so that "this
+## corner is deliberately flat" is a state you can see rather than infer.
+func _bank_badge(at: Vector2, level: int, hot: bool) -> void:
+	if level > 0:
+		_badge(at, "%s%d" % ["\u2220", level], COL_BANK, hot)
+	elif hot:
+		_badge(at, "\u2220", COL_TEXT, true)
+	else:
+		draw_circle(
+			cell_to_screen(at), maxf(2.0, _cell_px * 0.09),
+			COL_TEXT * Color(1, 1, 1, 0.35)
 		)
 
 ## A raised segment shows its height; a flat one that *could* be raised shows a

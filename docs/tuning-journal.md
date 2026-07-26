@@ -433,6 +433,116 @@ suspension travel. Fixing the track was the wrong answer to a car problem.
 > has to be a mean over a settled window, or every configuration appears to have
 > 7 g of grip.
 
+## M6 — banked corners and eased slopes
+
+**The ramps were wedges.** `roadRampLong`, the piece every hill had been built
+from, is eight vertices: the surface breaks from level into a 25% grade at one
+edge and back out at the other. `roadRampLongCurved` was sitting unused in the
+kit at 377 vertices. Sampling its top surface along the centre and normalising
+gave a curve matching **smootherstep** (`6t⁵ − 15t⁴ + 10t³`) to under 0.01 at
+every one of its 25 vertex rows — so the ribbon reproduces it analytically rather
+than reading the GLB, which `measure()` cannot afford to do on every mouse move.
+
+| | worst gradient change between collision samples |
+|---|---|
+| `roadRampLong` wedge | 25% (a step, at each end) |
+| `roadRampLongCurved`, 8 samples/tile | 8.4% |
+| `roadRampLongCurved`, 16 samples/tile | 4.4% |
+
+Kept at 16. The ramp is also why straights are now sampled every 0.2 units rather
+than once per tile — a curve carried on a 14 m sample is a set of facets.
+
+**Banking, first attempt: roll the whole tile.** Rendering it is what caught the
+problem; the numbers all looked right. Peak bank 10.00°, edge rise 1.46 m over
+the 8.4 m half-width, 19 of 46 tiles deformed, road surface tilted 1.70 m across
+its width — every measurement agreed with the design and the result was visibly
+broken. The tile's inner edge rolled *below* the 4 km ground plane and the grass
+clipped through the road; the outer edge would have stood up as a cliff.
+
+Fixed by making the cross-section an embankment rather than a tilt: inside edge
+at ground level, a climb across the middle 3.5 m either side of the centreline,
+then a straight grade back to ground by the tile edge. Nothing sits below the
+grass at any angle. The grade back down is linear because an eased one peaks at
+1.875× its average slope — 39° at the road edge, steep enough to launch a car
+that ran wide, against 19° for the linear one.
+
+Widths were the tuning: the banked strip is deliberately narrower than the
+tarmac, since widening it steepens the run-off in proportion.
+
+**Banking, second attempt: the car jumped.** Reported from actually driving it,
+and it took three measurements to find, two of which said the opposite of what
+they looked like they said.
+
+The first cause was real and was mine. `BANK_FULL_HALF` was 3.5 m — inside the
+tarmac's 4.83 — so both of the cross-section's gradient changes landed *on the
+driving surface*. Dumping the cross-section made it obvious:
+
+| lateral | rise | gradient | |
+|---|---|---|---|
+| −4.90 m | 0.123 | +19.4° | apron |
+| −3.50 m | 0.617 | +19.4° | **ridge, on the tarmac** |
+| −2.80 m | 0.494 | −10.0° | the actual bank |
+| +3.50 m | −0.617 | −10.0° | **kink, on the tarmac** |
+| +4.20 m | −0.617 | 0.0° | flat apron |
+
+Along the racing line it measured as a flawless 10° bank the whole time, because
+along the racing line it *was* one. Fixed by widening the banked strip past the
+tarmac so every gradient change sits on grass.
+
+The other two measurements were both wrong before they were right:
+
+- An **autopilot lap test** reported 3.5% of frames airborne on banked road
+  against 0% flat, which looked conclusive. It was measuring a field: the
+  autopilot could not hold the circuit and ended up 592 m off centre *at zero
+  bank*, so the "nearest centreline point" it classified by was noise. Its one
+  useful output was that of frames actually on or beside the road, 0–0.4% were
+  light at every angle.
+- A **launch test** replacing it — car placed on the road, aligned and already at
+  30 m/s, run free — reported 98.6% of points leaving the ground, worst at 0.0°
+  of bank. It was dropping the car 1.2 m and starting to measure while it was
+  still falling.
+
+Settled and steered, the same test finally split the circuit by cause:
+
+| | runs | mean airborne frames |
+|---|---|---|
+| Banked corners | 3 | **0.7** |
+| Hills | 4 | 23.0 |
+| Plain flat road | 26 | 13.2 |
+
+Banked corners were the most planted part of the lap. Banking never threw the car
+*on* the road — it threw it off the road edge, which an embankment model puts
+0.5 m above the grass with 2.1 m of verge to come back down.
+
+**Bank angle**, therefore, is set by that edge. 1.5°/2.5°/4° by corner size, 4°
+the ceiling: 0.69 m of road edge and an 18° apron, which the suspension follows.
+6° is a metre and 26°, and a car drifting a hand's width wide drops off it.
+Banked corners now average 0.0 airborne frames.
+
+Rounding the joins in the cross-section (`BANK_FILLET`) is kept because a sharp
+convex crest throws the car at *any* crossing speed — curvature is infinite at a
+corner — but honesty demands noting it changed nothing measurable here: nine
+samples across the crest left the car exactly as planted as three, at six times
+the collision triangles. It is sampled at three.
+
+Transition length 1.5 units (21 m) holds the roll rate to 0.87°/m — near 25°/s at
+racing speed, quick enough to feel like the road taking the car and slow enough
+that the chase camera never snaps. At 1.25 units it was 1.04°/m.
+
+**The anti-roll bar was fighting it.** `_apply_antiroll` measured roll against
+world up. On a flat circuit that is the road's up; on a banked one it saw a
+permanently rolled car and spent the corner levelling it against the road. Now
+takes the surface normal from one downward ray, falling back to world up when
+airborne. Nothing else in the tuning was touched — the reference vector was the
+bug, not the stiffness.
+
+> The measurement trap this time was measuring the wrong geometry and being
+> reassured by it. A test checking that shipped tracks kept their banked meshes
+> passed on **Flats**, which has no banking at all, because `roadStart` paints its
+> gantry banner with the same `road` material as the tarmac, 0.65 units up — so
+> every circuit reported a 4.5 m "bank" on its start tile. Reading a material name
+> is not the same as reading the driving surface.
+
 ### Still open
 
 - The hills are still the hardest part of the circuit to drive: 0.84 s airborne

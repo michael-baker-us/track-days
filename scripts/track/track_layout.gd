@@ -45,8 +45,11 @@ extends RefCounted
 ## Height can only *change* inside a straight, because a corner piece has the same
 ## deck height at both ends. So a run reconciles three numbers: the level of the
 ## corner before it, its own level, and the level of the corner after. It ramps
-## from the first to its own, holds, and ramps to the third — one `roadRampLong`
-## per level of difference, two cells each.
+## from the first to its own, holds, and ramps to the third — one
+## `roadRampLongCurved` per level of difference, two cells each. That piece eases
+## into the grade and out of it rather than breaking into it, so the transitions
+## are crests and dips instead of ridges; the builder reproduces its profile in
+## the collision ribbon so the wheels feel the same road the player can see.
 ##
 ## Closure comes from forcing the corner immediately before the start line to
 ## level zero. Walk the loop and the running height returns to exactly where it
@@ -64,7 +67,7 @@ const MAX_CORNER := 3
 ## start line has to find room for both before anything else.
 const START_CELLS := 4
 
-## Cells one `roadRampLong` occupies, and how much height it gains. One ramp per
+## Cells one `roadRampLongCurved` occupies, and how much height it gains. One ramp per
 ## level, so a level *difference* of N costs 2N cells of straight.
 const CELLS_PER_RAMP := 2
 const MAX_LEVEL := 3
@@ -92,6 +95,11 @@ class Bend extends RefCounted:
 	## tile share a deck height — so this is simply where the corner sits.
 	var level: int
 	var max_level: int
+	## How hard the road leans into this corner, 0 (flat) to MAX_BANK. Unlike
+	## radius and height there is nothing to fit it against — banking spends no
+	## cells and cannot stop the loop closing — so every corner can have any of
+	## them, and the only reason it is stored per corner is that it is a choice.
+	var bank: int
 
 ## A straight run between two bends.
 class Run extends RefCounted:
@@ -140,6 +148,11 @@ var start_cell := Vector2i.ZERO
 var reversed := false
 ## Bend cell -> chosen corner size. Absent means "largest that fits".
 var corner_sizes := {}
+## Bend cell -> chosen bank level, 0 for a flat corner. Absent means "whatever
+## suits the radius", so a circuit that has never been told anything about
+## banking still gets sensible corners, and one that has is left exactly as its
+## author set it — including deliberately flat.
+var corner_banks := {}
 ## A cell -> the level of the segment containing it. Keyed by cell rather than by
 ## segment index so that repainting elsewhere on the circuit does not shuffle
 ## every hill onto a different piece of road. A corner is keyed by its bend cell.
@@ -304,6 +317,15 @@ func _fit_corners(occupied: Dictionary, out: Compiled) -> void:
 		c.max_size = c.size
 		if corner_sizes.has(c.cell):
 			c.size = clampi(int(corner_sizes[c.cell]), 1, c.max_size)
+
+	# Banking is settled after the size, because the default follows from it:
+	# shrink a sweeper down to a hairpin and it stops being banked like a sweeper.
+	for c in out.corners:
+		c.bank = (
+			clampi(int(corner_banks[c.cell]), 0, TrackBuilder.MAX_BANK_LEVEL)
+			if corner_banks.has(c.cell)
+			else int(TrackBuilder.DEFAULT_BANK_LEVEL.get(c.size, 0))
+		)
 
 	for i in out.runs.size():
 		var before: Bend = _corner_before(out, i)
@@ -486,7 +508,11 @@ func _emit(out: Compiled) -> Array:
 		var piece: String = (
 			BRIDGE_CORNER_PIECES[c.size] if c.level > 0 else CORNER_PIECES[c.size]
 		)
-		segments.append(["C", piece, c.turn])
+		# Always explicit, never left to the builder's default: the compiler has
+		# already resolved what this corner's bank should be, and a flat corner
+		# has to survive the trip as a flat corner rather than being handed back
+		# the default for its radius.
+		segments.append(["C", piece, c.turn, TrackBuilder.BANK_DEGREES[c.bank]])
 	return segments
 
 ## A straight, as up to five stretches: a lead-in at the height it was entered,
@@ -525,10 +551,10 @@ func _emit_run(segments: Array, run: Run) -> void:
 
 	_emit_level(segments, lead, run.entry_level)
 	if up != 0:
-		segments.append(["S", "roadRampLong", absi(up), signi(up)])
+		segments.append(["S", "roadRampLongCurved", absi(up), signi(up)])
 	_emit_level(segments, middle, run.level)
 	if down != 0:
-		segments.append(["S", "roadRampLong", absi(down), signi(down)])
+		segments.append(["S", "roadRampLongCurved", absi(down), signi(down)])
 	_emit_level(segments, run_out, run.exit_level)
 
 ## `count` cells of straight held at `level`. Above the ground that means bridge
@@ -591,6 +617,9 @@ func to_dict() -> Dictionary:
 	var sizes := {}
 	for k in corner_sizes:
 		sizes[_key(k)] = corner_sizes[k]
+	var banks := {}
+	for k in corner_banks:
+		banks[_key(k)] = corner_banks[k]
 	var levels := {}
 	for k in elevation:
 		levels[_key(k)] = elevation[k]
@@ -602,6 +631,7 @@ func to_dict() -> Dictionary:
 		"start": [start_cell.x, start_cell.y],
 		"reversed": reversed,
 		"corner_sizes": sizes,
+		"corner_banks": banks,
 		"elevation": levels,
 	}
 
@@ -621,6 +651,10 @@ static func from_dict(data: Dictionary) -> TrackLayout:
 
 	for k in data.get("corner_sizes", {}):
 		layout.corner_sizes[_unkey(k)] = int(data["corner_sizes"][k])
+	# Absent in tracks saved before banking existed, which is exactly right:
+	# they get the default for each corner's radius rather than a flat circuit.
+	for k in data.get("corner_banks", {}):
+		layout.corner_banks[_unkey(k)] = int(data["corner_banks"][k])
 	for k in data.get("elevation", {}):
 		layout.elevation[_unkey(k)] = int(data["elevation"][k])
 	return layout

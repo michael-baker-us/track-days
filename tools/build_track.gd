@@ -26,15 +26,15 @@ const HIGHLAND := [
 	["S", "roadStraightLong", 2],
 	["C", "roadCornerLarge", "right"],
 	["S", "roadStraightLong", 3],
-	["S", "roadRampLong", 1, 1],
+	["S", "roadRampLongCurved", 1, 1],
 	["S", "roadStraightBridge", 2],
-	["S", "roadRampLong", 1, -1],
+	["S", "roadRampLongCurved", 1, -1],
 	["S", "roadStraightLong", 2],
 	["C", "roadCornerLarger", "right"],
 	["S", "roadStraightLong", 3],
-	["S", "roadRampLong", 1, 1],
+	["S", "roadRampLongCurved", 1, 1],
 	["S", "roadStraightBridge", 2],
-	["S", "roadRampLong", 1, -1],
+	["S", "roadRampLongCurved", 1, -1],
 	["S", "roadStraightLong", 1],
 	["S", "roadStraight", 1],
 	["C", "roadCornerLarge", "right"],
@@ -44,25 +44,32 @@ const HIGHLAND := [
 
 # A flat, tighter circuit: no elevation, shorter straights, and two left-hand
 # turns so it does not read as another clockwise oval.
+#
+# Its corners are flat too, stated explicitly. Banking is a per-corner choice
+# rather than something every bend gets, and this is the circuit that shows the
+# other answer: Highland leans into its sweepers, Flats does not lean at all, and
+# the pair of them make the difference something you can drive rather than read
+# about. The zero has to be written out — saying nothing would hand each corner
+# the default for its radius, which is the opposite of what is wanted here.
 const FLATS := [
 	["S", "roadStart", 1],
 	["S", "roadStartPositions", 1],
 	["S", "roadStraightLong", 4],
-	["C", "roadCornerLarger", "right"],
+	["C", "roadCornerLarger", "right", 0.0],
 	["S", "roadStraightLong", 3],
-	["C", "roadCornerLarge", "right"],
+	["C", "roadCornerLarge", "right", 0.0],
 	["S", "roadStraightLong", 4],
-	["C", "roadCornerLarge", "left"],
+	["C", "roadCornerLarge", "left", 0.0],
 	["S", "roadStraightLong", 3],
-	["C", "roadCornerLarger", "right"],
+	["C", "roadCornerLarger", "right", 0.0],
 	["S", "roadStraightLong", 7],
-	["C", "roadCornerLarge", "right"],
+	["C", "roadCornerLarge", "right", 0.0],
 	["S", "roadStraightLong", 5],
-	["C", "roadCornerLarge", "right"],
+	["C", "roadCornerLarge", "right", 0.0],
 	["S", "roadStraightLong", 2],
-	["C", "roadCornerLarge", "left"],
+	["C", "roadCornerLarge", "left", 0.0],
 	["S", "roadStraightLong", 2],
-	["C", "roadCornerLarge", "right"],
+	["C", "roadCornerLarge", "right", 0.0],
 	["S", "roadStraightLong", 3],
 ]
 
