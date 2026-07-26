@@ -1789,9 +1789,19 @@ func test_editor_panel_is_wired_and_fits() -> void:
 		back.global_position.y + back.size.y <= canvas.y)
 
 	# The legend opens over the canvas because the column has no room for it. It
-	# has to clear the panel, or it covers the controls it is describing.
+	# has to clear the panel, or it covers the controls it is describing. It is
+	# reference, not a control, so the canvas is not buried in it on arrival —
+	# both it and its switch start closed.
 	var flyout: Control = editor.get_node("LegendFlyout")
+	var toggle: Button = editor.get_node("Split/Side/Rows/LegendToggle")
+	check_true("the legend starts closed", not flyout.visible)
+	check_true("and its switch agrees", not toggle.button_pressed)
+
+	toggle.button_pressed = true
 	var side: Control = editor.get_node("Split/Side")
+	# Guards the check below: a flyout laid out at zero size clears everything.
+	check_true("the legend has a size once open (%.0f wide)" % flyout.size.x,
+		flyout.size.x > 0.0)
 	check_true("the legend clears the panel (%.0f vs %.0f)" % [
 		flyout.global_position.x + flyout.size.x, side.global_position.x],
 		flyout.global_position.x + flyout.size.x <= side.global_position.x)

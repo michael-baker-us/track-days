@@ -616,10 +616,13 @@ that does not fit has to go somewhere else, not wait for a bigger display.
 
 The column is ordered by what an edit needs answered: what circuit this is, what
 to do next, what the circuit currently *is*, then the actions. Those all stay
-put. The legend of canvas handles is reference the player stops needing, so it is
-the one section that folds away — and it opens as a **flyout over the canvas**
-rather than inside the column, because the column has no spare 200 units to give
-it on any window.
+put. The legend — labelled **TIPS**, because naming the canvas handles in the
+switch explained nothing to anyone who had not already found them — is reference
+the player stops needing, so it is the one section that folds away. It opens as a
+**flyout over the canvas** rather than inside the column, because the column has
+no spare 200 units to give it on any window, and it starts **closed**: eleven
+lines over a corner of the canvas is not what the editor should open on, and the
+guide card already answers "now what".
 
 > An earlier arrangement put the whole panel in a scroll region. That pushed the
 > readout — the live verdict, wanted on every single edit — under the fold. The
@@ -830,8 +833,8 @@ editor's direct manipulation want.
   it does mean the crossing has a little resistance in it.
 - The interface has no motion beyond the menu rows fading in, no sound, and no
   transition between screens; a scene change is a hard cut.
-- Nothing persists whether the editor's legend flyout was left open, so it is
-  open again on every visit.
+- Nothing persists whether the editor's tips flyout was left open, so it is
+  closed again on every visit.
 - No tagged release build yet; web deploys straight from `main`.
 - Physics runs at 120 Hz, which is the main CPU cost in a single-threaded web
   build. Unmeasured on real hardware in a browser.

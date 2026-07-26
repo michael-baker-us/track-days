@@ -101,12 +101,13 @@ func _initialize() -> void:
 	# whatever the window, so there is no such thing as a window with room to
 	# spare here, and eleven lines of reference will never fit alongside the
 	# controls and the feedback.
-	var legend_toggle := _button("LegendToggle", "HANDLES ON THE CANVAS")
+	var legend_toggle := _button("LegendToggle", "TIPS")
 	legend_toggle.theme_type_variation = UiTheme.V_DISCLOSURE
 	legend_toggle.toggle_mode = true
-	# Open to begin with: the handles have to be recognisable the first time the
-	# canvas is seen, and the switch beside it is how they are put away.
-	legend_toggle.button_pressed = true
+	# Closed to begin with: eleven lines covering a corner of the canvas is the
+	# first thing seen otherwise, and the guide card above already answers "now
+	# what". The switch is here for when the player wants the detail.
+	legend_toggle.button_pressed = false
 	legend_toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	legend_toggle.custom_minimum_size = Vector2(0.0, 22.0)
 	rows.add_child(legend_toggle)
@@ -136,13 +137,13 @@ func _initialize() -> void:
 	quit(0 if err == OK else 1)
 
 ## A legend, not a toolbar: nothing here is clickable, because every action is
-## performed on the canvas by hitting the thing it applies to. It exists so the
-## handles are recognisable the first time they are seen, which is why it is the
-## one thing allowed to fold away — the player stops needing it.
+## performed on the canvas by hitting the thing it applies to. It is reference
+## the player stops needing, which is why it is the one thing allowed to fold
+## away — and why it starts folded.
 func _legend() -> PanelContainer:
 	var flyout := PanelContainer.new()
 	flyout.name = "LegendFlyout"
-	flyout.visible = true
+	flyout.visible = false
 	# Pinned to the bottom right of the canvas, just clear of the panel, and
 	# grown up and to the left from there: anchored this way it sizes itself to
 	# its contents instead of needing a height guessed here and corrected every
