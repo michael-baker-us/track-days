@@ -130,6 +130,26 @@ func _count_class(n: Node, cls: String) -> int:
 		total += _count_class(c, cls)
 	return total
 
+## The car must start just *behind* the start line, not past it, or the timer
+## only begins after a full out lap. Asserts the line is close and ahead.
+func test_spawn_is_behind_the_line() -> void:
+	for info in GameState.TRACKS:
+		var inst: Node3D = load(info["scene"]).instantiate()
+		var spawn: Marker3D = inst.get_node("SpawnPoint")
+		var gate0: Area3D = inst.get_node("Checkpoints/Checkpoint00")
+		var half_h: float = gate0.get_child(0).shape.size.y * 0.5
+		var line: Vector3 = gate0.position - Vector3(0, half_h, 0)
+
+		var to_line := line - spawn.position
+		to_line.y = 0.0
+		check_true("track %s starts near the line" % info["id"], to_line.length() < 40.0)
+
+		# The car model faces local +Z, so that is "forward" from the spawn.
+		var forward := Basis(Vector3.UP, spawn.rotation.y) * Vector3(0, 0, 1)
+		check_true("track %s faces the line" % info["id"],
+			forward.normalized().dot(to_line.normalized()) > 0.8)
+		inst.free()
+
 func test_checkpoints() -> void:
 	check("checkpoint count", gates.size(), 16)
 	var seen := {}
@@ -180,6 +200,7 @@ func _physics_process(_delta: float) -> bool:
 		test_car_wired_to_tuning()
 		test_all_tracks_usable()
 		test_no_duplicated_instances()
+		test_spawn_is_behind_the_line()
 		test_checkpoints()
 		test_road_surface_follows_elevation()
 		return false

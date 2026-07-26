@@ -25,7 +25,7 @@ func _initialize() -> void:
 	rows.add_theme_constant_override("separation", 10)
 	root_ctrl.add_child(rows)
 
-	rows.add_child(_label("Heading", "RACING", 60))
+	rows.add_child(_label("Heading", "TRACK DAYS", 60))
 	rows.add_child(_label("Sub", "select a circuit", 20))
 	rows.add_child(_spacer(18))
 

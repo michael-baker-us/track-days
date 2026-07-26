@@ -125,6 +125,9 @@ Adding a circuit is a layout constant plus an entry in `GameState.TRACKS`.
 block the car; ordering is enforced in `lap_tracker.gd`, and an out-of-order
 gate is ignored so a skipped gate has to be gone back for.
 
+The car spawns just *behind* the line rather than past it, so the timer starts
+about two seconds in instead of after a full out lap.
+
 This matters because nothing physically prevents cutting: collision is one
 surface, grass grips like tarmac, and the guardrails are off. Ordered gates are
 what make a lap time mean anything.

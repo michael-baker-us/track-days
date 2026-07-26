@@ -32,7 +32,7 @@ func _process(delta: float) -> void:
 			if _banner_timer <= 0.0:
 				_banner.text = ""
 		else:
-			_lap.text = "OUT LAP"
+			_lap.text = "READY"
 			_current.text = _tracker.format_time(0.0)
 			# The hint lives in the centred banner, not the corner panel, so it
 			# cannot widen the panel off the edge of the screen.

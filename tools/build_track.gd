@@ -46,6 +46,10 @@ const CHECKPOINT_W := 4.0 * SCALE
 const CHECKPOINT_H := 12.0  # tall enough to still catch the car on a slope
 const CHECKPOINT_T := 4.0
 
+## How far behind the start line the car is placed. Far enough to get rolling,
+## close enough that the lap timer starts within a couple of seconds.
+const SPAWN_BEHIND_LINE := 22.0
+
 const DIRS := {
 	"N": Vector2(0, -1), "S": Vector2(0, 1),
 	"E": Vector2(1, 0), "W": Vector2(-1, 0),
@@ -239,11 +243,19 @@ func _build_one(track_name: String, layout: Array, out_path: String) -> bool:
 	_build_ground(root_node)
 	_build_lighting(root_node)
 
+	# Start just *behind* the line rather than just past it, so the timer starts
+	# a second or two in instead of after a full out lap.
+	var total := 0.0
+	for i in centreline.size() - 1:
+		total += centreline[i].distance_to(centreline[i + 1])
+
+	var grid := _point_at_arc(total - SPAWN_BEHIND_LINE)
 	var spawn := Marker3D.new()
 	spawn.name = "SpawnPoint"
-	var start_pt: Vector3 = centreline[1] if centreline.size() > 1 else Vector3.ZERO
-	spawn.position = start_pt + Vector3(0.0, 1.0, 0.0)
-	spawn.rotation.y = atan2(DIRS["S"].x, DIRS["S"].y)
+	spawn.position = (grid[0] as Vector3) + Vector3(0.0, 1.0, 0.0)
+	# The car model faces local +Z, so align +Z with the track tangent.
+	var tan: Vector2 = grid[1]
+	spawn.rotation.y = atan2(tan.x, tan.y)
 	root_node.add_child(spawn)
 
 	_set_owner(root_node, root_node)
@@ -251,11 +263,8 @@ func _build_one(track_name: String, layout: Array, out_path: String) -> bool:
 	packed.pack(root_node)
 	var err := ResourceSaver.save(packed, out_path)
 
-	var length := 0.0
-	for i in centreline.size() - 1:
-		length += centreline[i].distance_to(centreline[i + 1])
 	print("       %s | lap %.0f m | peak %.1f m | %s" % [
-		out_path.get_file(), length, peak * SCALE * VERT,
+		out_path.get_file(), total, peak * SCALE * VERT,
 		"saved" if err == OK else "SAVE FAILED %s" % err
 	])
 	root_node.free()
@@ -509,6 +518,23 @@ func _offset_line(side: float) -> Array[Vector3]:
 			out.append(a + off)
 		out.append(b + off)
 	return out
+
+## Position and horizontal tangent at a given arc length along the centreline.
+func _point_at_arc(target: float) -> Array:
+	var travelled := 0.0
+	for i in centreline.size() - 1:
+		var a := centreline[i]
+		var b := centreline[i + 1]
+		var seg := b - a
+		var seg_len := seg.length()
+		if seg_len < 0.001:
+			continue
+		if travelled + seg_len >= target:
+			var dir := seg / seg_len
+			return [a + dir * (target - travelled), Vector2(dir.x, dir.z).normalized()]
+		travelled += seg_len
+	var last := centreline[centreline.size() - 1]
+	return [last, Vector2(0, 1)]
 
 ## Walks a 3D polyline at fixed arc-length intervals, returning
 ## [point, horizontal tangent].

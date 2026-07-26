@@ -1,7 +1,7 @@
-# Racing
+# Track Days
 
-A 3D third-person arcade racer, built in Godot 4.7 (GDScript), starting as a tech demo:
-drive a car around a track and get the feel right before deciding where the game goes next.
+A 3D third-person arcade racer, built in Godot 4.7 (GDScript). Pick a circuit,
+chase a lap time.
 
 Separate from any pseudo-3D OutRun-style racer on the broader project roadmap — this one
 uses real 3D and Godot's built-in `VehicleBody3D` physics.
@@ -56,8 +56,10 @@ line at corners. Handling is tuned to a grippy-arcade target: 165 km/h top speed
 parameters live in a swappable `CarTuning` resource.
 
 M4 — lap timing over 16 ordered checkpoints, with a HUD showing speed, current
-lap, last lap and best lap. Best lap persists between sessions. Laps only count
-if every gate is crossed in sequence, so corners cannot be cut.
+lap, last lap and best lap. Best laps are per circuit and persist between
+sessions. Laps only count if every gate is crossed in sequence, so corners
+cannot be cut. The car starts just behind the line, so timing begins about two
+seconds in rather than after an out lap.
 
 See [`docs/tuning-journal.md`](docs/tuning-journal.md) for how the handling
 numbers were arrived at and what is still open.
