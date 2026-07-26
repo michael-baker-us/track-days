@@ -58,6 +58,20 @@ const CHECKPOINT_T := 4.0
 ## close enough that the lap timer starts within a couple of seconds.
 const SPAWN_BEHIND_LINE := 22.0
 
+## Where the start/finish line sits along the layout, in tile units.
+##
+## Not zero, which is the trap. The walker starts at the *leading edge* of the
+## `roadStart` tile, but that tile is 2 units long and carries the line across
+## the middle of itself: the painted stripe spans z 0.905..0.954 and the gantry
+## straddles it at 0.905..1.085. Timing from arc 0 therefore started and stopped
+## the clock 13 m before the car reached anything the player can see.
+##
+## The value is the midpoint of that whole assembly, so the trigger is within
+## half a metre of both the stripe and the middle of the arch rather than exact
+## on one and a metre out on the other.
+const START_LINE_ALONG := 0.96
+const START_LINE_ARC := START_LINE_ALONG * SCALE
+
 const DIRS := {
 	"N": Vector2(0, -1), "S": Vector2(0, 1),
 	"E": Vector2(1, 0), "W": Vector2(-1, 0),
@@ -211,8 +225,9 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 		_build_lighting(root_node)
 
 		# Start just *behind* the line rather than just past it, so the timer
-		# starts a second or two in instead of after a full out lap.
-		var grid := _point_at_arc(total - SPAWN_BEHIND_LINE)
+		# starts a second or two in instead of after a full out lap. Measured
+		# back from the line itself, so moving the line moves the grid with it.
+		var grid := _point_at_arc(START_LINE_ARC - SPAWN_BEHIND_LINE)
 		var spawn := Marker3D.new()
 		spawn.name = "SpawnPoint"
 		spawn.position = (grid[0] as Vector3) + Vector3(0.0, 1.0, 0.0)
@@ -381,17 +396,26 @@ func _build_checkpoints(root_node: Node3D) -> void:
 	holder.name = "Checkpoints"
 	root_node.add_child(holder)
 
-	var total := 0.0
-	for i in centreline.size() - 1:
-		total += centreline[i].distance_to(centreline[i + 1])
+	var total := _total_length()
 	var step := total / float(CHECKPOINT_COUNT)
 	_gate_spacing = step
 
 	var script: Script = load("res://scripts/track/checkpoint.gd")
-	var samples := _resample(centreline, step)
-	for i in mini(CHECKPOINT_COUNT, samples.size()):
-		var pt: Vector3 = samples[i][0]
-		var tan: Vector2 = samples[i][1]
+	# Gate 0 goes on the painted line and the rest follow it round, rather than
+	# all of them hanging off arc zero. Otherwise the lap both starts and ends
+	# before the car reaches the line it is being timed to.
+	#
+	# The box is then pushed forward by half its own depth, because `body_entered`
+	# fires when the car first touches the *leading face* — so it is that face,
+	# not the centre, that is the trigger plane and belongs on the line. The gate
+	# is deliberately thick so nothing tunnels through it at speed, and every
+	# metre of that thickness was a metre of the lap timed early.
+	for i in CHECKPOINT_COUNT:
+		var sample := _point_at_arc(
+			START_LINE_ARC + CHECKPOINT_T * 0.5 + step * float(i)
+		)
+		var pt: Vector3 = sample[0]
+		var tan: Vector2 = sample[1]
 
 		var area := Area3D.new()
 		area.name = "Checkpoint%02d" % i
@@ -493,10 +517,23 @@ func _offset_line(side: float) -> Array[Vector3]:
 		out.append(b + off)
 	return out
 
+func _total_length() -> float:
+	var total := 0.0
+	for i in centreline.size() - 1:
+		total += centreline[i].distance_to(centreline[i + 1])
+	return total
+
 ## Position and horizontal tangent at a given arc length along the centreline.
+##
+## The arc wraps, because everything is now placed relative to the start line:
+## the grid slot sits at a negative arc and the last gates run past the end.
 func _point_at_arc(target: float) -> Array:
 	if centreline.is_empty():
 		return [Vector3.ZERO, Vector2(0, 1)]
+	var total := _total_length()
+	if total <= 0.0:
+		return [centreline[0], Vector2(0, 1)]
+	target = fposmod(target, total)
 	var travelled := 0.0
 	for i in centreline.size() - 1:
 		var a := centreline[i]

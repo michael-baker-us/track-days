@@ -528,6 +528,147 @@ func test_stroke_fill_is_orthogonal() -> void:
 				connected = false
 		check_true("%s leaves no break" % label, connected)
 
+## Where the timer actually fires, measured against the geometry the player can
+## see rather than against the constant that positions it.
+##
+## Two separate mistakes put the clock ahead of the line, and both were invisible
+## from behind the wheel because the HUD has no reference to disagree with:
+##
+##  - Gate 0 sat at arc zero, which is the *leading edge* of the `roadStart`
+##    tile. That tile is 2 units long and carries the stripe and gantry across
+##    its middle, so the lap started and ended 13 m early.
+##  - `body_entered` fires when the car touches the gate's leading *face*, not
+##    its centre, so the gate's 4 m depth cost another 2 m.
+func test_timing_gate_sits_on_the_start_line() -> void:
+	var tool_script := load("res://tools/build_track.gd")
+	for entry in [["highland", tool_script.HIGHLAND], ["flats", tool_script.FLATS]]:
+		var name: String = entry[0]
+		var result := TrackBuilder.new().build(name, entry[1])
+		var gantry := _gantry_position(result.root)
+		check_true("%s has a gantry to measure against" % name, gantry != Vector3.INF)
+		if gantry == Vector3.INF:
+			result.root.free()
+			continue
+
+		var gate0: Area3D = result.root.get_node("Checkpoints/Checkpoint00")
+		var box: BoxShape3D = gate0.get_child(0).shape
+		# The face the car reaches first is half the box's depth back along the
+		# direction of travel; that plane, not the centre, is the trigger.
+		var forward := Basis(Vector3.UP, gate0.rotation.y) * Vector3(0, 0, 1)
+		var trigger: Vector3 = gate0.position - forward * (box.size.z * 0.5)
+
+		var gap := Vector2(trigger.x - gantry.x, trigger.z - gantry.z).length()
+		check_true("%s times the lap at the line (%.2f m out)" % [name, gap], gap < 2.0)
+
+		# And the grid slot is still a sensible run-up behind that line.
+		var spawn: Marker3D = result.root.get_node("SpawnPoint")
+		var run_up := Vector2(trigger.x - spawn.position.x, trigger.z - spawn.position.z).length()
+		check_true("%s run-up is %.1f m" % [name, run_up], run_up > 8.0 and run_up < 40.0)
+		result.root.free()
+
+## Gates must stay evenly spaced around the lap after being offset onto the line,
+## or a mis-wrapped arc would bunch them without breaking anything visibly.
+func test_gates_stay_evenly_spaced() -> void:
+	var result := TrackBuilder.new().build(
+		"spacing", load("res://tools/build_track.gd").HIGHLAND)
+	var gates: Array = result.root.get_node("Checkpoints").get_children()
+	check("gate count", gates.size(), TrackBuilder.CHECKPOINT_COUNT)
+	var lo := 1e9
+	var hi := -1e9
+	for i in gates.size():
+		var a: Vector3 = gates[i].position
+		var b: Vector3 = gates[(i + 1) % gates.size()].position
+		var d: float = Vector2(b.x - a.x, b.z - a.z).length()
+		lo = minf(lo, d)
+		hi = maxf(hi, d)
+	# Straight-line gaps run shorter than the arc through corners, so this is a
+	# generous band - it is catching bunching, not measuring precisely.
+	check_true("no gate pair is bunched (%.0f..%.0f m)" % [lo, hi], lo > 30.0)
+	check_true("no gate pair is stretched", hi < result.length * 0.5)
+	result.root.free()
+
+## Centre of the gantry over the start line, from the tall grey geometry of the
+## first road tile. Deliberately reads the art rather than the builder's own
+## constant, so a wrong constant cannot make the test agree with itself.
+func _gantry_position(root_node: Node3D) -> Vector3:
+	var holder: Node3D = root_node.get_node("RoadVisuals").get_child(0)
+	var inst: Node3D = holder.get_child(0)
+	var mi := _first_mesh_in(inst)
+	if mi == null:
+		return Vector3.INF
+	var sum := Vector3.ZERO
+	var count := 0
+	for si in mi.mesh.get_surface_count():
+		var mat := mi.mesh.surface_get_material(si)
+		if mat == null or mat.resource_name != "grey":
+			continue
+		for v in mi.mesh.surface_get_arrays(si)[Mesh.ARRAY_VERTEX]:
+			if v.y > 0.15:
+				sum += v
+				count += 1
+	if count == 0:
+		return Vector3.INF
+	var local: Vector3 = sum / float(count)
+	var visuals: Node3D = root_node.get_node("RoadVisuals")
+	return visuals.transform * (
+		holder.transform * (inst.transform * (mi.transform * local))
+	)
+
+func _first_mesh_in(n: Node) -> MeshInstance3D:
+	if n is MeshInstance3D:
+		return n
+	for c in n.get_children():
+		var m := _first_mesh_in(c)
+		if m != null:
+			return m
+	return null
+
+## A saved circuit has to be reachable from the menu for editing, including one
+## too broken to drive — otherwise an unfinished track is a dead row that cannot
+## be fixed without hunting through the editor's own dropdown.
+func test_title_offers_editing_of_custom_tracks() -> void:
+	var good := sample_layout()
+	good.display_name = "Menu Test"
+	TrackStore.save(good)
+
+	var broken := TrackLayout.new()
+	broken.display_name = "Menu Test Broken"
+	broken.cells.assign(good.cells.slice(0, good.cells.size() - 4))
+	TrackStore.save(broken)
+
+	var title: Control = load("res://scenes/title.tscn").instantiate()
+	root.add_child(title)
+
+	var rows: VBoxContainer = title.get_node("Rows/Tracks")
+	check("a row per circuit", rows.get_child_count(), GameState.all_tracks().size())
+
+	var built_in_with_edit := 0
+	var custom_without_edit := 0
+	var broken_row_drivable := false
+	var broken_row_editable := false
+	for i in rows.get_child_count():
+		var row: Node = rows.get_child(i)
+		var main: Button = row.get_child(0)
+		var has_edit: bool = row.get_child_count() > 1
+		var custom: bool = GameState.all_tracks()[i].get("custom", false)
+		if not custom and has_edit:
+			built_in_with_edit += 1
+		if custom and not has_edit:
+			custom_without_edit += 1
+		if main.text.begins_with(broken.display_name):
+			broken_row_drivable = not main.disabled
+			broken_row_editable = has_edit
+	# Shipped circuits are baked scenes with no layout, so there is nothing to
+	# open; offering Edit on them would be a dead button.
+	check("no Edit on the shipped circuits", built_in_with_edit, 0)
+	check("every custom circuit offers Edit", custom_without_edit, 0)
+	check_true("a broken circuit is not drivable", not broken_row_drivable)
+	check_true("but is still editable", broken_row_editable)
+
+	title.free()
+	TrackStore.delete(good.id)
+	TrackStore.delete(broken.id)
+
 ## Custom tracks are JSON on disk, so the whole shape has to survive the trip.
 func test_layout_round_trip() -> void:
 	var layout := sample_layout()
@@ -713,6 +854,9 @@ func _physics_process(_delta: float) -> bool:
 		test_bend_can_cross_its_straight()
 		test_close_gap()
 		test_stroke_fill_is_orthogonal()
+		test_timing_gate_sits_on_the_start_line()
+		test_gates_stay_evenly_spaced()
+		test_title_offers_editing_of_custom_tracks()
 		return false
 
 	if frame == 4:

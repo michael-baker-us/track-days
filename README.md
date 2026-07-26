@@ -124,7 +124,8 @@ lines, so the widest that fits is picked automatically and can be cycled down,
 trading straight for a faster corner. Climbs live inside one straight and come
 back down before the next corner, so height closes for the same reason position
 does. Circuits are saved as JSON under `user://tracks/` and appear on the title
-screen with their own lap records.
+screen with their own lap records and an **Edit** button, so a saved track can
+always be reopened — including one left too unfinished to drive.
 
 See [`docs/tuning-journal.md`](docs/tuning-journal.md) for how the handling
 numbers were arrived at and what is still open.
@@ -133,7 +134,7 @@ numbers were arrived at and what is still open.
 
 | Scene | Purpose |
 |---|---|
-| `scenes/title.tscn` | Entry point — track selection |
+| `scenes/title.tscn` | Entry point — track selection, and Edit for custom tracks |
 | `scenes/editor/track_editor.tscn` | Drag a circuit into shape and drive it |
 | `scenes/race.tscn` | A race. The track is instanced at runtime from the selection |
 | `scenes/track/track_*.tscn` | The circuits. Generated; edit the layout spec and rebuild |

@@ -61,7 +61,7 @@ static func all_tracks() -> Array[Dictionary]:
 static func describe(layout: TrackLayout) -> String:
 	var compiled := layout.compile()
 	if not compiled.ok:
-		return "unfinished — open the editor to fix it"
+		return "unfinished — press Edit to finish it"
 	var result := TrackBuilder.new().measure(compiled.segments)
 	var text := "%.0f m, %d corners" % [result.length, compiled.corners.size()]
 	if result.peak > 0.5:

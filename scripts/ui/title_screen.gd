@@ -19,11 +19,33 @@ func _ready() -> void:
 	GameState.return_scene = TITLE_SCENE
 	_entries = GameState.all_tracks()
 	for i in _entries.size():
-		_tracks.add_child(_track_button(i))
+		_tracks.add_child(_track_row(i))
 	_editor_button.pressed.connect(_on_editor_pressed)
 	# So the keyboard works without touching the mouse first.
 	if _tracks.get_child_count() > 0:
-		_tracks.get_child(0).grab_focus()
+		_tracks.get_child(0).get_child(0).grab_focus()
+
+## One row per circuit: the track itself, plus an Edit button for the ones the
+## player built. Without that, getting back to a saved circuit meant opening the
+## editor — which starts a *new* track — and then finding yours in the dropdown.
+func _track_row(index: int) -> HBoxContainer:
+	var info: Dictionary = _entries[index]
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+
+	var button := _track_button(index)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(button)
+
+	if info.get("custom", false):
+		var edit := Button.new()
+		edit.text = "Edit"
+		edit.custom_minimum_size = Vector2(74.0, 74.0)
+		edit.add_theme_font_size_override("font_size", 17)
+		edit.tooltip_text = "Open %s in the track editor" % info["name"]
+		edit.pressed.connect(_on_edit_pressed.bind(String(info["id"])))
+		row.add_child(edit)
+	return row
 
 func _track_button(index: int) -> Button:
 	var info: Dictionary = _entries[index]
@@ -33,17 +55,22 @@ func _track_button(index: int) -> Button:
 	)
 
 	var button := Button.new()
-	button.custom_minimum_size = Vector2(460.0, 74.0)
+	button.custom_minimum_size = Vector2(380.0, 74.0)
 	button.text = "%s\n%s   ·   %s" % [info["name"], info["blurb"], best_text]
 	button.add_theme_font_size_override("font_size", 19)
 	# An unfinished custom track has no drivable geometry. Offering it anyway
-	# would drop the player onto a broken circuit instead of telling them why.
+	# would drop the player onto a broken circuit instead of telling them why —
+	# but the Edit button beside it stays live, which is where they need to go.
 	if info.get("custom", false) and not (info["layout"] as TrackLayout).compile().ok:
 		button.disabled = true
-		button.tooltip_text = "This circuit does not close yet — open the editor."
+		button.tooltip_text = "This circuit does not close yet — edit it to finish it."
 	else:
 		button.pressed.connect(_on_track_pressed.bind(index))
 	return button
+
+func _on_edit_pressed(track_id: String) -> void:
+	GameState.editing_id = track_id
+	get_tree().change_scene_to_file(EDITOR_SCENE)
 
 func _on_track_pressed(index: int) -> void:
 	GameState.selected_index = index

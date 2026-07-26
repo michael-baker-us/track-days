@@ -85,8 +85,12 @@ diagnostic (which loaded `car.tscn` directly) reported it fixed.
 
 ## Flow
 
-`title.tscn` lists `GameState.TRACKS` and records the choice in a static var,
-which survives the scene change. `race.tscn` holds everything a race needs
+`title.tscn` lists `GameState.all_tracks()` and records the choice in a static
+var, which survives the scene change. Custom circuits get an **Edit** button
+beside them, which sets `GameState.editing_id` and opens the editor on that
+track. It stays live even when the circuit is too broken to drive — that row's
+main button is disabled, so Edit is the only way back in and must not be gated on
+the same condition. `race.tscn` holds everything a race needs
 *except* the track; `race.gd` instances the selected circuit, drops the car on
 its `SpawnPoint`, and tells the lap tracker which record to use. One race scene
 therefore serves every circuit, and adding a track means adding a layout and a
@@ -313,6 +317,27 @@ gate is ignored so a skipped gate has to be gone back for.
 
 The car spawns just *behind* the line rather than past it, so the timer starts
 about two seconds in instead of after a full out lap.
+
+> **The gates hang off the start line, not off arc zero — and it is their leading
+> face that counts.** Two separate mistakes once put the clock 13.85 m ahead of
+> the line the player can see, so a lap both started and finished before the car
+> reached the gantry:
+>
+> - Arc zero is the *leading edge* of the `roadStart` tile, but that tile is two
+>   units long and carries its painted stripe and gantry across the middle of
+>   itself. `START_LINE_ALONG` is the midpoint of that assembly, and everything —
+>   gates and grid slot alike — is measured from there.
+> - `Area3D.body_entered` fires when the car first touches the box's *leading
+>   face*, not its centre. The gates are deliberately 4 m deep so nothing tunnels
+>   through at speed, and every metre of that depth was a metre timed early, so
+>   each box is pushed forward by half its own depth to put that face on the line.
+>
+> Neither was visible from behind the wheel: the HUD has no reference to disagree
+> with, and the car is 22 m back on the grid so the clock starting "about when you
+> set off" looked right. The suite now locates the gantry from its own mesh
+> vertices in the built scene and asserts the trigger plane is within 2 m of it —
+> deliberately reading the art rather than the constant, so a wrong constant
+> cannot make the test agree with itself.
 
 This matters because nothing physically prevents cutting: collision is one
 surface, grass grips like tarmac, and the guardrails are off. Ordered gates are
