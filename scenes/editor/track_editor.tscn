@@ -3,204 +3,204 @@
 [ext_resource type="Script" path="res://scripts/ui/track_editor.gd" id="1_64auw"]
 [ext_resource type="Script" path="res://scripts/ui/track_grid.gd" id="2_7d7mg"]
 
-[node name="TrackEditor" type="Control" unique_id=33973925]
+[node name="TrackEditor" type="Control" unique_id=212115932]
 layout_mode = 3
 anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_64auw")
 
-[node name="Background" type="ColorRect" parent="." unique_id=1492142914]
+[node name="Background" type="ColorRect" parent="." unique_id=1208477907]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 color = Color(0.11, 0.13, 0.15, 1)
 
-[node name="Split" type="HBoxContainer" parent="." unique_id=811903951]
+[node name="Split" type="HBoxContainer" parent="." unique_id=1937176523]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_constants/separation = 0
 
-[node name="Grid" type="Control" parent="Split" unique_id=31253768]
+[node name="Grid" type="Control" parent="Split" unique_id=1652083098]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("2_7d7mg")
 
-[node name="Side" type="VBoxContainer" parent="Split" unique_id=368722241]
+[node name="Side" type="VBoxContainer" parent="Split" unique_id=1121824429]
 custom_minimum_size = Vector2(330, 0)
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Scroll" type="ScrollContainer" parent="Split/Side" unique_id=1860719928]
+[node name="Scroll" type="ScrollContainer" parent="Split/Side" unique_id=439320769]
 layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
-[node name="Panel" type="VBoxContainer" parent="Split/Side/Scroll" unique_id=1248998992]
+[node name="Panel" type="VBoxContainer" parent="Split/Side/Scroll" unique_id=1782684218]
 custom_minimum_size = Vector2(306, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 7
 
-[node name="Heading" type="Label" parent="Split/Side/Scroll/Panel" unique_id=865500946]
+[node name="Heading" type="Label" parent="Split/Side/Scroll/Panel" unique_id=1227567778]
 layout_mode = 2
 theme_override_font_sizes/font_size = 25
 text = "TRACK EDITOR"
 
-[node name="NameEdit" type="LineEdit" parent="Split/Side/Scroll/Panel" unique_id=17681519]
+[node name="NameEdit" type="LineEdit" parent="Split/Side/Scroll/Panel" unique_id=906964651]
 layout_mode = 2
 placeholder_text = "Circuit name"
 
-[node name="Picker" type="OptionButton" parent="Split/Side/Scroll/Panel" unique_id=166621078]
+[node name="Picker" type="OptionButton" parent="Split/Side/Scroll/Panel" unique_id=772025692]
 layout_mode = 2
 
-[node name="DrawButton" type="Button" parent="Split/Side/Scroll/Panel" unique_id=579012254]
+[node name="DrawButton" type="Button" parent="Split/Side/Scroll/Panel" unique_id=704750935]
 custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 toggle_mode = true
 text = "Draw road  (D)"
 
-[node name="Guide" type="Label" parent="Split/Side/Scroll/Panel" unique_id=714321378]
+[node name="Guide" type="Label" parent="Split/Side/Scroll/Panel" unique_id=811781834]
 custom_minimum_size = Vector2(306, 54)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 15
 autowrap_mode = 3
 
-[node name="Rule" type="ColorRect" parent="Split/Side/Scroll/Panel" unique_id=905105625]
+[node name="Rule" type="ColorRect" parent="Split/Side/Scroll/Panel" unique_id=887735691]
 custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
 color = Color(1, 1, 1, 0.1)
 
-[node name="Readout" type="Label" parent="Split/Side/Scroll/Panel" unique_id=1045832649]
+[node name="Readout" type="Label" parent="Split/Side/Scroll/Panel" unique_id=801310323]
 custom_minimum_size = Vector2(306, 92)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 15
 autowrap_mode = 3
 
-[node name="Status" type="Label" parent="Split/Side/Scroll/Panel" unique_id=1479956519]
+[node name="Status" type="Label" parent="Split/Side/Scroll/Panel" unique_id=1849839333]
 custom_minimum_size = Vector2(306, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 13
 autowrap_mode = 3
 
-[node name="@ColorRect@14" type="ColorRect" parent="Split/Side/Scroll/Panel" unique_id=2038222542]
+[node name="@ColorRect@14" type="ColorRect" parent="Split/Side/Scroll/Panel" unique_id=228145985]
 custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
 color = Color(1, 1, 1, 0.1)
 
-[node name="Legend" type="VBoxContainer" parent="Split/Side/Scroll/Panel" unique_id=1159110443]
+[node name="Legend" type="VBoxContainer" parent="Split/Side/Scroll/Panel" unique_id=1829331147]
 layout_mode = 2
 theme_override_constants/separation = 3
 
-[node name="LegendRow" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1597422124]
+[node name="LegendRow" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1113081202]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "DRAW ON"
 
-[node name="@Label@15" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1727306646]
+[node name="@Label@15" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1824605967]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "  drag lays road · right-drag erases"
 
-[node name="@Label@16" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=829457772]
+[node name="@Label@16" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1845893805]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "DRAW OFF"
 
-[node name="@Label@17" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=707796631]
+[node name="@Label@17" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1890154055]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "  drag a green dot — move a corner"
 
-[node name="@Label@18" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1587744538]
+[node name="@Label@18" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1082876814]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "  drag the road — slide a straight"
 
-[node name="@Label@19" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1211619770]
+[node name="@Label@19" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=53639076]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "  double-click it — add a bend, then"
 
-[node name="@Label@20" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=298025832]
+[node name="@Label@20" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=487459752]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "     drag that bend in or out"
 
-[node name="@Label@21" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=725365551]
+[node name="@Label@21" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=833430355]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "  right-click a dot — remove a corner"
 
-[node name="@Label@22" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=286478696]
+[node name="@Label@22" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1774021978]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "  numbered badge — corner radius"
 
-[node name="@Label@23" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=694971634]
+[node name="@Label@23" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1943108679]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "  badge inside the loop — raise it"
 
-[node name="@Label@24" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=746498928]
+[node name="@Label@24" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=69077151]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "     raise a corner too to hold the"
 
-[node name="@Label@25" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=882309359]
+[node name="@Label@25" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=1094372337]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "     height right through it"
 
-[node name="@Label@26" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=669566048]
+[node name="@Label@26" type="Label" parent="Split/Side/Scroll/Panel/Legend" unique_id=670176226]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "  drag the flag — move the start"
 
-[node name="Actions" type="VBoxContainer" parent="Split/Side" unique_id=1114962586]
+[node name="Actions" type="VBoxContainer" parent="Split/Side" unique_id=261345271]
 layout_mode = 2
 theme_override_constants/separation = 5
 
-[node name="CloseButton" type="Button" parent="Split/Side/Actions" unique_id=890076144]
+[node name="CloseButton" type="Button" parent="Split/Side/Actions" unique_id=2127074969]
 visible = false
 custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 text = "Join the ends up"
 
-[node name="UndoButton" type="Button" parent="Split/Side/Actions" unique_id=959215666]
+[node name="UndoButton" type="Button" parent="Split/Side/Actions" unique_id=199043857]
 custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 text = "Undo  (ctrl+Z)"
 
-[node name="SaveButton" type="Button" parent="Split/Side/Actions" unique_id=1843056655]
+[node name="SaveButton" type="Button" parent="Split/Side/Actions" unique_id=1531460640]
 custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 text = "Save  (ctrl+S)"
 
-[node name="TestButton" type="Button" parent="Split/Side/Actions" unique_id=1174098183]
+[node name="TestButton" type="Button" parent="Split/Side/Actions" unique_id=58133226]
 custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 text = "Test drive"
 
-[node name="DeleteButton" type="Button" parent="Split/Side/Actions" unique_id=1922149424]
+[node name="DeleteButton" type="Button" parent="Split/Side/Actions" unique_id=1856363743]
 custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 text = "Delete"
 
-[node name="BackButton" type="Button" parent="Split/Side/Actions" unique_id=765231499]
+[node name="BackButton" type="Button" parent="Split/Side/Actions" unique_id=1319196908]
 custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 text = "Back to menu  (esc)"
 
-[node name="Keys" type="Label" parent="Split/Side" unique_id=1409571814]
+[node name="Keys" type="Label" parent="Split/Side" unique_id=82474492]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 12
-text = "wheel zooms · middle-drag pans · F refits · shift-drag draws"
+text = "zoom: wheel or pinch · pan: two-finger drag, middle-drag, or cmd-drag · F refits · shift-drag draws"
 autowrap_mode = 3

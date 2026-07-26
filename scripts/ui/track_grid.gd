@@ -48,6 +48,11 @@ const BASE_CELL := 22.0
 ## How close, in cells, the cursor has to be to grab a handle or hit a badge.
 const GRAB := 0.75
 
+## Trackpad two-finger scroll, in screen pixels per unit of gesture delta. The
+## gesture arrives in scroll units rather than pixels, so it needs scaling to feel
+## like it is dragging the canvas.
+const PAN_GESTURE_SPEED := 14.0
+
 const COL_BG := Color(0.10, 0.11, 0.13)
 const COL_GRID := Color(0.16, 0.18, 0.21)
 const COL_ROAD := Color(0.29, 0.31, 0.35)
@@ -251,17 +256,36 @@ func _gui_input(event: InputEvent) -> void:
 		_button(event)
 	elif event is InputEventMouseMotion:
 		_motion(event)
+	elif event is InputEventPanGesture:
+		# Two-finger scroll on a trackpad. macOS sends this rather than wheel
+		# events, and a trackpad has no middle button to pan with at all.
+		_pan(-(event as InputEventPanGesture).delta * PAN_GESTURE_SPEED)
+	elif event is InputEventMagnifyGesture:
+		# Pinch. `factor` is relative, so it composes with itself frame to frame.
+		var pinch := event as InputEventMagnifyGesture
+		_zoom_about(pinch.position, pinch.factor)
+
+func _pan(by: Vector2) -> void:
+	_origin += by
+	queue_redraw()
+
+## Zooms while keeping whatever is under `at` under `at`, which is what makes both
+## the wheel and a pinch feel like they are working on the thing being pointed at.
+func _zoom_about(at: Vector2, factor: float) -> void:
+	var before := screen_to_cell_f(at)
+	_cell_px = clampf(_cell_px * factor, MIN_ZOOM, MAX_ZOOM)
+	_origin = at - before * _cell_px
+	queue_redraw()
 
 func _button(event: InputEventMouseButton) -> void:
 	if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 		if not event.pressed:
 			return
-		var step := 1.12 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.12
-		var before := screen_to_cell_f(event.position)
-		_cell_px = clampf(_cell_px * step, MIN_ZOOM, MAX_ZOOM)
-		# Keep whatever was under the cursor under the cursor.
-		_origin = event.position - before * _cell_px
-		queue_redraw()
+		# A real wheel notch is a fixed step; high-resolution devices report a
+		# smaller `factor` per event and would otherwise zoom absurdly fast.
+		var notch: float = 1.0 + 0.12 * (event.factor if event.factor > 0.0 else 1.0)
+		var step := notch if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / notch
+		_zoom_about(event.position, step)
 		return
 
 	if event.button_index == MOUSE_BUTTON_MIDDLE:
@@ -269,11 +293,18 @@ func _button(event: InputEventMouseButton) -> void:
 		return
 
 	if not event.pressed:
+		_panning = false
 		_end_drag()
 		return
 
 	grab_focus()
 	var cell := screen_to_cell(event.position)
+
+	# Cmd or ctrl and drag pans, so a trackpad without a middle button still has a
+	# keyboard-and-one-finger way to move the view.
+	if event.is_command_or_control_pressed():
+		_panning = true
+		return
 
 	# Shift is a temporary override, so a stroke can be laid without leaving
 	# shaping mode.
@@ -329,8 +360,7 @@ func _climb_cell(run_index: int) -> Vector2i:
 
 func _motion(event: InputEventMouseMotion) -> void:
 	if _panning:
-		_origin += event.relative
-		queue_redraw()
+		_pan(event.relative)
 		return
 
 	var cell := screen_to_cell(event.position)

@@ -93,8 +93,11 @@ circuit is refused, so loose ends and crossings cannot be made this way.
 | Move the start line | Drag the flag |
 | Lay road without leaving shaping | Shift-drag / shift-right-drag |
 
-Always available: **Ctrl+Z** undo · **Ctrl+S** save · wheel zooms · middle-drag
-pans · **F** refits.
+Always available: **Ctrl+Z** undo · **Ctrl+S** save · **F** refits.
+
+Zoom with the wheel or a trackpad pinch. Pan with a two-finger trackpad drag,
+a middle-drag, or Cmd/Ctrl and drag — a trackpad has no middle button, so there
+is a route for each.
 
 ## Status
 

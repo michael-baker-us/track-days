@@ -20,6 +20,10 @@ var step := 0
 
 var custom_track: Node3D
 var sustained_track: Node3D
+## Staged a few frames ahead of its assertions: containers only lay out
+## some frames after a scene is added, so sizes are not final immediately.
+var staged_title: Control
+var staged_track_ids: Array[String] = []
 
 func _initialize() -> void:
 	# race.tscn instances whichever track GameState has selected, so the suite
@@ -640,7 +644,7 @@ func test_title_offers_editing_of_custom_tracks() -> void:
 	var title: Control = load("res://scenes/title.tscn").instantiate()
 	root.add_child(title)
 
-	var rows: VBoxContainer = title.get_node("Rows/Tracks")
+	var rows: VBoxContainer = title.get_node("Centre/Rows/TrackScroll/Tracks")
 	check("a row per circuit", rows.get_child_count(), GameState.all_tracks().size())
 
 	var built_in_with_edit := 0
@@ -650,7 +654,10 @@ func test_title_offers_editing_of_custom_tracks() -> void:
 	for i in rows.get_child_count():
 		var row: Node = rows.get_child(i)
 		var main: Button = row.get_child(0)
-		var has_edit: bool = row.get_child_count() > 1
+		# Every row has a second child: an Edit button on the custom circuits, and
+		# on the shipped ones a plain spacer reserving the same width so the menu's
+		# right edge stays straight. Only the button counts as an Edit affordance.
+		var has_edit: bool = row.get_child_count() > 1 and row.get_child(1) is Button
 		var custom: bool = GameState.all_tracks()[i].get("custom", false)
 		if not custom and has_edit:
 			built_in_with_edit += 1
@@ -874,6 +881,99 @@ func _roomy_rectangle() -> TrackLayout:
 	layout.start_cell = Vector2i(8, 0)
 	return layout
 
+## The UI is laid out in pixels, so without content scaling it keeps its pixel
+## size and shrinks as a fraction of the screen the denser the display gets: the
+## title menu measured 47% of screen width at 1152x648 but 21% at 2560x1440, which
+## is why it looked tiny on a Retina laptop panel and fine on an external monitor.
+func test_ui_scales_with_the_window() -> void:
+	check("content scaling is on",
+		ProjectSettings.get_setting("display/window/stretch/mode", ""), "canvas_items")
+	# "expand" holds the scale at 1:1 and only reveals more canvas, which is the
+	# bug; "keep" letterboxes, unwanted with a 3D view behind the UI.
+	check("scaled by height, not letterboxed or left at 1:1",
+		ProjectSettings.get_setting("display/window/stretch/aspect", ""), "keep_height")
+	var design := Vector2i(
+		ProjectSettings.get_setting("display/window/size/viewport_width", 0),
+		ProjectSettings.get_setting("display/window/size/viewport_height", 0)
+	)
+	check_true("a design size is set (%s)" % design, design.x > 0 and design.y > 0)
+	check("the root window scales to it", root.content_scale_size, design)
+
+## Godot rewrites project.godot whenever it feels like it — an `--import`, an
+## editor open, even a web export — and when it does it drops whole sections and
+## every `;` comment in the file. The web renderer override has been lost that way
+## twice. Nothing warns: the export still succeeds and the page just renders wrong,
+## because web is WebGL 2 only and Forward+ does not exist there.
+func test_web_render_settings_survive() -> void:
+	# Read the file, not ProjectSettings. `get_setting` resolves feature tags and
+	# happily answers for `rendering_method.web` from the untagged value, so it
+	# reports the override as present when the line has actually been deleted —
+	# which is exactly the failure this is meant to catch.
+	var path := "res://project.godot"
+	check_true("project.godot is readable", FileAccess.file_exists(path))
+	if not FileAccess.file_exists(path):
+		return
+	var text := FileAccess.get_file_as_string(path)
+	check_true("desktop stays on Forward+",
+		text.contains('renderer/rendering_method="forward_plus"'))
+	check_true("the web renderer override is still in the file",
+		text.contains('renderer/rendering_method.web="gl_compatibility"'))
+	# The display block goes the same way, and losing it is what made the UI tiny.
+	check_true("the stretch mode is still in the file",
+		text.contains('window/stretch/mode="canvas_items"'))
+
+## Every circuit has to stay reachable however many are saved. The menu used to be
+## centred with hardcoded offsets, so it grew downwards off the bottom of the
+## screen and took the last circuits, "Build a track" and the hint with it.
+func stage_title_menu() -> void:
+	for n in 8:
+		var layout := sample_layout()
+		layout.display_name = "Fits Test %d" % n
+		layout.id = ""
+		TrackStore.save(layout)
+		staged_track_ids.append(layout.id)
+	staged_title = load("res://scenes/title.tscn").instantiate()
+	root.add_child(staged_title)
+
+func test_title_menu_fits_however_many_tracks() -> void:
+	var title: Control = staged_title
+	check_true("title staged", title != null)
+	if title == null:
+		return
+	var rows: Control = title.get_node("Centre/Rows")
+	var scroll: ScrollContainer = title.get_node("Centre/Rows/TrackScroll")
+	var tracks: VBoxContainer = title.get_node("Centre/Rows/TrackScroll/Tracks")
+	var editor_button: Button = title.get_node("Centre/Rows/EditorButton")
+	var canvas: Vector2 = root.get_visible_rect().size
+
+	check_true("the menu is centred (%.1f vs %.1f)" % [
+		rows.position.x + rows.size.x * 0.5, canvas.x * 0.5],
+		absf((rows.position.x + rows.size.x * 0.5) - canvas.x * 0.5) < 2.0)
+	check_true("the menu fits top to bottom (%.0f..%.0f in %.0f)" % [
+		rows.position.y, rows.position.y + rows.size.y, canvas.y],
+		rows.position.y >= -1.0 and rows.position.y + rows.size.y <= canvas.y + 1.0)
+	check_true("more circuits than fit unscrolled",
+		tracks.get_combined_minimum_size().y > scroll.size.y)
+	check_true("so the list scrolls instead of overflowing",
+		scroll.get_v_scroll_bar().visible)
+	check_true("and 'Build a track' is still on screen",
+		editor_button.global_position.y + editor_button.size.y <= canvas.y)
+
+	# A ragged right edge. Every *row* is stretched to the list width regardless,
+	# so it is the main button that has to be measured: without a spacer reserving
+	# the Edit column, the shipped circuits' buttons ran the full width while the
+	# custom ones stopped short.
+	var widths := {}
+	for row in tracks.get_children():
+		widths[snappedf((row.get_child(0) as Control).size.x, 0.5)] = true
+	check("every circuit's button is the same width", widths.size(), 1)
+
+	title.queue_free()
+	staged_title = null
+	for id in staged_track_ids:
+		TrackStore.delete(id)
+	staged_track_ids.clear()
+
 ## Custom tracks are JSON on disk, so the whole shape has to survive the trip.
 func test_layout_round_trip() -> void:
 	var layout := sample_layout()
@@ -1062,6 +1162,9 @@ func _physics_process(_delta: float) -> bool:
 		test_timing_gate_sits_on_the_start_line()
 		test_gates_stay_evenly_spaced()
 		test_title_offers_editing_of_custom_tracks()
+		test_ui_scales_with_the_window()
+		test_web_render_settings_survive()
+		stage_title_menu()
 		test_sustained_elevation_across_corners()
 		test_a_corner_can_be_raised_on_its_own()
 		test_start_line_stays_on_the_ground()
@@ -1078,6 +1181,12 @@ func _physics_process(_delta: float) -> bool:
 	if frame == 5:
 		# A frame later than the staging, so the new bodies are in the space.
 		test_collision_follows_a_sustained_section()
+		return false
+
+	if frame == 8:
+		# Containers lay out on a later frame, so sizes and positions are only
+		# final some frames after the scene is added.
+		test_title_menu_fits_however_many_tracks()
 		return false
 
 	if frame < 5 or frame % 5 != 0:

@@ -136,7 +136,10 @@ func _initialize() -> void:
 	actions.add_child(_button("BackButton", "Back to menu  (esc)"))
 
 	var keys := _wrapped("Keys", 12)
-	keys.text = "wheel zooms · middle-drag pans · F refits · shift-drag draws"
+	keys.text = (
+		"zoom: wheel or pinch · pan: two-finger drag, middle-drag, or cmd-drag"
+		+ " · F refits · shift-drag draws"
+	)
 	side.add_child(keys)
 
 	_set_owner(root_ctrl, root_ctrl)

@@ -415,6 +415,13 @@ overrides the renderer for web alone. Rendering under Compatibility was checked
 before committing to it: the grid shader, gantry, shadows and HUD all survive,
 with slightly brighter tonemapping.
 
+> **Godot rewrites `project.godot` on its own schedule** — an `--import`, an
+> editor open, even a web export — and when it does it drops whole sections and
+> every `;` comment in the file. The `rendering_method.web` override has been lost
+> that way twice, and nothing warns: the export still succeeds and the page simply
+> renders wrong. So the reasoning lives here rather than in comments there, and
+> `tests/run_tests.gd` asserts both renderer settings are present.
+
 `export_presets.cfg` is committed (not gitignored as Godot suggests by default)
 because CI needs it. That is safe while web is the only target — it holds no
 signing keys — and should be revisited if a platform that needs credentials is
@@ -423,6 +430,26 @@ added.
 > Godot's exporter can print a configuration error and still **exit 0**. The
 > workflow therefore checks the artifacts exist rather than trusting the exit
 > code.
+
+## Display scaling
+
+The UI is laid out in pixels, so with no stretch mode it kept its pixel size and
+shrank as a fraction of the screen the denser the display got — the title menu
+measured 47% of screen width at 1152x648 and 21% at 2560x1440, which is why it
+looked tiny on a Retina laptop panel and correct on an external monitor.
+
+`window/stretch/mode = "canvas_items"` scales the whole UI with the window against
+a 1280x720 design size; 3D rendering is unaffected. The aspect is `keep_height`,
+not the two obvious alternatives: `expand` deliberately holds the scale at 1:1 and
+only reveals more canvas, which is the bug being fixed, and `keep` letterboxes,
+which is unwanted with a 3D view behind the UI. With `keep_height` a wider window
+simply shows more to the sides — measured at 16:9, 16:10 and ultrawide, the
+background reaches every corner with no bars.
+
+> Measuring this is easy to get wrong. `root.size` is the *window* size while
+> Controls are laid out in canvas units, so comparing the two makes a correctly
+> scaled UI look broken. `root.get_visible_rect().size` is the canvas, and
+> `root.get_final_transform()` carries the scale.
 
 ## Known gaps
 

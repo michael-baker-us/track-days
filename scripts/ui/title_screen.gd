@@ -8,8 +8,18 @@ const RACE_SCENE := "res://scenes/race.tscn"
 const EDITOR_SCENE := "res://scenes/editor/track_editor.tscn"
 const TITLE_SCENE := "res://scenes/title.tscn"
 
-@onready var _tracks: VBoxContainer = $Rows/Tracks
-@onready var _editor_button: Button = $Rows/EditorButton
+## Tallest the track list is allowed to get before it scrolls. The rest of the
+## menu is fixed height, and at the design height of 720 this leaves the heading,
+## "Build a track" and the hint all comfortably on screen.
+const TRACK_LIST_MAX_H := 340.0
+
+## Width reserved for the Edit button, matched by a spacer on the circuits that do
+## not have one so every row ends at the same place.
+const EDIT_W := 74.0
+
+@onready var _scroll: ScrollContainer = $Centre/Rows/TrackScroll
+@onready var _tracks: VBoxContainer = $Centre/Rows/TrackScroll/Tracks
+@onready var _editor_button: Button = $Centre/Rows/EditorButton
 
 var _entries: Array[Dictionary] = []
 
@@ -20,6 +30,11 @@ func _ready() -> void:
 	_entries = GameState.all_tracks()
 	for i in _entries.size():
 		_tracks.add_child(_track_row(i))
+	# Size the list to its contents, up to the cap, so a short list has no
+	# scrollbar and a long one does not push the rest of the menu off screen.
+	_scroll.custom_minimum_size.y = minf(
+		_tracks.get_combined_minimum_size().y, TRACK_LIST_MAX_H
+	)
 	_editor_button.pressed.connect(_on_editor_pressed)
 	# So the keyboard works without touching the mouse first.
 	if _tracks.get_child_count() > 0:
@@ -40,11 +55,18 @@ func _track_row(index: int) -> HBoxContainer:
 	if info.get("custom", false):
 		var edit := Button.new()
 		edit.text = "Edit"
-		edit.custom_minimum_size = Vector2(74.0, 74.0)
+		edit.custom_minimum_size = Vector2(EDIT_W, 74.0)
 		edit.add_theme_font_size_override("font_size", 17)
 		edit.tooltip_text = "Open %s in the track editor" % info["name"]
 		edit.pressed.connect(_on_edit_pressed.bind(String(info["id"])))
 		row.add_child(edit)
+	else:
+		# The shipped circuits have nothing to edit, but they still need the width
+		# reserving or their rows run wider than the custom ones and the right-hand
+		# edge of the menu comes out ragged.
+		var gap := Control.new()
+		gap.custom_minimum_size = Vector2(EDIT_W, 0.0)
+		row.add_child(gap)
 	return row
 
 func _track_button(index: int) -> Button:
@@ -55,7 +77,7 @@ func _track_button(index: int) -> Button:
 	)
 
 	var button := Button.new()
-	button.custom_minimum_size = Vector2(380.0, 74.0)
+	button.custom_minimum_size = Vector2(300.0, 74.0)
 	button.text = "%s\n%s   ·   %s" % [info["name"], info["blurb"], best_text]
 	button.add_theme_font_size_override("font_size", 19)
 	# An unfinished custom track has no drivable geometry. Offering it anyway
