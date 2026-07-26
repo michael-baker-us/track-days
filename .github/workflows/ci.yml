@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  GODOT_VERSION: "4.7"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot
+        run: |
+          BASE="Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/${BASE}.zip"
+          unzip -q godot.zip
+          chmod +x "$BASE"
+          sudo mv "$BASE" /usr/local/bin/godot
+          godot --version
+
+      # Generates .godot/, which holds the global class_name registry. Without
+      # this the project cannot resolve CarTuning and every later step fails to
+      # parse - the same trap as deleting .godot locally.
+      - name: Import project
+        run: godot --headless --editor --quit --path .
+
+      - name: Check scripts parse
+        run: |
+          rc=0
+          while IFS= read -r f; do
+            # --check-only reports parse errors on stdout while still exiting 0,
+            # so the output has to be inspected rather than the exit code.
+            out=$(godot --headless --check-only --script "$f" 2>&1)
+            if grep -q "SCRIPT ERROR\|Parse Error" <<<"$out"; then
+              echo "::error file=$f::$out"
+              rc=1
+            fi
+          done < <(find scripts resources tests tools -name '*.gd')
+          exit $rc
+
+      - name: Run tests
+        run: godot --headless --path . --script tests/run_tests.gd

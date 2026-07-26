@@ -6,7 +6,21 @@ drive a car around a track and get the feel right before deciding where the game
 Separate from any pseudo-3D OutRun-style racer on the broader project roadmap — this one
 uses real 3D and Godot's built-in `VehicleBody3D` physics.
 
-See [`docs/plan.md`](docs/plan.md) for the full milestone plan and architecture notes.
+See [`docs/architecture.md`](docs/architecture.md) for how it fits together,
+[`docs/tuning-journal.md`](docs/tuning-journal.md) for how the handling numbers
+were arrived at, and [`docs/plan.md`](docs/plan.md) for the milestone plan.
+
+## Testing
+
+```bash
+# Headless suite; exits non-zero on failure, so CI gates on it.
+/path/to/Godot.app/Contents/MacOS/Godot --headless --path . --script tests/run_tests.gd
+```
+
+Covers tuning invariants, lap-ordering rules, checkpoint integrity, and that the
+road collision surface actually follows the track's elevation. Handling *feel*
+is not unit-tested — see [`docs/tuning-journal.md`](docs/tuning-journal.md) for
+how that is measured instead.
 
 ## Running
 
