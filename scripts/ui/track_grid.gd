@@ -220,8 +220,9 @@ func _draw_corner_labels() -> void:
 			continue
 		var mid: Vector2i = run.cells[run.cells.size() / 2]
 		var at := cell_to_screen(Vector2(mid)) + Vector2.ONE * _cell_px * 0.5
+		# Clear of the line itself, which at this point is coloured the same.
 		draw_string(
-			font, at + Vector2(-pt * 0.6, pt * 0.4), "+%d" % run.level,
+			font, at + Vector2(-pt * 0.6, -_cell_px * 0.55), "+%d" % run.level,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, pt, COL_HIGH
 		)
 
@@ -230,8 +231,7 @@ func _draw_corner_labels() -> void:
 func _draw_start() -> void:
 	if compiled.runs.is_empty() or compiled.runs[0].cells.is_empty():
 		return
-	var run: TrackLayout.Run = compiled.runs[0]
-	var cell: Vector2i = run.cells[0]
+	var cell: Vector2i = compiled.start_marker
 	var dir := Vector2(compiled.corners[0].in_dir)
 	var across := Vector2(-dir.y, dir.x)
 

@@ -94,20 +94,26 @@ const PIECES := {
 		"conns": {"N": Vector2(0.5, 0.0), "S": Vector2(0.5, 1.0)},
 		"conn_y": {"N": 0.5, "S": 0.5},
 	},
+	# The arc centre is the *outer* corner of the block, not the point where the
+	# two centre lines cross. Both give a quarter circle through the same two
+	# connection points — they are mirror images across the chord — but only this
+	# one leaves the arc tangent to the straights it joins. Centred on the
+	# crossing point instead, the road turns the wrong way out of each end and
+	# the centreline cuts across the inside of the bend.
 	"roadCornerSmall": {
 		"cell": Vector2(1.0, 1.0), "shift": Vector2(0.35, 1.65),
 		"conns": {"E": Vector2(1.0, 0.5), "S": Vector2(0.5, 1.0)},
-		"arc": Vector2(0.5, 0.5),
+		"arc": Vector2(1.0, 1.0),
 	},
 	"roadCornerLarge": {
 		"cell": Vector2(2.0, 2.0), "shift": Vector2(0.35, 2.65),
 		"conns": {"E": Vector2(2.0, 0.5), "S": Vector2(0.5, 2.0)},
-		"arc": Vector2(0.5, 0.5),
+		"arc": Vector2(2.0, 2.0),
 	},
 	"roadCornerLarger": {
 		"cell": Vector2(3.0, 3.0), "shift": Vector2(0.35, 3.65),
 		"conns": {"E": Vector2(3.0, 0.5), "S": Vector2(0.5, 3.0)},
-		"arc": Vector2(0.5, 0.5),
+		"arc": Vector2(3.0, 3.0),
 	},
 }
 

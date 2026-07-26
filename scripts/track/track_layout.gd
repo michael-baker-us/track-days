@@ -96,6 +96,9 @@ class Compiled extends RefCounted:
 	var runs: Array[Run] = []
 	## The painted loop in visiting order, rotated so it begins at the start run.
 	var cycle: Array[Vector2i] = []
+	## The cell the start line actually lands on, which is not the first cell of
+	## the start run: the corner before it has already taken `size - 1` of them.
+	var start_marker := Vector2i.ZERO
 	## Builder tile-units -> grid cell coordinates. The builder always walks from
 	## its own origin heading south, so its output is the painted route rotated
 	## and translated; this puts the two back on top of each other, which is what
@@ -440,6 +443,7 @@ func _grid_transform(out: Compiled) -> Transform2D:
 	# The corner before the start run has already eaten the first cells of it.
 	var eaten: int = out.corners[out.corners.size() - 1].size - 1
 	var first: Vector2i = run.cells[mini(eaten, run.cells.size() - 1)]
+	out.start_marker = first
 	# The corner closing the start run entered it travelling along it.
 	var dir := Vector2(out.corners[0].in_dir)
 
