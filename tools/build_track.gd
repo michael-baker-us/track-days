@@ -3,85 +3,240 @@ extends SceneTree
 # Bakes the shipped circuits into committed .tscn files.
 #
 # All the geometry lives in scripts/track/track_builder.gd, which the game also
-# calls at runtime to build player-authored tracks. This file is only the two
+# calls at runtime to build player-authored tracks. This file is only the three
 # layouts plus the save step, so a custom track and a shipped one are made of
 # exactly the same thing.
 #
 # Every layout must close: the builder reports a gap that has to be (0, 0) with
 # net +/-4 turns and height back to 0, or the loop does not join up. This script
 # exits non-zero if any track fails, so a broken circuit cannot ship silently.
-
-# The original circuit: long straights, fast sweepers, and two climbs. Each
-# climb replaces exactly 6 units of straight (ramp 2 + bridge 2 + ramp 2), so
-# adding elevation did not require re-solving the layout.
 #
-# Every corner states its banking, because nothing anywhere infers it: a corner
-# with no angle on it is flat, in a hand-written layout as much as in the editor.
-# The angles here run up with radius — the sweepers lean most, since they are the
-# corners taken fastest and the only ones with room either side to roll into and
-# out of. Flats is the same circuit's opposite number, banked nowhere at all.
-const HIGHLAND := [
+# ## These are three real circuits, seen through a 90-degree grid
+#
+# Ardennes is Spa-Francorchamps, Monte Carlo is Monaco, La Sarthe is Le Mans.
+# The tile set only turns in right angles and only in three radii, so none of
+# them is a survey — what carries over is the shape of the lap and the order of
+# its corners: where the hairpin is, which straight is the long one, which bends
+# are quick enough to be worth banking, and where the road climbs.
+#
+# Each layout was solved as a rectilinear polygon first. A leg of the polygon
+# spans `straight_cells + N_in + N_out - 1` tile units, where N is the size of
+# the corner at either end, so choosing the outline in whole units decides the
+# straight counts rather than the other way round, and closure is arithmetic
+# instead of trial and error. The outlines were also checked for a road that
+# crosses or touches itself, which the closure test says nothing about.
+#
+# ## Turn labels are the builder's, not the driver's
+#
+# All three circuits run clockwise, and all three are *left*-dominant here with a
+# net turn total of +4. That is not a mistake: the builder calls a -90 degree
+# rotation "right", but the car faces local +Z and a car facing +Z has its right
+# hand at -X, so what the layout calls "left" is the direction the driver turns
+# right. The two older circuits ran the other way round.
+#
+# ## Height stops at one level
+#
+# `roadStraightBridge` is drawn with 0.5 tile units of structure below its deck,
+# which is exactly one level of climb: raised by one, it stands on the ground,
+# and raised by two it floats 3.5 m above it. So every climb here goes up a
+# level, holds, and comes back down inside the same straight. Corners stay on the
+# ground for the same reason -- the bridge corners are deck-only pieces with no
+# structure at all, meant for the editor's sustained elevated sections.
+
+# Spa-Francorchamps: La Source, the climb through Eau Rouge onto a long straight
+# at height, then the fast half of the lap. The three big sweepers carry 4
+# degrees of bank and the medium bends 2.5; the hairpin and the chicane get
+# nothing, because banking is a per-corner choice and a hairpin banked hard is a
+# skate bowl. 1472 m, 14 corners, 3.5 m of climb.
+const ARDENNES := [
 	["S", "roadStart", 1],
 	["S", "roadStartPositions", 1],
-	["S", "roadStraightLong", 6],
-	["C", "roadCornerLarger", "right", 4.0],
-	["S", "roadStraightLong", 4],
-	["C", "roadCornerLarge", "right", 2.5],
-	["S", "roadStraightLong", 3],
-	["C", "roadCornerLarge", "left", 2.5],
 	["S", "roadStraightLong", 2],
-	["C", "roadCornerLarge", "right", 2.5],
-	["S", "roadStraightLong", 3],
-	["S", "roadRampLongCurved", 1, 1],
-	["S", "roadStraightBridge", 2],
-	["S", "roadRampLongCurved", 1, -1],
-	["S", "roadStraightLong", 2],
-	["C", "roadCornerLarger", "right", 4.0],
-	["S", "roadStraightLong", 3],
-	["S", "roadRampLongCurved", 1, 1],
-	["S", "roadStraightBridge", 2],
-	["S", "roadRampLongCurved", 1, -1],
-	["S", "roadStraightLong", 1],
+	# La Source: two of the smallest corners back to back, which is as close to a
+	# hairpin as a right-angle tile set gets. The road comes back 2 units away.
+	["C", "roadCornerSmall", "left", 0.0],
 	["S", "roadStraight", 1],
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 3],
+	# Eau Rouge and Raidillon: the left-right flick, and then the climb.
 	["C", "roadCornerLarge", "right", 2.5],
+	["S", "roadStraight", 1],
+	["C", "roadCornerLarge", "left", 2.5],
+	["S", "roadStraightLong", 1],
+	["S", "roadRampLongCurved", 1, 1],
+	# The Kemmel straight, held at height over the crest and then run out flat.
+	["S", "roadStraightBridge", 4],
+	["S", "roadRampLongCurved", 1, -1],
+	["S", "roadStraightLong", 5],
+	# Les Combes and Malmedy, the chicane at the top of the hill.
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 1],
+	["C", "roadCornerSmall", "right", 0.0],
+	["S", "roadStraightLong", 1],
+	# Rivage, turning the lap back down the valley.
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 3],
+	["S", "roadStraight", 1],
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 1],
+	# Pouhon, Fagnes, Stavelot: the fast, banked half.
+	["C", "roadCornerLarger", "right", 4.0],
 	["S", "roadStraightLong", 4],
+	["C", "roadCornerLarge", "left", 2.5],
+	["S", "roadStraightLong", 1],
+	["C", "roadCornerLarger", "left", 4.0],
+	["S", "roadStraightLong", 4],
+	["S", "roadStraight", 1],
+	# Blanchimont, flat out, onto a rise back towards the line.
+	["C", "roadCornerLarger", "right", 4.0],
+	["S", "roadStraight", 1],
+	["S", "roadRampLongCurved", 1, 1],
+	["S", "roadStraightBridge", 1],
+	["S", "roadRampLongCurved", 1, -1],
+	["S", "roadStraight", 1],
+	# The Bus Stop chicane, and out onto the pit straight.
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 1],
+	["C", "roadCornerSmall", "right", 0.0],
+	["S", "roadStraightLong", 1],
 	["S", "roadStraight", 1],
 ]
 
-# A flat, tighter circuit: no elevation, shorter straights, and two left-hand
-# turns so it does not read as another clockwise oval.
+# Monaco: the shortest circuit, the tightest, and the flattest in the only sense
+# that matters here -- **not one corner on it is banked**. That is the point of
+# it next to the other two. Banking is a choice per corner rather than something
+# every bend gets, and a street circuit is where the answer is honestly no: the
+# road is a road, and eleven of these fourteen corners are the smallest tile in
+# the set, taken slowly enough that leaning them would buy nothing. Every corner
+# says `0.0` out loud rather than saying nothing, because those have to keep
+# meaning the same thing.
 #
-# Its corners are flat too, stated explicitly. Banking is a per-corner choice
-# rather than something every bend gets, and this is the circuit that shows the
-# other answer: Highland leans into its sweepers, Flats does not lean at all, and
-# the pair of them make the difference something you can drive rather than read
-# about. The zero has to be written out — saying nothing would hand each corner
-# the default for its radius, which is the opposite of what is wanted here.
-const FLATS := [
+# The lap steps down the hill in four bends and steps back along the harbour in
+# four more, which is both what Monaco does and the only way a loop with this
+# many same-handed corners closes without the road crossing itself.
+# 1054 m, 14 corners, 3.5 m of climb up Beau Rivage.
+const MONTE_CARLO := [
+	["S", "roadStart", 1],
+	["S", "roadStartPositions", 1],
+	["S", "roadStraightLong", 2],
+	["S", "roadStraight", 1],
+	# Sainte Devote, and the climb up Beau Rivage.
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraight", 1],
+	["S", "roadRampLongCurved", 1, 1],
+	["S", "roadStraightBridge", 1],
+	["S", "roadRampLongCurved", 1, -1],
+	["S", "roadStraight", 1],
+	# Massenet into Casino, one straight into the other with nothing between.
+	["C", "roadCornerLarge", "right", 0.0],
+	["C", "roadCornerLarge", "left", 0.0],
+	["S", "roadStraightLong", 2],
+	# Mirabeau and Loews, stepping down to the sea.
+	["C", "roadCornerSmall", "right", 0.0],
+	["S", "roadStraightLong", 1],
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 2],
+	# Portier, onto the longest straight on the circuit.
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 6],
+	["S", "roadStraight", 1],
+	# The Nouvelle Chicane.
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 1],
+	["C", "roadCornerSmall", "right", 0.0],
+	["S", "roadStraight", 1],
+	# Tabac, and the run along the harbour.
+	["C", "roadCornerLarge", "left", 0.0],
+	["S", "roadStraightLong", 4],
+	# The swimming pool complex: four of the smallest corners in 100 m.
+	["C", "roadCornerSmall", "right", 0.0],
+	["S", "roadStraight", 1],
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 1],
+	["S", "roadStraight", 1],
+	["C", "roadCornerSmall", "right", 0.0],
+	# Rascasse and Anthony Noghes, back onto the line.
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraight", 1],
+	["C", "roadCornerLarge", "left", 0.0],
+	["S", "roadStraightLong", 1],
+	["S", "roadStraight", 1],
+]
+
+# Le Mans: the longest of the three and the one that is mostly straight. Three
+# runs down the Mulsanne, split by chicanes, take up a quarter of the lap on
+# their own, and the second of them goes over a crest at speed. Then Indianapolis
+# -- the biggest sweeper in the set, banked as hard as anything is banked --
+# Arnage, and the Porsche Curves, which are three of the medium corners taken as
+# one continuous change of direction. 1768 m, 18 corners, 3.5 m of climb.
+const LA_SARTHE := [
 	["S", "roadStart", 1],
 	["S", "roadStartPositions", 1],
 	["S", "roadStraightLong", 4],
-	["C", "roadCornerLarger", "right", 0.0],
-	["S", "roadStraightLong", 3],
-	["C", "roadCornerLarge", "right", 0.0],
+	["S", "roadStraight", 1],
+	# The Dunlop chicane, then the curve under the bridge.
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 1],
+	["C", "roadCornerSmall", "right", 0.0],
+	["S", "roadStraight", 1],
+	["C", "roadCornerLarge", "left", 2.5],
+	["S", "roadStraightLong", 1],
+	# The Esses, downhill in reality and simply quick here.
+	["C", "roadCornerLarge", "right", 1.5],
+	["S", "roadStraight", 1],
+	["C", "roadCornerLarge", "left", 1.5],
+	["S", "roadStraightLong", 1],
+	# Tertre Rouge, onto the Mulsanne.
+	["C", "roadCornerLarge", "left", 2.5],
+	["S", "roadStraightLong", 8],
+	# First chicane.
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 1],
+	["C", "roadCornerSmall", "right", 0.0],
+	# Second run, over a crest.
+	["S", "roadStraightLong", 2],
+	["S", "roadRampLongCurved", 1, 1],
+	["S", "roadStraightBridge", 3],
+	["S", "roadRampLongCurved", 1, -1],
+	["S", "roadStraightLong", 1],
+	# Second chicane.
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 1],
+	["C", "roadCornerSmall", "right", 0.0],
 	["S", "roadStraightLong", 4],
-	["C", "roadCornerLarge", "left", 0.0],
-	["S", "roadStraightLong", 3],
-	["C", "roadCornerLarger", "right", 0.0],
-	["S", "roadStraightLong", 7],
-	["C", "roadCornerLarge", "right", 0.0],
-	["S", "roadStraightLong", 5],
-	["C", "roadCornerLarge", "right", 0.0],
+	["S", "roadStraight", 1],
+	# Mulsanne corner: everything stops here.
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 8],
+	# Indianapolis, then Arnage.
+	["C", "roadCornerLarger", "left", 4.0],
 	["S", "roadStraightLong", 2],
-	["C", "roadCornerLarge", "left", 0.0],
-	["S", "roadStraightLong", 2],
-	["C", "roadCornerLarge", "right", 0.0],
-	["S", "roadStraightLong", 3],
+	["S", "roadStraight", 1],
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 1],
+	["S", "roadStraight", 1],
+	# The Porsche Curves.
+	["C", "roadCornerLarge", "right", 2.5],
+	["S", "roadStraightLong", 1],
+	["C", "roadCornerLarge", "left", 2.5],
+	["S", "roadStraight", 1],
+	["C", "roadCornerLarge", "right", 2.5],
+	["S", "roadStraightLong", 1],
+	["S", "roadStraight", 1],
+	# The Ford chicane, and the line.
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 1],
+	["C", "roadCornerSmall", "right", 0.0],
+	["S", "roadStraightLong", 1],
+	["S", "roadStraight", 1],
 ]
 
 const TRACKS := {
-	"highland": {"file": "res://scenes/track/track_highland.tscn", "layout": HIGHLAND},
-	"flats": {"file": "res://scenes/track/track_flats.tscn", "layout": FLATS},
+	"ardennes": {"file": "res://scenes/track/track_ardennes.tscn", "layout": ARDENNES},
+	"monte_carlo": {
+		"file": "res://scenes/track/track_monte_carlo.tscn", "layout": MONTE_CARLO
+	},
+	"la_sarthe": {"file": "res://scenes/track/track_la_sarthe.tscn", "layout": LA_SARTHE},
 }
 
 func _initialize() -> void:

@@ -10,7 +10,7 @@ signal lap_completed(lap_number: int, time: float, is_best: bool)
 signal timing_started
 
 ## Which track's record to read and write. Set before the first physics frame.
-var track_id: String = "highland"
+var track_id: String = "ardennes"
 
 var checkpoint_count: int = 0
 var lap_number: int = 0

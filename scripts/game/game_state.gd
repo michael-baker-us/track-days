@@ -11,18 +11,31 @@ const RECORDS_PATH := "user://records.cfg"
 ## of polluting the player's real best laps.
 static var records_path: String = RECORDS_PATH
 
+## The three shipped circuits, each cut down from a real one -- Ardennes from
+## Spa-Francorchamps, Monte Carlo from Monaco, La Sarthe from Le Mans. See
+## `tools/build_track.gd` for how much of each survives a 90-degree tile set.
+##
+## Names and blurbs are drawn on the title screen, so they stay inside the
+## built-in font: no accents, no degree signs. The web export has no system
+## fallback and would print a tofu box instead.
 const TRACKS := [
 	{
-		"id": "highland",
-		"name": "Highland",
-		"blurb": "Long straights, fast sweepers, two climbs",
-		"scene": "res://scenes/track/track_highland.tscn",
+		"id": "ardennes",
+		"name": "Ardennes",
+		"blurb": "A hairpin, a long climb, fast sweepers",
+		"scene": "res://scenes/track/track_ardennes.tscn",
 	},
 	{
-		"id": "flats",
-		"name": "The Flats",
-		"blurb": "Flat and technical, two left-handers",
-		"scene": "res://scenes/track/track_flats.tscn",
+		"id": "monte_carlo",
+		"name": "Monte Carlo",
+		"blurb": "Fourteen tight corners, not one banked",
+		"scene": "res://scenes/track/track_monte_carlo.tscn",
+	},
+	{
+		"id": "la_sarthe",
+		"name": "La Sarthe",
+		"blurb": "Huge straights, chicanes, one big sweeper",
+		"scene": "res://scenes/track/track_la_sarthe.tscn",
 	},
 ]
 

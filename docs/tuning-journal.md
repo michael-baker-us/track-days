@@ -552,6 +552,57 @@ bug, not the stiffness.
 > every circuit reported a 4.5 m "bank" on its start tile. Reading a material name
 > is not the same as reading the driving surface.
 
+## M7 — three circuits off a real map
+
+Highland and Flats were replaced by **Ardennes** (Spa-Francorchamps, 1473 m),
+**Monte Carlo** (Monaco, 1054 m) and **La Sarthe** (Le Mans, 1768 m). Nothing in
+the builder changed; this was layout work, and what it produced was mostly
+findings about the constraints the layout grammar already had.
+
+**Closure stopped being trial and error.** The old layouts were solved by
+adjusting straight counts until the walker came back to the origin. Each of these
+was drawn as a rectilinear polygon first: a leg spans
+`straight_cells + N_in + N_out - 1` tile units, where N is the size of the corner
+at either end, so picking the outline in whole units *decides* the straight
+counts and closure is arithmetic. Two sums — one per axis — say whether the loop
+joins up, before anything is built.
+
+**Closure says nothing about the road crossing itself**, and that is the failure
+this actually hit. A layout can close perfectly with one straight driven straight
+over another. It is not visible in the closure line, and on a 40-tile circuit it
+is not obvious in a screenshot either. The check that found it paints the tarmac
+onto a grid at quarter-tile resolution and looks for a cell claimed twice by
+stretches more than four units apart along the lap, which is what separates a
+genuine crossing from an S-bend passing close to itself. Monaco's first draft
+failed it in two places; the shipped circuits, checked the same way, are clean.
+
+Monaco needed re-planning rather than re-numbering. Its first corner order —
+Casino, Mirabeau, Loews, Portier, chicane, five same-handed corners in a row —
+has **no** non-crossing solution at any leg length: the hairpin makes a peninsula
+and the straight after it has to cross back over the road that fed it. Ordering
+it as a staircase down the hill and a staircase back along the harbour is both
+what the real circuit does and the arrangement that closes.
+
+**Elevation is capped at one level by the art, not by the grammar.**
+`roadStraightBridge` is modelled with 0.5 tile units of structure below its deck
+— exactly one level of climb. Raised by one it stands on the ground; raised by
+two it floats 3.5 m above it, with the supports hanging in mid-air. So every
+climb on these three goes up a level, holds, and comes back down inside the same
+straight, and corners stay on the ground: the bridge *corner* pieces are
+deck-only, with no structure at all. `TrackLayout.MAX_LEVEL` is still 3 and the
+editor still offers it, which is a real thing to fix in the art or the piece
+choice rather than in the layouts.
+
+> The measurement trap, again in the banking test. `_road_height_spread` compared
+> a tile's highest road vertex with its lowest, which is banking only on a circuit
+> with no hills — a ramp tile reports 2.02 m of "bank" from its own climb. Flats
+> had no elevation at all, so the test never noticed; Monte Carlo has a crest up
+> Beau Rivage and failed instantly. It now compares the surface only within thin
+> bands along the tile, where a ramp is level and only a lean shows up, and a
+> deliberately flat circuit measures 0.00. The old measure was not just noisy — it
+> would have let a banked circuit that had silently reverted to level pass on the
+> strength of its ramps.
+
 ### Still open
 
 - The hills are still the hardest part of the circuit to drive: 0.84 s airborne
@@ -569,8 +620,10 @@ bug, not the stiffness.
   power-sliding slightly in a straight line. Not obviously wrong for an arcade
   racer, but it has not been deliberately tuned.
 - The grid shader aliases badly toward the horizon; wants a distance fade.
-- The circuit has no chicane: `roadCurved` always offsets the same way relative
-  to travel, so mirroring it needs a negative scale rather than a Y rotation.
+- Chicanes are two of the smallest corners back to back, which is as tight as the
+  kit gets. `roadCurved` — the piece that would make a proper offset kink — always
+  offsets the same way relative to travel, so mirroring it needs a negative scale
+  rather than a Y rotation, and nothing emits it.
 - Walls approximate `roadCurved` as a straight line between its endpoints.
 - `track_01.tscn` (bare flat plane) is kept deliberately — physics measurements
   want a surface with no walls to run into.

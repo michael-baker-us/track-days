@@ -25,8 +25,10 @@ GODOT=/path/to/Godot.app/Contents/MacOS/Godot
 
 # Rebuild every circuit after editing a layout in build_track.gd.
 # Prints a closure gap per track: it must be (0, 0) with net turns +/-4 and
-# height back to 0, or the loop does not join up. Adjust straight counts until
-# it closes; the script exits non-zero if any track fails to close.
+# height back to 0, or the loop does not join up. The script exits non-zero if
+# any track fails to close. Note that closing is not the same as not crossing
+# itself, which nothing here checks -- see docs/architecture.md before writing a
+# new layout.
 "$GODOT" --headless --path . --script tools/build_track.gd
 
 # Rebuild the HUD after editing build_ui.gd. Node names there must match the

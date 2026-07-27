@@ -101,10 +101,11 @@ is a route for each.
 
 ## Status
 
-M3 — two circuits, both 14 m wide and built from Kenney Racing Kit tiles by a
-layout spec: **Highland** (1278 m, long straights and two climbs) and **The
-Flats** (1287 m, flat and technical). A title screen selects between them and
-shows the best lap for each.
+M3 — three circuits, all 14 m wide and built from Kenney Racing Kit tiles by a
+layout spec, each cut down from a real one: **Ardennes** (1473 m, Spa's hairpin,
+climb and sweepers), **Monte Carlo** (1054 m, fourteen tight corners and no
+banking anywhere) and **La Sarthe** (1768 m, Le Mans' straights and chicanes).
+A title screen selects between them and shows the best lap for each.
 Guardrails exist behind a flag but are off by default; they clipped the racing
 line at corners. Handling is tuned to a grippy-arcade target: 165 km/h top speed,
 0–100 in 3.4 s, 100–0 in 24 m (1.6 g), and corners held at 98–127 km/h. All feel

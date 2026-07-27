@@ -195,8 +195,9 @@ func test_centreline_has_no_kinks() -> void:
 	var step_deg := 90.0 / float(TrackBuilder.ARC_STEPS)
 	var tool_script := load("res://tools/build_track.gd")
 	var layouts := {
-		"highland": tool_script.HIGHLAND,
-		"flats": tool_script.FLATS,
+		"ardennes": tool_script.ARDENNES,
+		"monte_carlo": tool_script.MONTE_CARLO,
+		"la_sarthe": tool_script.LA_SARTHE,
 		"custom": sample_layout().compile().segments,
 	}
 	for name in layouts:
@@ -565,7 +566,11 @@ func test_stroke_fill_is_orthogonal() -> void:
 ##    its centre, so the gate's 4 m depth cost another 2 m.
 func test_timing_gate_sits_on_the_start_line() -> void:
 	var tool_script := load("res://tools/build_track.gd")
-	for entry in [["highland", tool_script.HIGHLAND], ["flats", tool_script.FLATS]]:
+	for entry in [
+		["ardennes", tool_script.ARDENNES],
+		["monte_carlo", tool_script.MONTE_CARLO],
+		["la_sarthe", tool_script.LA_SARTHE],
+	]:
 		var name: String = entry[0]
 		var result := TrackBuilder.new().build(name, entry[1])
 		var gantry := _gantry_position(result.root)
@@ -594,7 +599,7 @@ func test_timing_gate_sits_on_the_start_line() -> void:
 ## or a mis-wrapped arc would bunch them without breaking anything visibly.
 func test_gates_stay_evenly_spaced() -> void:
 	var result := TrackBuilder.new().build(
-		"spacing", load("res://tools/build_track.gd").HIGHLAND)
+		"spacing", load("res://tools/build_track.gd").ARDENNES)
 	var gates: Array = result.root.get_node("Checkpoints").get_children()
 	check("gate count", gates.size(), TrackBuilder.CHECKPOINT_COUNT)
 	var lo := 1e9
@@ -1040,7 +1045,7 @@ func test_plateau_inside_one_straight_still_works() -> void:
 ## surface the wheels drop off, and it would not be visible in a screenshot.
 func test_corners_are_banked() -> void:
 	var builder := TrackBuilder.new()
-	builder.measure(load("res://tools/build_track.gd").HIGHLAND)
+	builder.measure(load("res://tools/build_track.gd").ARDENNES)
 	check("a bank angle per centreline point",
 		builder.bank.size(), builder.centreline.size())
 
@@ -1050,7 +1055,7 @@ func test_corners_are_banked() -> void:
 		peak = maxf(peak, absf(b))
 		if absf(b) <= TrackBuilder.BANK_EPSILON:
 			flat += 1
-	# Highland's biggest corners are size 3, so they set the peak.
+	# Ardennes' biggest corners are size 3, so they set the peak.
 	check_near("the widest corners reach their full bank",
 		rad_to_deg(peak), TrackBuilder.BANK_DEGREES[3], 0.01)
 	check_true("and nothing exceeds the ceiling",
@@ -1062,7 +1067,7 @@ func test_corners_are_banked() -> void:
 
 	# Which way each point is turning, read off the centreline itself rather than
 	# taken from the layout, so the test cannot inherit a sign error from the
-	# thing it is checking. Highland turns both ways, so this covers both.
+	# thing it is checking. Ardennes turns both ways, so this covers both.
 	var wrong_way := 0
 	var tested := 0
 	for i in range(1, builder.centreline.size() - 1):
@@ -1161,20 +1166,20 @@ func test_banked_collision_leans_into_the_corner() -> void:
 ## generated from the same profile either way, so the car would corner correctly
 ## on a road that had visibly reverted to being level.
 func test_shipped_tracks_keep_their_banked_meshes() -> void:
-	# Highland banks its sweepers and Flats is deliberately flat, so the two
-	# shipped circuits between them check that banking survives being packed
-	# *and* that asking for none actually gets none.
-	var want_banked := {"highland": true, "flats": false}
+	# Ardennes and La Sarthe bank their sweepers and Monte Carlo is deliberately
+	# flat — it is a street circuit — so the shipped circuits between them check
+	# that banking survives being packed *and* that asking for none gets none.
+	var want_banked := {"ardennes": true, "monte_carlo": false, "la_sarthe": true}
 	for info in GameState.TRACKS:
 		var inst: Node3D = load(info["scene"]).instantiate()
 		var visuals: Node3D = inst.get_node("RoadVisuals")
 		var banked := 0
 		var steepest := 0.0
 		for holder in visuals.get_children():
-			var spread := _road_height_spread(holder, visuals)
-			if spread > 0.5:
+			var slope := _road_cross_slope(holder, visuals)
+			if slope > BANKED_TILE_M:
 				banked += 1
-			steepest = maxf(steepest, spread)
+			steepest = maxf(steepest, slope)
 
 		if not want_banked.get(info["id"], false):
 			# A flat tile's road surface is level to within its own thickness.
@@ -1187,7 +1192,7 @@ func test_shipped_tracks_keep_their_banked_meshes() -> void:
 		check_true("track %s has banked tiles (%d of %d)"
 			% [info["id"], banked, visuals.get_child_count()], banked >= 4)
 		check_true("track %s banks by a visible amount (%.2f m across the road)"
-			% [info["id"], steepest], steepest > 0.5)
+			% [info["id"], steepest], steepest > BANKED_TILE_M)
 		inst.free()
 
 ## Banking is a choice, and "flat" has to be one of the answers.
@@ -1199,7 +1204,7 @@ func test_banking_can_be_turned_off() -> void:
 	var tool_script := load("res://tools/build_track.gd")
 
 	var flat := TrackBuilder.new()
-	flat.measure(tool_script.FLATS)
+	flat.measure(tool_script.MONTE_CARLO)
 	var worst := 0.0
 	for b in flat.bank:
 		worst = maxf(worst, absf(b))
@@ -1210,7 +1215,7 @@ func test_banking_can_be_turned_off() -> void:
 	# so a circuit can only lean where its author asked it to.
 	var implied := TrackBuilder.new()
 	var silent := []
-	for seg in tool_script.HIGHLAND:
+	for seg in tool_script.ARDENNES:
 		silent.append(seg.slice(0, 3) if seg[0] == "C" else seg)
 	implied.measure(silent)
 	var implied_worst := 0.0
@@ -1219,10 +1224,10 @@ func test_banking_can_be_turned_off() -> void:
 	check_near("a layout that never mentions banking gets none",
 		rad_to_deg(implied_worst), 0.0, 0.001)
 
-	# Highland is the same circuit with its angles written in, so the difference
+	# Ardennes is the same circuit with its angles written in, so the difference
 	# between the two is only ever what the layout asked for.
 	var asked := TrackBuilder.new()
-	asked.measure(tool_script.HIGHLAND)
+	asked.measure(tool_script.ARDENNES)
 	var asked_worst := 0.0
 	for b in asked.bank:
 		asked_worst = maxf(asked_worst, absf(b))
@@ -1287,12 +1292,40 @@ func test_corner_banking_is_authored_and_saved() -> void:
 ## with room to spare.
 const DECK_MAX_Y := 0.3
 
-func _road_height_spread(holder: Node3D, visuals: Node3D) -> float:
+## Thin bands of tile, in local units, that the surface is compared within. See
+## `_road_cross_slope` for why the comparison has to be banded at all.
+const SLICE := 0.025
+
+## A tile counts as banked above this much rise across the road, in metres. The
+## kit's road is 9.7 m wide between the points banking is carried to, so the
+## smallest angle on offer, 1.5 degrees, lifts one edge by 0.26 m and the largest
+## by 0.68. At 0.3 every angle a circuit can ask for registers, and a tile with no
+## banking on it at all — measured at 0.00 on Monte Carlo — cannot.
+const BANKED_TILE_M := 0.3
+
+## How much the painted road surface of one tile rises across its own width, in
+## metres. Reads the art's own "road" material rather than the whole tile, so the
+## answer is about the driving surface and not about scenery.
+##
+## **Across, not overall.** Comparing the whole tile's highest road vertex with
+## its lowest measures a ramp's *climb* — 2 m of it — as though it were banking,
+## which is a false pass waiting to happen on any circuit with a hill on it: it
+## fails a deliberately flat one and it would let a banked circuit that had
+## silently reverted to level pass on the strength of its ramps. So the surface is
+## compared only within thin bands along the tile, where a ramp is level and only
+## a lean shows up.
+##
+## The height cut is not decoration either. `roadStart` paints its gantry banner
+## with the same "road" material as the tarmac, 0.65 units up, and without this
+## the start tile reports a 4.5 m "bank" on every circuit ever built — which is
+## how this first passed on a track that has no banking at all. The deck sits at
+## 0.01, and the steepest banking moves it by under 0.1, so 0.3 separates them
+## with room to spare.
+func _road_cross_slope(holder: Node3D, visuals: Node3D) -> float:
 	var mi := _first_mesh_in(holder)
 	if mi == null or mi.mesh == null:
 		return 0.0
-	var lo := INF
-	var hi := -INF
+	var bands := {}
 	for s in mi.mesh.get_surface_count():
 		var mat: Material = mi.mesh.surface_get_material(s)
 		if mat == null or mat.resource_name != "road":
@@ -1302,9 +1335,14 @@ func _road_height_spread(holder: Node3D, visuals: Node3D) -> float:
 			if local.y > DECK_MAX_Y:
 				continue
 			var world: Vector3 = visuals.transform * (holder.transform * local)
-			lo = minf(lo, world.y)
-			hi = maxf(hi, world.y)
-	return 0.0 if lo == INF else hi - lo
+			var band := int(round(local.z / SLICE))
+			var seen: Vector2 = bands.get(band, Vector2(INF, -INF))
+			bands[band] = Vector2(minf(seen.x, world.y), maxf(seen.y, world.y))
+	var worst := 0.0
+	for band: int in bands:
+		var seen: Vector2 = bands[band]
+		worst = maxf(worst, seen.y - seen.x)
+	return worst
 
 ## Hills have to arrive gradually.
 ##
@@ -1315,7 +1353,7 @@ func _road_height_spread(holder: Node3D, visuals: Node3D) -> float:
 ## success is that the gradient never changes sharply anywhere on the lap.
 func test_slopes_are_eased() -> void:
 	var builder := TrackBuilder.new()
-	builder.measure(load("res://tools/build_track.gd").HIGHLAND)
+	builder.measure(load("res://tools/build_track.gd").ARDENNES)
 	var line := builder.centreline
 
 	var worst := 0.0
@@ -1341,8 +1379,9 @@ func test_slopes_are_eased() -> void:
 func test_hills_use_the_eased_ramp() -> void:
 	var tool_script := load("res://tools/build_track.gd")
 	var layouts := {
-		"highland": tool_script.HIGHLAND,
-		"flats": tool_script.FLATS,
+		"ardennes": tool_script.ARDENNES,
+		"monte_carlo": tool_script.MONTE_CARLO,
+		"la_sarthe": tool_script.LA_SARTHE,
 		"custom": _raised_sample_layout(),
 	}
 	for name in layouts:
@@ -1354,8 +1393,7 @@ func test_hills_use_the_eased_ramp() -> void:
 			elif seg[1] == "roadRampLongCurved":
 				eased += int(seg[2])
 		check("%s uses no wedge ramps" % name, wedges, 0)
-		if name != "flats":
-			check_true("%s ramps at all" % name, eased > 0)
+		check_true("%s ramps at all" % name, eased > 0)
 
 ## A player-painted circuit with a hill on it, as a segment list. The roomy
 ## rectangle, because its straights are long enough to actually afford ramps.
@@ -1458,6 +1496,10 @@ func test_ui_text_stays_inside_the_built_in_font() -> void:
 	for path in [
 		"res://scripts/ui/track_grid.gd", "res://scripts/ui/track_editor.gd",
 		"res://scripts/ui/title_screen.gd", "res://scripts/ui/hud.gd",
+		# Not a UI script, but the circuit names and blurbs it holds are drawn
+		# straight onto the title screen, and they are the strings most likely to
+		# want an accent.
+		"res://scripts/game/game_state.gd",
 		"res://tools/build_editor.gd", "res://tools/build_title.gd",
 		"res://tools/build_ui.gd",
 	]:
@@ -2421,7 +2463,7 @@ func test_layout_round_trip() -> void:
 	for info in GameState.all_tracks():
 		ids.append(info["id"])
 	check_true("offered on the menu", ids.has(layout.id))
-	check_true("shipped tracks still listed first", ids[0] == "highland")
+	check_true("shipped tracks still listed first", ids[0] == "ardennes")
 
 	TrackStore.delete(layout.id)
 	check_true("delete removes it", TrackStore.load_layout(layout.id) == null)
@@ -2718,8 +2760,8 @@ func _physics_process(_delta: float) -> bool:
 			# Records are keyed per track, so a time on one circuit must not
 			# show up as a record on another.
 			check_near("best persisted for this track",
-				GameState.best_lap_for("highland"), tracker.best_lap, 0.001)
-			check("other track unaffected", GameState.best_lap_for("flats"), 0.0)
+				GameState.best_lap_for("ardennes"), tracker.best_lap, 0.001)
+			check("other track unaffected", GameState.best_lap_for("monte_carlo"), 0.0)
 			gates[1].passed.emit(1)
 			gates[2].passed.emit(2)
 			gates[9].passed.emit(9)  # skip ahead - a cut

@@ -52,11 +52,11 @@ plane underneath is just grass now.
 ### 3. One builder serves the tool and the game
 
 `TrackBuilder` (`scripts/track/track_builder.gd`) is the only code that turns a
-layout into a circuit. `tools/build_track.gd` calls it to bake the two shipped
+layout into a circuit. `tools/build_track.gd` calls it to bake the three shipped
 tracks into committed `.tscn` files; `race.gd` calls it at runtime to build a
 player-made track, which has no scene file at all.
 
-So a custom circuit is not a lesser thing than Highland — same collision ribbon,
+So a custom circuit is not a lesser thing than Ardennes — same collision ribbon,
 same sixteen ordered gates, same spawn rule — and there is only one
 implementation to test.
 
@@ -186,13 +186,31 @@ Height falls out of the same mechanism: a piece's rise is
 only on which end is entered.
 
 The builder reports a **closure gap** per track, which must be `(0, 0)` with net
-±4 turns and height back to 0. That is how a hand-written loop is made to
-actually join up — adjust straight counts until it closes. `build_track.gd`
-exits non-zero if any track fails, so a layout that does not close cannot be
-shipped silently.
+±4 turns and height back to 0. `build_track.gd` exits non-zero if any track
+fails, so a layout that does not close cannot be shipped silently.
 
 Adding a shipped circuit is a layout constant plus an entry in
-`GameState.TRACKS`.
+`GameState.TRACKS`. Three things about writing that constant are not visible
+from the grammar:
+
+- **Solve the outline, not the straight counts.** A leg of the rectilinear
+  outline spans `straight_cells + N_in + N_out - 1` tile units, where N is the
+  size of the corner at either end. Choose the outline in whole units and the
+  straight counts fall out of it, with closure as two sums — one per axis —
+  rather than as trial and error.
+- **Closure does not mean the road misses itself.** A layout can close perfectly
+  with one straight driven over another; nothing in the builder objects, and it
+  is not visible in the closure line. Check the outline for legs that cross or
+  run within a tile width of each other. Some corner *orders* have no
+  non-crossing solution at any leg length — five same-handed corners in a row
+  make a peninsula the next straight has to cross back over, which is what
+  reordered Monte Carlo into a pair of staircases.
+- **Climb one level and come back down inside the same straight.**
+  `roadStraightBridge` carries 0.5 tile units of structure below its deck, so at
+  level 1 it stands on the ground and at level 2 it floats 3.5 m above it. The
+  bridge *corners* are deck-only pieces with no structure at all. Sustained
+  elevated sections through corners are an editor feature; the shipped circuits
+  keep their corners on the ground.
 
 ### Banked corners
 
@@ -213,9 +231,11 @@ one with enough road either side to ease the roll in and out of, while a hairpin
 banked hard is a skate bowl whose tilt arrives in a car length — but they are a
 suggestion in the editor's cycle order, not a value anything applies on its own.
 
-The two shipped circuits show both answers, and both say so out loud:
-**Highland** writes 2.5° on its medium corners and 4° on its sweepers, **Flats**
-writes `0.0` on every corner and does not lean at all.
+The shipped circuits show both answers, and all three say so out loud:
+**Ardennes** and **La Sarthe** write 2.5° on their medium corners and 4° on their
+sweepers, **Monte Carlo** writes `0.0` on every one of its fourteen and does not
+lean anywhere. That is the honest answer for a street circuit, which is why it is
+the one that carries it.
 
 The profile is built by giving each corner its full angle across its own arc and
 easing to nothing over `BANK_TRANSITION` (1.5 units, 21 m) at each end, then
@@ -236,7 +256,7 @@ Two things then consume the profile, and they must not disagree:
   same cross-section function. The art is kept exactly: same surfaces, same
   materials, same kerbs and markings. Tiles on flat road keep sharing one
   imported mesh; only corners and the road either side pay for a unique one
-  (19 of 46 holders on Highland).
+  (18 of 60 holders on Ardennes, and none at all on Monte Carlo).
 
 > **The banked tile replaces the glb instance rather than overriding the mesh
 > inside it.** Writing a property onto a node *inside* an instanced sub-scene is
@@ -558,7 +578,7 @@ than fail to parse.
 `GameState.all_tracks()` lists the shipped circuits followed by whatever is on
 disk. Built-ins come first so their indices never move when a custom track is
 added or deleted, and custom ids are namespaced `user_` so nobody can name a
-circuit "highland" and inherit its lap record.
+circuit "ardennes" and inherit its lap record.
 
 ## The interface
 

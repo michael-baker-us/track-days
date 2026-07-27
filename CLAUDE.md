@@ -50,7 +50,7 @@ regenerated rather than hand-edited (see `tools/README.md`). Order matters:
 
 ```bash
 "$GODOT" --headless --path . --script tools/build_theme.gd   # ui_theme.tres
-"$GODOT" --headless --path . --script tools/build_track.gd   # both circuits
+"$GODOT" --headless --path . --script tools/build_track.gd   # all three circuits
 "$GODOT" --headless --path . --script tools/build_ui.gd      # hud.tscn
 "$GODOT" --headless --path . --script tools/build_title.gd   # title.tscn
 "$GODOT" --headless --path . --script tools/build_editor.gd  # track_editor.tscn
