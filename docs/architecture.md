@@ -768,6 +768,42 @@ it. Only the live window is retargeted.
 > covers the same fraction of the short edge either way. That is what lets one
 > set of touch-pad sizes serve both orientations.
 
+### `size_changed` is not enough on a phone
+
+A browser fires its resize on rotation **before** it has finished reshaping the
+canvas, so a handler reading `window.size` at signal time gets the size the
+window is about to stop being. Every orientation decision in the game is made
+from that one read — the canvas rule, the camera's aspect, the HUD's layout, the
+editor's — and **none of them is ever revisited**, so a single stale read latches:
+landscape gets drawn to the portrait rule, turning back applies the landscape
+rule to a portrait screen, and it stays one rotation behind forever because there
+is no event left to correct it. First load is always right, which is what makes
+it look like rotation specifically is broken.
+
+`ViewportScaling.SizeWatch` is a `Node` parented to the **window**, not to a
+scene, so it outlives every scene change the way the signal connection does. It
+compares `window.size` each frame and re-emits `size_changed` when it differs
+from what it last saw. Polling works because the size is only wrong for a moment;
+whatever the browser said at signal time, `window.size` is right a frame or two
+later. The same tick also covers a resize that reports no signal at all.
+
+It **re-emits the signal** rather than calling `apply` itself, deliberately: the
+signal is the one wire every listener is already on, and what the watch observed
+is exactly what the signal means. Any other route would leave the camera and the
+editor still holding the stale value while only the canvas recovered.
+
+> Not a canvas-policy problem, which is the other thing that produces these
+> symptoms: `export_presets.cfg` has `html/canvas_resize_policy=2` (adjust to
+> whole window), so the canvas does follow the browser.
+
+> Testing this needs the *state* a phone ends up in, not a desktop resize — a
+> correctly-sized window carrying the previous orientation's rule, with nothing
+> further coming. Only the aspect can be staged wrong: writing
+> `content_scale_size` re-fires `size_changed` on the spot and the handler puts it
+> straight back. And the assertion has to **poll** rather than pick a frame, because
+> physics runs at 120 Hz while the watch runs on idle frames, so consecutive
+> frames in `run_tests.gd` can share one idle frame or none.
+
 ### What content scaling does *not* fix
 
 Swapping the canvas rule is only half of a rotation. Three things sit outside it,

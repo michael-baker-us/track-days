@@ -71,6 +71,45 @@ static func attach(window: Window) -> void:
 		return
 	window.set_meta(ATTACHED_META, true)
 	window.size_changed.connect(_on_size_changed.bind(window))
+	# Parented to the window, not to the scene, so it outlives every scene change
+	# the way the connection above does. Deferred because `attach` is called from
+	# a scene's `_ready`, and the tree will not take a new child mid-build.
+	var watch := SizeWatch.new()
+	watch.name = "ViewportScalingWatch"
+	watch.window = window
+	watch.seen = window.size
+	window.add_child.call_deferred(watch)
 
 static func _on_size_changed(window: Window) -> void:
 	apply(window)
+
+## Re-checks the window's size every frame and announces a change the signal did
+## not usefully report.
+##
+## `size_changed` is not enough on a phone. A browser fires its resize on
+## rotation *before* it has finished reshaping the canvas, so the handler reads
+## the size the window is about to stop being. Every orientation decision in the
+## game is made from that one read — the canvas rule here, the camera's aspect,
+## the HUD's layout, the editor's — and none of them is ever revisited, so a
+## single stale read latches: landscape gets drawn to the portrait rule, and
+## turning back applies the landscape rule to a portrait screen. It is
+## permanently one rotation behind and there is no event left to fix it.
+##
+## Polling catches it because the size is only wrong for a moment: whatever the
+## browser said at signal time, `window.size` is right a frame or two later. The
+## same tick also covers a resize that reports no signal at all.
+##
+## It re-emits `size_changed` rather than calling [method apply] itself. The
+## signal is the one wire every listener is already on, and what the watch has
+## observed is exactly what the signal means — the window's size has changed. Any
+## other route would leave the camera and the editor still reading the stale
+## value while only the canvas recovered.
+class SizeWatch extends Node:
+	var window: Window
+	var seen := Vector2i.ZERO
+
+	func _process(_delta: float) -> void:
+		if window == null or not is_instance_valid(window) or window.size == seen:
+			return
+		seen = window.size
+		window.size_changed.emit()

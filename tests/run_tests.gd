@@ -31,6 +31,9 @@ var view_zoom_before := Vector2.ZERO
 ## Every editor control and its place in its row, taken while the editor is still
 ## in its landscape arrangement.
 var editor_layout_before := {}
+## Frames the stale-rotation recovery was staged on and noticed on.
+var stale_staged_at := 0
+var stale_fixed_at := 0
 
 func _initialize() -> void:
 	# race.tscn instances whichever track GameState has selected, so the suite
@@ -1729,6 +1732,55 @@ func test_more_panel_holds_the_rest() -> void:
 	more.pressed.emit()
 	check_true("and MORE shuts the panel again", not side.visible)
 
+## The state a rotating phone actually leaves behind, which the desktop resize
+## tests above never produce: the window has finished turning, but the rule that
+## was applied is the *previous* orientation's, because the browser fired its
+## resize before it had reshaped the canvas and the handler read a size the
+## window was about to stop being.
+##
+## Nothing revisits that read. Every orientation decision in the game — the canvas
+## rule, the camera's aspect, the HUD, the editor's layout — hangs off it, so one
+## stale read latches: landscape is drawn to the portrait rule, and turning back
+## applies the landscape rule to a portrait screen. There is no event left that
+## would fix it, which is why it never came right.
+##
+## Staged by putting the previous orientation's rule on a correctly-sized window
+## and winding the watch back to the size the signal *would* have reported.
+## Nothing rotates after that: recovering with no further event is the whole
+## point, so the recovery has to come from the watch and nowhere else.
+##
+## Only the aspect is corrupted. Writing `content_scale_size` re-fires
+## `size_changed` on the spot and the handler puts it straight back, so it cannot
+## be left wrong for a test to find — the aspect is the half that stays stale,
+## and it is the half that squashes a landscape screen into a portrait canvas.
+func stage_a_stale_rotation() -> void:
+	var watch: Node = root.get_node_or_null("ViewportScalingWatch")
+	check_true("the window is watched for sizes the signal missed", watch != null)
+	if watch == null:
+		return
+	root.size = Vector2i(1280, 720)
+	root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP_WIDTH
+	watch.seen = Vector2i(720, 1280)
+	stale_staged_at = frame
+
+## Polled rather than checked on a fixed frame: physics runs at 120 Hz and the
+## watch runs on idle frames, so consecutive test frames can share one — or none.
+func poll_stale_rotation() -> void:
+	if stale_staged_at == 0 or stale_fixed_at > 0:
+		return
+	if root.content_scale_aspect == Window.CONTENT_SCALE_ASPECT_KEEP_HEIGHT:
+		stale_fixed_at = frame
+
+func test_a_stale_rotation_corrects_itself() -> void:
+	var camera: Camera3D = _find_first("ChaseCamera", "Camera3D")
+	check_true("a rule applied from a stale size corrects itself with no further"
+		+ " rotation (after %d frames)" % (stale_fixed_at - stale_staged_at),
+		stale_fixed_at > 0)
+	# The correction has to reach every listener, not just the canvas. The camera
+	# is the one that made the game unplayable, and it hangs off the same signal.
+	check_true("and the camera catches up with it",
+		camera == null or camera.keep_aspect == Camera3D.KEEP_HEIGHT)
+
 func _editor_grid() -> TrackGrid:
 	return staged_editor.get_node_or_null("Split/Stack/Grid") if staged_editor != null else null
 
@@ -2511,6 +2563,18 @@ func _physics_process(_delta: float) -> bool:
 		if staged_editor != null:
 			staged_editor.queue_free()
 			staged_editor = null
+		return false
+
+	if frame == 17:
+		stage_a_stale_rotation()
+		return false
+
+	# Watched from here on rather than on one chosen frame, because the watch runs
+	# on idle frames and this runner counts physics ones.
+	poll_stale_rotation()
+
+	if frame == 24:
+		test_a_stale_rotation_corrects_itself()
 		return false
 
 	if frame < 5 or frame % 5 != 0:
