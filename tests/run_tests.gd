@@ -34,6 +34,8 @@ var editor_layout_before := {}
 ## Frames the stale-rotation recovery was staged on and noticed on.
 var stale_staged_at := 0
 var stale_fixed_at := 0
+## Lap clock reading taken just before pausing.
+var paused_lap_time := 0.0
 
 func _initialize() -> void:
 	# race.tscn instances whichever track GameState has selected, so the suite
@@ -2012,6 +2014,107 @@ func _find_first(node_name: String, type: String) -> Node:
 	var found := root.find_children(node_name, type, true, false)
 	return found[0] if not found.is_empty() else null
 
+## Leaving a race used to be instant, on `ui_cancel`. That is a deliberate reach
+## on a keyboard, a thumb-rest on a pad, and nothing at all on a phone — which
+## had no way out short of reloading the page. All three routes now arrive at the
+## same menu and leaving is the second press.
+func test_pause_is_reachable_from_every_input() -> void:
+	check_true("there is a pause action at all", InputMap.has_action("pause"))
+	if not InputMap.has_action("pause"):
+		return
+	var keys := PackedInt32Array()
+	var buttons := PackedInt32Array()
+	for event in InputMap.action_get_events("pause"):
+		if event is InputEventKey:
+			keys.append((event as InputEventKey).physical_keycode)
+		elif event is InputEventJoypadButton:
+			buttons.append((event as InputEventJoypadButton).button_index)
+	check_true("escape opens it", keys.has(KEY_ESCAPE))
+	check_true("and so does the pad's Start", buttons.has(JOY_BUTTON_START))
+
+	var menu: Control = _find_first("PauseMenu", "Control")
+	check_true("the race carries a pause menu", menu != null)
+	if menu == null:
+		return
+	# The menu pauses the tree, so it cannot itself be paused or nothing could
+	# ever dismiss it.
+	check("the menu keeps running while the tree does not",
+		menu.process_mode, Node.PROCESS_MODE_ALWAYS)
+	var button: Button = _find_first("PauseButton", "Button")
+	check_true("and a touch route in exists", button != null)
+	if button == null:
+		return
+	# Escape and Start are physical; only touch needs something on screen. Same
+	# rule as the driving pads.
+	var was_touch := button.visible
+	check("shown on exactly the devices the driving pads are",
+		was_touch, DisplayServer.is_touchscreen_available())
+
+## Every joypad binding has to be device `-1` (all devices). `InputMap` matches an
+## event only when the binding's device is `-1` or an exact index, so `device 0`
+## covers just the first pad the OS enumerates — and a pad that sleeps and
+## reconnects can come back on another one. Recorded in the architecture notes
+## because `project.godot` cannot hold a comment; this is what actually enforces
+## it, including for actions added later.
+func test_joypad_bindings_take_any_device() -> void:
+	var wrong := PackedStringArray()
+	for action in InputMap.get_actions():
+		for event in InputMap.action_get_events(action):
+			var device := -2
+			if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+				device = event.device
+			if device >= 0:
+				wrong.append("%s (device %d)" % [action, device])
+	check("every joypad binding accepts any device (%s)" % ", ".join(wrong),
+		wrong.size(), 0)
+
+## The reason the whole tree pauses rather than just the car: `lap_tracker`
+## accumulates in `_physics_process`, so a menu that left it running would
+## quietly add the time spent reading it to the lap being driven.
+func stage_pause() -> void:
+	var menu: Control = _find_first("PauseMenu", "Control")
+	if menu == null:
+		return
+	paused_lap_time = tracker.lap_time
+	# Through the real input path, not by calling the handler: Escape fires
+	# `pause` *and* `ui_cancel` from one event, and the bug being guarded is a
+	# second listener elsewhere turning one press into two toggles that cancel
+	# out. Only a real dispatch can catch that.
+	_press_action_key(KEY_ESCAPE)
+
+func test_pausing_stops_the_race() -> void:
+	var menu: Control = _find_first("PauseMenu", "Control")
+	if menu == null:
+		return
+	check_true("one press of escape opens the menu", menu.visible)
+	check_true("and pauses the tree", paused)
+	check_near("so the lap clock stops with it",
+		tracker.lap_time, paused_lap_time, 0.0001)
+
+	# The same key shuts it again, so the way in is the way out.
+	_press_action_key(KEY_ESCAPE)
+	check_true("pressing it again closes the menu", not menu.visible)
+	check_true("and unpauses", not paused)
+
+	# Leaving has to unpause first: `paused` belongs to the tree, not the scene,
+	# so quitting while set carries the freeze into the title screen.
+	menu._set_paused(true)
+	check_true("staged paused again", paused)
+	menu._resume()
+	check_true("resume always leaves the tree running", not paused)
+
+func _press_action_key(keycode: Key) -> void:
+	var down := InputEventKey.new()
+	down.physical_keycode = keycode
+	down.pressed = true
+	Input.parse_input_event(down)
+	Input.flush_buffered_events()
+	var up := InputEventKey.new()
+	up.physical_keycode = keycode
+	up.pressed = false
+	Input.parse_input_event(up)
+	Input.flush_buffered_events()
+
 func _find_touch_controls() -> Control:
 	var found := root.find_children("TouchControls", "Control", true, false)
 	return found[0] if not found.is_empty() else null
@@ -2572,6 +2675,18 @@ func _physics_process(_delta: float) -> bool:
 	# Watched from here on rather than on one chosen frame, because the watch runs
 	# on idle frames and this runner counts physics ones.
 	poll_stale_rotation()
+
+	if frame == 21:
+		test_pause_is_reachable_from_every_input()
+		test_joypad_bindings_take_any_device()
+		stage_pause()
+		return false
+
+	if frame == 22:
+		# A frame after the press, so a paused physics frame has been through and
+		# the lap clock has had its chance to move.
+		test_pausing_stops_the_race()
+		return false
 
 	if frame == 24:
 		test_a_stale_rotation_corrects_itself()

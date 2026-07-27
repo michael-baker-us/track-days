@@ -139,7 +139,36 @@ that sleeps and reconnects can come back on a different index, and there is no
 reason a one-player game should care which index it got.
 
 Neither fact can be recorded in `project.godot` itself — Godot rewrites that file
-on its own schedule and deletes `;` comments.
+on its own schedule and deletes `;` comments. Both are asserted by the suite
+instead: `test_joypad_bindings_take_any_device` walks the whole `InputMap`, so an
+action added later cannot quietly reintroduce a concrete device index.
+
+### Leaving a race
+
+`ui_cancel` used to change scene the instant it was pressed. That is fine on a
+keyboard, where Escape is a deliberate reach; it is wrong on a pad, where B sits
+under the thumb, and it did not exist at all on a phone, which had **no way out
+of a race** short of reloading the page. One mis-press threw away the lap being
+driven.
+
+All three routes now arrive at the same pause menu and leaving is the second
+press. The way *in* differs per device because the devices differ — `pause`
+(Escape, and the pad's Start), plus an on-screen button shown on the same rule as
+the driving pads, since the other two routes are physical — but nothing after
+that does.
+
+`pause` and `ui_cancel` are both read in `pause_menu.gd`, in one handler, in that
+order. Escape fires **both actions from a single event**, so splitting them
+across two handlers toggles twice and leaves the menu exactly as it was found.
+
+The whole tree pauses rather than just the car: `lap_tracker` accumulates in
+`_physics_process`, so a menu that did not pause would quietly add the time spent
+reading it to the lap. That makes two things load-bearing — the menu is
+`PROCESS_MODE_ALWAYS`, because a paused menu cannot unpause itself, and leaving
+unpauses first, because `paused` belongs to the tree rather than the scene and
+would otherwise carry the freeze into the title screen. Pausing also releases the
+touch pads: a synthesised press is held until something sends the matching
+release, and the pads stop getting events the moment the tree stops.
 
 ## The track builder
 

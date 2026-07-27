@@ -7,8 +7,6 @@ extends Node3D
 ## scene serves every circuit — including the ones the player built, which have
 ## no scene file at all and are constructed on the spot from their layout.
 
-const TITLE_SCENE := "res://scenes/title.tscn"
-
 @onready var _car: VehicleBody3D = $Car
 @onready var _tracker: Node = $LapTracker
 
@@ -38,10 +36,10 @@ func _make_track(track_info: Dictionary) -> Node3D:
 	var compiled := layout.compile()
 	return TrackBuilder.new().build(layout.id, compiled.segments).root
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel"):
-		var back: String = GameState.return_scene
-		get_tree().change_scene_to_file(back if not back.is_empty() else TITLE_SCENE)
+## Leaving a race is `scripts/ui/pause_menu.gd`'s job, not this scene's. It used
+## to happen here, the instant Escape was pressed — fine on a keyboard, wrong on
+## a pad where B sits under the thumb, and impossible on a phone, which had no
+## way out at all. One mis-press threw away the lap being driven.
 
 func _place_car(pos: Vector3, yaw: float) -> void:
 	_car.global_transform = Transform3D(Basis(Vector3.UP, yaw), pos)
