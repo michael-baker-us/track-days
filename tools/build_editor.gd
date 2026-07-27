@@ -41,12 +41,28 @@ func _initialize() -> void:
 	split.add_theme_constant_override("separation", 0)
 	root_ctrl.add_child(split)
 
+	# The canvas and the two bars that only appear on a phone. In landscape the
+	# bars are hidden and this is just the canvas, exactly as it always was; in
+	# portrait `track_editor.gd` moves the frequent controls into them and floats
+	# the panel over the top. See `_apply_layout` there for why the controls move
+	# rather than being built twice.
+	var stack := VBoxContainer.new()
+	stack.name = "Stack"
+	stack.add_theme_constant_override("separation", 0)
+	stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	split.add_child(stack)
+
+	stack.add_child(_bar("TopBar", "Tools", _button("MoreButton", "MORE")))
+
 	var grid := Control.new()
 	grid.name = "Grid"
 	grid.set_script(load("res://scripts/ui/track_grid.gd"))
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	split.add_child(grid)
+	stack.add_child(grid)
+
+	stack.add_child(_bar("BottomBar", "PhoneActions", null))
 
 	# The panel is a surface in its own right, not a strip of controls floating
 	# on the canvas: one border down its left edge separates the thing being
@@ -79,10 +95,16 @@ func _initialize() -> void:
 	rows.add_child(picker)
 
 	# Drawing and shaping are peers, so the switch between them is a visible
-	# toggle rather than a modifier key nobody discovers.
-	var draw_button := _button("DrawButton", "Draw road  (D)")
+	# toggle rather than a modifier key nobody discovers. Erase sits beside Draw
+	# for the same reason and one more: a touchscreen has no second button, so
+	# without it erasing a stroke and removing a corner have no route in at all.
+	# Fit is here rather than only on F because a phone has no F.
+	var draw_button := _button("DrawButton", "Draw")
 	draw_button.toggle_mode = true
-	rows.add_child(draw_button)
+	var erase_button := _button("EraseButton", "Erase")
+	erase_button.toggle_mode = true
+	rows.add_child(_row("ToolRow", [draw_button, erase_button,
+		_button("FitButton", "Fit")]))
 
 	# What to do next. Deliberately the most prominent thing after the heading -
 	# it is the only answer to "the editor is open, now what". In its own framed
@@ -118,7 +140,7 @@ func _initialize() -> void:
 	keys.theme_type_variation = UiTheme.V_FINE
 	keys.text = (
 		"wheel or pinch zooms \u00b7 middle-drag, two-finger drag or cmd-drag pans"
-		+ " \u00b7 F refits \u00b7 shift-drag draws"
+		+ " \u00b7 F refits \u00b7 D draws \u00b7 E erases \u00b7 shift-drag draws"
 	)
 	rows.add_child(keys)
 
@@ -172,18 +194,24 @@ func _legend() -> PanelContainer:
 	# Each mode's own rows are indented under it, so the two halves cannot be
 	# read as one list.
 	for row: Array in [
-		["mode", "DRAW ON"],
-		["item", "drag lays road \u00b7 right-drag erases"],
+		["mode", "DRAW"],
+		["item", "drag lays road"],
 		["gap", ""],
-		["mode", "DRAW OFF"],
+		["mode", "ERASE"],
+		["item", "drag rubs road out"],
+		["item", "tap a green dot \u2014 remove that corner"],
+		["gap", ""],
+		["mode", "NEITHER \u2014 SHAPING"],
 		["item", "drag a green dot \u2014 move a corner"],
 		["item", "drag the road \u2014 slide a straight"],
-		["item", "double-click it \u2014 add a bend, then drag that bend in or out"],
-		["item", "right-click a dot \u2014 remove a corner"],
+		["item", "double-tap it \u2014 add a bend, then drag that bend in or out"],
 		["item", "numbered badge \u2014 corner radius"],
 		["item", "badge inside the loop \u2014 raise it; raise a corner too to hold"
 			+ " the height right through it"],
 		["item", "drag the flag \u2014 move the start"],
+		["gap", ""],
+		["mode", "THE VIEW"],
+		["item", "pinch zooms \u00b7 two fingers drag the canvas \u00b7 Fit reframes"],
 	]:
 		legend.add_child(_legend_row(row[0], row[1]))
 	return flyout
@@ -224,10 +252,39 @@ func _actions() -> VBoxContainer:
 ## under one parent get silently renumbered by Godot and the @onready paths in
 ## track_editor.gd would then point at whichever one it renamed.
 func _pair(node_name: String, left: Button, right: Button) -> HBoxContainer:
+	return _row(node_name, [left, right])
+
+## One of the two phone bars. Hidden as built: landscape is the default the
+## committed scene has to load as, and the suite measures it.
+##
+## `Slots` is the column the moved controls are dropped into and `row` the button
+## row inside it, so the bar's own contents (`MORE`, nothing) keep their place
+## whatever arrives. Both are named, because the reflow addresses them by path.
+func _bar(node_name: String, row_name: String, resident: Button) -> PanelContainer:
+	var bar := PanelContainer.new()
+	bar.name = node_name
+	bar.theme_type_variation = UiTheme.V_BAR
+	bar.visible = false
+
+	var slots := VBoxContainer.new()
+	slots.name = "Slots"
+	slots.add_theme_constant_override("separation", 6)
+	bar.add_child(slots)
+
+	var row := HBoxContainer.new()
+	row.name = row_name
+	row.add_theme_constant_override("separation", 6)
+	if resident != null:
+		resident.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(resident)
+	slots.add_child(row)
+	return bar
+
+func _row(node_name: String, buttons: Array) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.name = node_name
 	row.add_theme_constant_override("separation", 6)
-	for b in [left, right]:
+	for b: Button in buttons:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(b)
 	return row

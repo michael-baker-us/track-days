@@ -25,6 +25,12 @@ var sustained_track: Node3D
 var staged_title: Control
 var staged_track_ids: Array[String] = []
 var staged_editor: Control
+## Editor canvas framing recorded before a resize, to compare with after it.
+var view_centre_before := Vector2.ZERO
+var view_zoom_before := Vector2.ZERO
+## Every editor control and its place in its row, taken while the editor is still
+## in its landscape arrangement.
+var editor_layout_before := {}
 
 func _initialize() -> void:
 	# race.tscn instances whichever track GameState has selected, so the suite
@@ -1536,6 +1542,424 @@ func test_orientation_picks_a_scaling_rule() -> void:
 	check("the project default is still the landscape rule",
 		ProjectSettings.get_setting("display/window/stretch/aspect", ""), "keep_height")
 
+## The rule above is pure and was tested as such, which is exactly why the three
+## things that actually broke on a rotating phone were all missed: each is a live
+## rewiring that only happens when a real window changes shape.
+##
+## The camera one made the game unplayable held upright. `Camera3D` holds the
+## *vertical* FOV by default, so a 9:16 viewport keeps the whole height and
+## throws most of the width away — the car filled the screen and the road ahead
+## was gone. Content scaling does not touch the 3D projection, so nothing the UI
+## does fixes it.
+## Opened on a circuit of its own rather than the starter rectangle. The erase
+## test removes a corner, and a rectangle has exactly the four a circuit is not
+## allowed to go below — on that layout the edit under test is correctly refused,
+## so the test would fail while the feature worked.
+func stage_rotation() -> void:
+	var layout := sample_layout()
+	layout.display_name = "Touch Test"
+	TrackStore.save(layout)
+	staged_track_ids.append(layout.id)
+	GameState.editing_id = layout.id
+	staged_editor = load("res://scenes/editor/track_editor.tscn").instantiate()
+	root.add_child(staged_editor)
+
+func test_rotation_rewires_the_view() -> void:
+	var camera: Camera3D = _find_first("ChaseCamera", "Camera3D")
+	var banner: Control = _find_first("Banner", "Label")
+	var lap_panel: Control = _find_first("LapPanel", "PanelContainer")
+	var grid := _editor_grid()
+	check_true("the race scene has a camera, a banner and a lap panel",
+		camera != null and banner != null and lap_panel != null)
+	check_true("an editor is staged to rotate", grid != null)
+	if camera == null or banner == null or lap_panel == null or grid == null:
+		return
+
+	check("rotating retargets the canvas",
+		root.content_scale_size, ViewportScaling.PORTRAIT)
+	check("and the camera keeps the width instead of the height",
+		camera.keep_aspect, Camera3D.KEEP_WIDTH)
+
+	# 214 units of lap panel and ~470 of banner do not fit across 720, so on a
+	# phone the two were drawn on top of each other. They share the top of the
+	# screen only while the canvas is wide.
+	var overlap := banner.get_global_rect().intersection(lap_panel.get_global_rect())
+	check_true("the banner clears the lap panel (%s vs %s)" % [
+		banner.get_global_rect(), lap_panel.get_global_rect()],
+		overlap.size.x <= 0.0 or overlap.size.y <= 0.0)
+
+	# The canvas more than halves in width across a rotation. Its pan and zoom
+	# were computed against the old size and nothing recomputed them, so the
+	# circuit simply left the screen — and the F key that refits it is not
+	# something a phone can press.
+	var shown := _circuit_screen_rect(grid)
+	check_true("the circuit is still on the canvas after rotating (%s in %s)" % [
+		shown, grid.size],
+		Rect2(Vector2.ZERO, grid.size).encloses(shown))
+
+## A resize that is *not* a rotation must keep what the player was looking at
+## where it was: their pan and zoom are deliberate, and refitting on every
+## dragged window edge would throw them away. Staged a frame ahead of its
+## assertion, because containers re-lay-out on a later frame than the resize.
+func stage_a_taller_window() -> void:
+	var grid := _editor_grid()
+	if grid == null:
+		return
+	view_centre_before = grid.screen_to_cell_f(grid.size * 0.5)
+	view_zoom_before = grid.cell_to_screen(Vector2.ONE) - grid.cell_to_screen(Vector2.ZERO)
+	# Still portrait, so this is a resize and not a rotation.
+	root.size = Vector2i(720, 1600)
+
+func test_a_plain_resize_keeps_the_view() -> void:
+	var grid := _editor_grid()
+	if grid == null:
+		return
+	check_true("a resize that is not a rotation holds the zoom",
+		(grid.cell_to_screen(Vector2.ONE) - grid.cell_to_screen(Vector2.ZERO))
+			.is_equal_approx(view_zoom_before))
+	check_true("and holds the middle of the view (%s vs %s)" % [
+		grid.screen_to_cell_f(grid.size * 0.5), view_centre_before],
+		grid.screen_to_cell_f(grid.size * 0.5).distance_to(view_centre_before) < 0.01)
+
+## The editor is one set of controls in two arrangements, and the controls
+## *move* between them rather than being built twice — so the way this breaks is
+## that a trip through portrait and back leaves the sidebar subtly rearranged,
+## which nothing else would notice until someone opened the editor on a desktop
+## after rotating a phone.
+##
+## Checked as a round trip against a snapshot taken before anything moved, so it
+## fails on a control that comes back to the wrong parent *or* the wrong place in
+## its row.
+func snapshot_editor_layout() -> Dictionary:
+	var out := {}
+	if staged_editor == null:
+		return out
+	# `owned` — a LineEdit and an OptionButton carry internal children whose index
+	# cannot even be asked for, and they are not part of this layout anyway.
+	for node in staged_editor.find_children("*", "Control", true, true):
+		var control := node as Control
+		out[String(staged_editor.get_path_to(control))] = control.get_index()
+	return out
+
+func test_portrait_reflow_is_reversible() -> void:
+	check_true("a layout was snapshotted before rotating",
+		not editor_layout_before.is_empty())
+	var after := snapshot_editor_layout()
+	var moved := PackedStringArray()
+	for path: String in editor_layout_before:
+		if not after.has(path):
+			moved.append(path + " (gone)")
+		elif after[path] != editor_layout_before[path]:
+			moved.append("%s (%d, was %d)" % [
+				path, after[path], editor_layout_before[path]])
+	check("every control is back where it started (%s)" % ", ".join(moved),
+		moved.size(), 0)
+	check("and nothing new appeared", after.size(), editor_layout_before.size())
+
+## What the phone layout has to deliver: the canvas gets the screen's width back,
+## and nothing becomes unreachable in the process. The sidebar was 364 units wide
+## against a 720-unit portrait canvas, so the circuit was being edited in less
+## room than the controls editing it took up.
+func test_portrait_gives_the_canvas_the_screen() -> void:
+	var grid := _editor_grid()
+	var editor: Control = staged_editor
+	if grid == null or editor == null:
+		return
+	var canvas: Vector2 = root.get_visible_rect().size
+	check_true("the canvas spans the full width on a phone (%.0f of %.0f)" % [
+		grid.size.x, canvas.x],
+		grid.size.x >= canvas.x - 1.0)
+	check_true("and still has most of the height (%.0f of %.0f)" % [
+		grid.size.y, canvas.y],
+		grid.size.y > canvas.y * 0.6)
+
+	var side: Control = editor.get_node("Side")
+	check_true("the panel is floated off the layout, not docked beside it",
+		side != null)
+	if side == null:
+		return
+	check_true("and starts closed, so the canvas is not buried on arrival",
+		not side.visible)
+
+	# Opened here and inspected a frame later, once the panel has actually been
+	# laid out at its floated width. See [method test_more_panel_holds_the_rest].
+	var more: Button = editor.get_node("Split/Stack/TopBar/Slots/Tools/MoreButton")
+	more.pressed.emit()
+	check_true("MORE opens the panel", side.visible)
+
+	# The bars carry what is wanted while drawing, and Test drive is the payoff
+	# the whole screen exists for — none of it may need MORE to reach.
+	for path in [
+		"Split/Stack/TopBar/Slots/Tools/DrawButton",
+		"Split/Stack/TopBar/Slots/Tools/EraseButton",
+		"Split/Stack/TopBar/Slots/Tools/FitButton",
+		"Split/Stack/TopBar/Slots/Tools/UndoButton",
+		"Split/Stack/BottomBar/Slots/GuideCard",
+		"Split/Stack/BottomBar/Slots/PhoneActions/TestButton",
+		"Split/Stack/BottomBar/Slots/PhoneActions/SaveButton",
+		"Split/Stack/BottomBar/Slots/PhoneActions/BackButton",
+	]:
+		var control := editor.get_node_or_null(path) as Control
+		check_true("%s is on a bar, not behind MORE" % path.get_file(),
+			control != null and control.is_visible_in_tree())
+
+## What MORE has to be worth opening: everything the bars did not take, still
+## there and still reachable. And the panel has to clear MORE itself — a panel
+## covering its own switch is one that cannot be shut again, which is what the
+## first version did.
+func test_more_panel_holds_the_rest() -> void:
+	var editor: Control = staged_editor
+	if editor == null:
+		return
+	var side: Control = editor.get_node_or_null("Side")
+	var more: Button = editor.get_node_or_null(
+		"Split/Stack/TopBar/Slots/Tools/MoreButton")
+	if side == null or more == null:
+		return
+	check_true("the panel does not cover MORE (%s vs %s)" % [
+		side.get_global_rect(), more.get_global_rect()],
+		not side.get_global_rect().intersects(more.get_global_rect()))
+	for node_name in ["NameEdit", "Picker", "DeleteButton", "LegendToggle",
+			"ReadoutCard"]:
+		var found := editor.find_children(node_name, "Control", true, false)
+		var control: Control = found[0] if not found.is_empty() else null
+		check_true("%s is reachable through MORE" % node_name,
+			control != null and side.is_ancestor_of(control)
+				and control.is_visible_in_tree())
+	more.pressed.emit()
+	check_true("and MORE shuts the panel again", not side.visible)
+
+func _editor_grid() -> TrackGrid:
+	return staged_editor.get_node_or_null("Split/Stack/Grid") if staged_editor != null else null
+
+## Pan and pinch are the two things a phone cannot reach through the emulated
+## mouse: it collapses every finger onto one pointer, so a second finger simply
+## does not exist as far as the mouse path is concerned. Without these, a circuit
+## drawn on a phone could never be moved or zoomed — and `fit_view` alone cannot
+## get you close enough to hit a badge.
+func test_two_fingers_pan_and_pinch_the_canvas() -> void:
+	var grid := _editor_grid()
+	check_true("an editor is staged for touch", grid != null)
+	if grid == null:
+		return
+	var mid := grid.size * 0.5
+	var left := mid - Vector2(80.0, 0.0)
+	var right := mid + Vector2(80.0, 0.0)
+
+	var before_cell := grid.screen_to_cell_f(mid)
+	var before_zoom := grid.cell_to_screen(Vector2.ONE) - grid.cell_to_screen(Vector2.ZERO)
+
+	# Two fingers moved together, span unchanged: pan, no zoom.
+	_grid_touch(grid, 0, left, true)
+	_grid_touch(grid, 1, right, true)
+	_grid_drag(grid, 0, left + Vector2(60.0, 40.0))
+	_grid_drag(grid, 1, right + Vector2(60.0, 40.0))
+	check_true("two fingers moving together pan the canvas",
+		grid.screen_to_cell_f(mid + Vector2(60.0, 40.0)).distance_to(before_cell) < 0.01)
+	check_true("and moving together does not zoom it",
+		(grid.cell_to_screen(Vector2.ONE) - grid.cell_to_screen(Vector2.ZERO))
+			.is_equal_approx(before_zoom))
+
+	# Now spread them apart about the same midpoint: zoom, no pan.
+	var centre := mid + Vector2(60.0, 40.0)
+	var pinned := grid.screen_to_cell_f(centre)
+	_grid_drag(grid, 0, centre - Vector2(160.0, 0.0))
+	_grid_drag(grid, 1, centre + Vector2(160.0, 0.0))
+	check_true("spreading them zooms in (%.1f px per cell, was %.1f)" % [
+		(grid.cell_to_screen(Vector2.ONE) - grid.cell_to_screen(Vector2.ZERO)).x,
+		before_zoom.x],
+		(grid.cell_to_screen(Vector2.ONE) - grid.cell_to_screen(Vector2.ZERO)).x
+			> before_zoom.x + 0.5)
+	# The point between the fingers has to stay under them, or the canvas slides
+	# out from under the gesture and pinching to look at a corner walks away
+	# from that corner.
+	check_true("and holds the point between the fingers (%s vs %s)" % [
+		grid.screen_to_cell_f(centre), pinned],
+		grid.screen_to_cell_f(centre).distance_to(pinned) < 0.01)
+
+	_grid_touch(grid, 0, Vector2.ZERO, false)
+	_grid_touch(grid, 1, Vector2.ZERO, false)
+	grid.fit_view()
+
+## A pinch has to leave the circuit exactly as it found it, and two separate
+## things stand between it and an accidental edit.
+##
+## The first is where the gesture *starts*. Fingers land on whatever they land
+## on, and the emulated mouse has already reported the first of them as a press —
+## so a pinch centred on a corner arrives as a grab of that corner. Closing that
+## grab off is not enough on its own: closing it used to count as an edit, which
+## put an undo entry on the stack that undoes nothing.
+##
+## The second is the emulated mouse *during* the gesture. It keeps following one
+## finger throughout, and a finger lifted and put back down mid-pinch — which is
+## how anyone adjusts their grip — arrives as a fresh press on whatever is under
+## it, mid-gesture, with no drag in progress to have been closed off.
+func test_a_pinch_does_not_edit_the_circuit() -> void:
+	var grid := _editor_grid()
+	if grid == null:
+		return
+	var handles := TrackShape.corners_of(grid.layout.cells)
+	var dot := grid.cell_to_screen(Vector2(handles[0]) + Vector2(0.5, 0.5))
+	# Second finger placed towards the middle of the canvas, so it lands on the
+	# canvas whichever corner of the circuit the first one is on.
+	var inward := (grid.size * 0.5 - dot).normalized() * 140.0
+
+	var cells: int = grid.layout.cells.size()
+	var edits: Array[int] = []
+	grid.layout_edited.connect(func(): edits.append(1))
+
+	# A pinch that begins on a corner handle.
+	_grid_mouse(grid, dot, true)
+	_grid_touch(grid, 0, dot, true)
+	_grid_touch(grid, 1, dot + inward, true)
+	_grid_drag(grid, 0, dot - inward * 0.4)
+	_grid_drag(grid, 1, dot + inward * 1.4)
+	_grid_touch(grid, 0, Vector2.ZERO, false)
+	_grid_touch(grid, 1, Vector2.ZERO, false)
+	_grid_mouse(grid, dot - inward * 0.4, false)
+	check("a pinch beginning on a handle leaves the circuit alone",
+		grid.layout.cells.size(), cells)
+	check("and puts nothing on the undo stack", edits.size(), 0)
+
+	# A finger re-planted mid-gesture, which reaches the canvas as a press with
+	# two fingers already down.
+	_grid_touch(grid, 1, dot, true)
+	_grid_touch(grid, 2, dot + inward, true)
+	_grid_mouse(grid, dot, true)
+	_grid_mouse_motion(grid, dot + inward * 2.0)
+	_grid_mouse(grid, dot + inward * 2.0, false)
+	_grid_touch(grid, 1, Vector2.ZERO, false)
+	_grid_touch(grid, 2, Vector2.ZERO, false)
+	check("a press arriving mid-gesture is not an edit",
+		grid.layout.cells.size(), cells)
+	check("and still nothing on the undo stack", edits.size(), 0)
+	grid.fit_view()
+
+## Erasing a stroke and removing a corner were both right-button-only, which on a
+## touchscreen means unreachable. They are the only two destructive edits, so
+## being unable to take anything back out is not a small gap.
+func test_erase_mode_reaches_the_right_button_edits() -> void:
+	var grid := _editor_grid()
+	if grid == null:
+		return
+	var editor: Control = staged_editor
+	var erase: Button = editor.get_node("Split/Side/Rows/ToolRow/EraseButton")
+	var draw: Button = editor.get_node("Split/Side/Rows/ToolRow/DrawButton")
+
+	draw.button_pressed = true
+	erase.button_pressed = true
+	check_true("erasing turns drawing off", not draw.button_pressed)
+	check_true("and the canvas agrees", grid.erase_mode and not grid.draw_mode)
+
+	# A tap on a corner dot removes that corner, the same dot that moves it with
+	# erase off — one target, and the mode says which of the two it does.
+	#
+	# Aimed at a corner the shape editor will actually give up: not every one can
+	# go — the sample circuit's own bends are all load-bearing — and which ones
+	# can is `test_shape_add_and_remove`'s business. So a bend is added first,
+	# which is the case anyone removing one is in anyway. What is under test here
+	# is only that a tap reaches the removal at all, which before erase mode
+	# needed a button a touchscreen does not have.
+	var handles := TrackShape.corners_of(grid.layout.cells)
+	var bumped := TrackShape.insert_bump(handles, 0, handles[0], -6)
+	check_true("a bend can be added to remove again", not bumped.is_empty())
+	if bumped.is_empty():
+		return
+	grid.layout.cells = TrackShape.cells_from_corners(bumped)
+	grid.refresh(grid.layout.compile())
+	handles = TrackShape.corners_of(grid.layout.cells)
+
+	var removable := -1
+	for i in handles.size():
+		if not TrackShape.straighten_at(handles, i).is_empty():
+			removable = i
+			break
+	check_true("the staged circuit has a corner that can be removed", removable >= 0)
+	if removable < 0:
+		return
+	var corners: int = grid.compiled.corners.size()
+	var dot := grid.cell_to_screen(Vector2(handles[removable]) + Vector2(0.5, 0.5))
+	_grid_mouse(grid, dot, true)
+	_grid_mouse(grid, dot, false)
+	check_true("tapping a dot with erase on removes that corner (%d, was %d)" % [
+		grid.compiled.corners.size(), corners],
+		grid.compiled.corners.size() < corners)
+
+	# And a drag rubs road out, which is what right-drag did. Aimed at the middle
+	# of the longest straight: a corner dot wins the hit test, which is the whole
+	# point of the check above, so anywhere near one would be testing that
+	# instead.
+	var cells: int = grid.layout.cells.size()
+	var longest: TrackLayout.Run = grid.compiled.runs[0]
+	for run in grid.compiled.runs:
+		if run.cells.size() > longest.cells.size():
+			longest = run
+	var on_road := grid.cell_to_screen(
+		Vector2(longest.cells[longest.cells.size() / 2]) + Vector2(0.5, 0.5))
+	_grid_mouse(grid, on_road, true)
+	_grid_mouse(grid, on_road, false)
+	check_true("dragging with erase on rubs road out (%d cells, was %d)" % [
+		grid.layout.cells.size(), cells],
+		grid.layout.cells.size() < cells)
+
+	erase.button_pressed = false
+	check_true("and turning it off returns to shaping", not grid.erase_mode)
+
+## A fingertip covers far more than a cursor's single pixel, so the same hit
+## radius that suits a mouse makes every badge a near miss on glass.
+func test_touch_widens_the_hit_targets() -> void:
+	var grid := _editor_grid()
+	if grid == null:
+		return
+	check_true("a touch device gets a wider grab than a mouse (%.2f vs %.2f cells)"
+		% [grid._grab_radius(), TrackGrid.GRAB],
+		grid._grab_radius() > TrackGrid.GRAB)
+	# Capped, because the radius and bank badges sit 1.2 cells apart and a circle
+	# wider than that makes which one was tapped a coin toss.
+	check_true("but never wide enough to swallow the badge next door",
+		grid._grab_radius() <= TrackGrid.TOUCH_GRAB_MAX_CELLS)
+
+func _grid_touch(grid: TrackGrid, index: int, at: Vector2, pressed: bool) -> void:
+	var e := InputEventScreenTouch.new()
+	e.index = index
+	e.pressed = pressed
+	e.position = grid.get_global_transform_with_canvas() * at
+	grid._input(e)
+
+func _grid_drag(grid: TrackGrid, index: int, at: Vector2) -> void:
+	var e := InputEventScreenDrag.new()
+	e.index = index
+	e.position = grid.get_global_transform_with_canvas() * at
+	grid._input(e)
+
+## The emulated mouse, which is what a single finger actually reaches the canvas
+## as. Fed straight to `_gui_input` because that is where the viewport delivers
+## it, with positions already in the control's own space.
+func _grid_mouse(grid: TrackGrid, at: Vector2, pressed: bool) -> void:
+	var e := InputEventMouseButton.new()
+	e.button_index = MOUSE_BUTTON_LEFT
+	e.pressed = pressed
+	e.position = at
+	grid._gui_input(e)
+
+func _grid_mouse_motion(grid: TrackGrid, at: Vector2) -> void:
+	var e := InputEventMouseMotion.new()
+	e.position = at
+	grid._gui_input(e)
+
+## Where the painted circuit lands on the canvas, in the grid's own coordinates.
+func _circuit_screen_rect(grid: TrackGrid) -> Rect2:
+	var lo := grid.cell_to_screen(Vector2(grid.layout.cells[0]))
+	var hi := lo
+	for c in grid.layout.cells:
+		lo = lo.min(grid.cell_to_screen(Vector2(c)))
+		hi = hi.max(grid.cell_to_screen(Vector2(c) + Vector2.ONE))
+	return Rect2(lo, hi - lo)
+
+func _find_first(node_name: String, type: String) -> Node:
+	var found := root.find_children(node_name, type, true, false)
+	return found[0] if not found.is_empty() else null
+
 func _find_touch_controls() -> Control:
 	var found := root.find_children("TouchControls", "Control", true, false)
 	return found[0] if not found.is_empty() else null
@@ -1755,10 +2179,12 @@ func test_editor_panel_is_wired_and_fits() -> void:
 	if editor == null:
 		return
 	for path in [
-		"Split/Grid",
+		"Split/Stack/Grid",
 		"Split/Side/Rows/NameEdit",
 		"Split/Side/Rows/Picker",
-		"Split/Side/Rows/DrawButton",
+		"Split/Side/Rows/ToolRow/DrawButton",
+		"Split/Side/Rows/ToolRow/EraseButton",
+		"Split/Side/Rows/ToolRow/FitButton",
 		"Split/Side/Rows/GuideCard/Rows/Guide",
 		"Split/Side/Rows/ReadoutCard/Rows/Readout",
 		"Split/Side/Rows/Status",
@@ -2043,6 +2469,48 @@ func _physics_process(_delta: float) -> bool:
 		# final some frames after the scene is added.
 		test_title_menu_fits_however_many_tracks()
 		test_editor_panel_is_wired_and_fits()
+		return false
+
+	# Touch and rotation go last, on frames the lap sequence below does not claim
+	# (it steps on every fifth). Rotation leaves the window portrait for two
+	# frames, which reshapes everything the layout tests above measure, so nothing
+	# that reads a size may run between the turn and the restore.
+	if frame == 9:
+		stage_rotation()
+		return false
+
+	if frame == 11:
+		# A frame after staging, so the canvas has a size to hit-test against.
+		test_two_fingers_pan_and_pinch_the_canvas()
+		test_a_pinch_does_not_edit_the_circuit()
+		test_erase_mode_reaches_the_right_button_edits()
+		test_touch_widens_the_hit_targets()
+		return false
+
+	if frame == 12:
+		editor_layout_before = snapshot_editor_layout()
+		root.size = Vector2i(720, 1280)
+		return false
+
+	if frame == 13:
+		test_rotation_rewires_the_view()
+		test_portrait_gives_the_canvas_the_screen()
+		stage_a_taller_window()
+		return false
+
+	if frame == 14:
+		test_a_plain_resize_keeps_the_view()
+		test_more_panel_holds_the_rest()
+		root.size = Vector2i(1280, 720)
+		return false
+
+	if frame == 16:
+		# A frame after turning back, so the reflow and the containers under it
+		# have both run.
+		test_portrait_reflow_is_reversible()
+		if staged_editor != null:
+			staged_editor.queue_free()
+			staged_editor = null
 		return false
 
 	if frame < 5 or frame % 5 != 0:

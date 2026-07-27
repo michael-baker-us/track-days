@@ -36,6 +36,17 @@ static func aspect_mode(size: Vector2i) -> Window.ContentScaleAspect:
 		else Window.CONTENT_SCALE_ASPECT_KEEP_HEIGHT
 	)
 
+## The matching rule for a 3D camera, which has the same problem and does not get
+## the fix for free. `Camera3D` defaults to `KEEP_HEIGHT`: the vertical FOV is
+## held and the horizontal one shrinks with the viewport. On a 9:16 phone that
+## leaves about a third of the horizontal view a landscape window gets — the car
+## fills the screen, the road ahead is gone, and the game is unplayable held
+## upright. Portrait therefore keeps the *width*, exactly as the canvas does, so
+## the same amount of track is visible either way up and the extra room becomes
+## more sky and more road rather than a crop.
+static func camera_aspect(size: Vector2i) -> int:
+	return Camera3D.KEEP_WIDTH if is_portrait(size) else Camera3D.KEEP_HEIGHT
+
 static func apply(window: Window) -> void:
 	if window == null:
 		return

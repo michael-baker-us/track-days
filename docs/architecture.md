@@ -768,6 +768,36 @@ it. Only the live window is retargeted.
 > covers the same fraction of the short edge either way. That is what lets one
 > set of touch-pad sizes serve both orientations.
 
+### What content scaling does *not* fix
+
+Swapping the canvas rule is only half of a rotation. Three things sit outside it,
+and all three shipped broken on a phone; each now has a test that rotates a real
+window rather than checking the rule as a pure function, which is how they were
+missed.
+
+**The camera.** Content scaling does not touch the 3D projection, and `Camera3D`
+defaults to `KEEP_HEIGHT` — it holds the *vertical* FOV and lets the horizontal
+one shrink with the viewport. A 9:16 phone therefore keeps the full height and
+throws most of the width away: the car filled the screen, the road ahead was
+gone, and the game was unplayable held upright. `ViewportScaling.camera_aspect`
+mirrors the canvas rule (portrait keeps the width) and `chase_camera.gd`
+subscribes to `size_changed` itself, so the connection dies with the camera
+rather than outliving it on the window.
+
+**Anything two controls wide.** Screen-edge anchoring survives a rotation on its
+own, but only where the things anchored do not meet. The lap panel wants 214
+units and the banner about 470; across 1280 they share a line, across 720 they
+are drawn on top of each other. `hud.gd` drops the banner below the panel in
+portrait, and lifts the speed readout clear of the gas pedal wherever the touch
+pads exist.
+
+**Anything holding coordinates of its own.** The editor canvas keeps a pan and a
+zoom that mean nothing except against a given canvas size, so a rotation left the
+circuit off screen — with no F key on a phone to refit it. `TrackGrid` handles
+`resized`: an orientation flip refits, and any other resize keeps whatever was in
+the middle in the middle, because a dragged window edge should not throw away a
+deliberate zoom.
+
 ## Touch controls
 
 `TouchControls` lives inside `hud.tscn` and is hidden unless
@@ -806,9 +836,77 @@ CanvasLayer's space. They coincide only while that layer's transform is identity
 so the hit test converts through `get_canvas_transform().affine_inverse()` rather
 than relying on it.
 
-The menus and the track editor need none of this: `emulate_mouse_from_touch`
-already turns a tap into a click, which is exactly what a `Button` and the
-editor's direct manipulation want.
+The menus need none of this: `emulate_mouse_from_touch` already turns a tap into
+a click, which is exactly what a `Button` wants.
+
+## The editor on a phone
+
+The editor needed all three of the things emulation cannot give it. It is worth
+being precise about which, because each was a different kind of gap.
+
+**Two fingers.** Emulation collapses every finger onto one pointer, so pan and
+pinch simply do not exist on the mouse path — and `InputEventMagnifyGesture` and
+`InputEventPanGesture`, which the canvas already handled, are macOS *trackpad*
+events that a touchscreen never sends. `TrackGrid._input` therefore reads raw
+`InputEventScreenTouch`/`Drag`, the same route `TouchControls` uses and for the
+same reason. **One finger is deliberately not handled there**: emulation already
+turns it into exactly the left-button drag the canvas has always understood, so
+drawing, dragging a corner and tapping a badge work on a phone without the script
+knowing. Only the part emulation cannot express is taken over.
+
+Two things then stand between a pinch and an accidental edit, and both have a
+test that fails without them:
+
+- The gesture *starts* wherever the fingers land, and the emulated mouse has
+  already reported the first of them as a press — so a pinch centred on a corner
+  arrives as a grab of that corner. `_end_drag` closes it off, and it now records
+  an undo entry only when the drag actually **changed** something (`_drag_moved`),
+  or a pinch left an entry on the stack that undoes nothing.
+- *During* the gesture the emulated mouse keeps following a finger, and a finger
+  lifted and put back down mid-pinch — how anyone adjusts their grip — arrives as
+  a fresh press on whatever is underneath. `_gui_input` drops mouse events while
+  two fingers are down.
+
+**A second button.** Erasing a stroke and removing a corner were right-button
+only, which on glass means unreachable — and they are the only two destructive
+edits, so a circuit could be built but nothing taken back out. `erase_mode` is
+the mode this canvas otherwise refuses to have, and it earns the exception by
+being destructive: a mode you can see you are in is the cheap way to stop a stray
+thumb rubbing out a circuit. The road tints toward `DANGER` while it is on, and a
+corner dot still wins the hit test, so the dot that *moves* a corner with erase
+off is the dot that *removes* it with erase on.
+
+> Hit targets widen on touch but only to one cell. A fingertip wants roughly 80
+> canvas units on a phone; the radius and bank badges sit 1.2 cells apart, so past
+> about a cell a wider circle stops being a bigger target and starts being a coin
+> toss between two neighbours. Getting closer than that is what pinching is for.
+
+**Room.** The sidebar is 364 units against a 720-unit portrait canvas, so the
+circuit was being edited in less space than the controls editing it. Portrait
+reflows to a bar above the canvas (Draw, Erase, Fit, Undo, MORE), a bar below it
+(the guide, the status line, Test drive / Save / Back) and the sidebar **floated
+over the canvas behind MORE**, holding the name, the picker, the stats, the tips
+and Delete — what you go looking for rather than what you reach for while
+drawing.
+
+The controls **move** between the two arrangements rather than being built twice.
+Two of each button would mean two `disabled` flags, two signal connections and
+two chances to disagree about which is lit, and Undo and Test drive both spend
+most of their life disabled, so a stale twin would show immediately.
+`track_editor.gd` records each moving control's parent and index once, before
+anything has moved, and restores by that index in ascending order — restoring in
+any other order puts them back in the wrong places. The round trip is tested
+against a snapshot of the whole control tree, because the way this breaks is that
+a trip through portrait and back leaves the sidebar subtly rearranged and nothing
+notices until someone opens the editor on a desktop afterwards.
+
+> The floated panel stops short of **both** bars. Covering the top one buries
+> MORE under the panel MORE opened, leaving no way to shut it; covering the
+> bottom one takes Test drive away at the moment you have finished with the
+> settings you opened it for.
+
+Icons were not an option for the bars — see the built-in font constraint under
+*Web build constraints*. The toolbar is short words.
 
 ## Known gaps
 
@@ -835,6 +933,14 @@ editor's direct manipulation want.
   transition between screens; a scene change is a hard cut.
 - Nothing persists whether the editor's tips flyout was left open, so it is
   closed again on every visit.
+- Rotating the window refits the editor canvas, which throws away a deliberate
+  zoom. It is the right call the first time and irritating the second; remembering
+  the framing per orientation would be better.
+- The phone bars are keyed off orientation alone. A tablet held upright has ample
+  room for the sidebar and gets the bars anyway; a width threshold would be the
+  more honest test.
+- Nothing on a phone reaches double-tap-to-add-a-bend reliably, and there is no
+  touch route to the shift-drag override. Both are still mouse-first.
 - No tagged release build yet; web deploys straight from `main`.
 - Physics runs at 120 Hz, which is the main CPU cost in a single-threaded web
   build. Unmeasured on real hardware in a browser.

@@ -54,6 +54,7 @@ const V_DISCLOSURE := &"Disclosure"  ## Shows and hides the section under it.
 const V_CARD := &"CardButton"        ## A whole list row that happens to be pressable.
 const V_CARD_PANEL := &"CardPanel"   ## A framed block inside a panel.
 const V_SIDEBAR := &"Sidebar"        ## A panel docked to a screen edge.
+const V_BAR := &"EdgeBar"            ## The same, docked to a horizontal edge.
 const V_HUD := &"HudPanel"           ## A readout floating over the 3D view.
 
 ## Builds the project theme. Pure — no file access — so the test suite can build
@@ -249,6 +250,26 @@ static func _panels(theme: Theme) -> void:
 	sidebar.content_margin_top = 16.0
 	sidebar.content_margin_bottom = 14.0
 	theme.set_stylebox("panel", V_SIDEBAR, sidebar)
+
+	# The sidebar turned on its side: what the editor becomes on a phone, where a
+	# column down the right would leave the canvas narrower than the panel. Both
+	# horizontal borders are drawn because one variation serves the bar above the
+	# canvas and the bar below it; the border facing off-screen is never seen.
+	# Padding is tighter than the sidebar's — a bar spends the screen's short
+	# edge, which is the one a phone has least of.
+	theme.set_type_variation(V_BAR, "PanelContainer")
+	var bar := StyleBoxFlat.new()
+	bar.bg_color = SURFACE
+	bar.set_corner_radius_all(0)
+	bar.set_border_width_all(0)
+	bar.border_width_top = 1
+	bar.border_width_bottom = 1
+	bar.border_color = LINE
+	bar.content_margin_left = 12.0
+	bar.content_margin_right = 12.0
+	bar.content_margin_top = 8.0
+	bar.content_margin_bottom = 8.0
+	theme.set_stylebox("panel", V_BAR, bar)
 
 	# Over the 3D view, so it is translucent — a solid block would punch a hole in
 	# the road. It carries no padding of its own: the HUD spaces its own contents

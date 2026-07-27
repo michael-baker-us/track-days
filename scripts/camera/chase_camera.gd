@@ -7,6 +7,24 @@ extends Camera3D
 var _car: VehicleBody3D
 var _tuning: CarTuning
 
+## The camera has to be told about orientation separately from the UI. Content
+## scaling reshapes the canvas; it does nothing to the 3D projection, and
+## `Camera3D` defaults to holding the *vertical* FOV — so a portrait phone loses
+## most of its horizontal view and the road ahead disappears behind the car. See
+## `ViewportScaling.camera_aspect`.
+##
+## The connection is made from here rather than from `ViewportScaling.attach`, so
+## it dies with the camera: the window outlives every scene, and a bound callable
+## pointing at a freed camera would otherwise have to be unwired by hand.
+func _ready() -> void:
+	_apply_aspect()
+	get_window().size_changed.connect(_apply_aspect)
+
+func _apply_aspect() -> void:
+	if not is_inside_tree():
+		return
+	keep_aspect = ViewportScaling.camera_aspect(get_window().size)
+
 func _physics_process(delta: float) -> void:
 	if _car == null:
 		_car = get_tree().get_first_node_in_group("player_car")

@@ -49,6 +49,19 @@ const BASE_CELL := 22.0
 ## How close, in cells, the cursor has to be to grab a handle or hit a badge.
 const GRAB := 0.75
 
+## The same thing for a fingertip, in canvas units, because a finger is a fixed
+## size on the glass while a cell is whatever the zoom says.
+##
+## The cap is the binding constraint, not the floor. A fingertip wants about 80
+## canvas units of target on a phone, but the radius and bank badges sit only 1.2
+## cells apart, so anything past about one cell stops being a wider target and
+## starts being a coin toss between two neighbours. One cell is as far as this can
+## go; getting closer than that is what pinching in is for, which touch can now
+## do. Overlap at exactly the cap is settled the way it always was, by the order
+## `_hit_test` asks its questions in.
+const TOUCH_GRAB := 44.0
+const TOUCH_GRAB_MAX_CELLS := 1.0
+
 ## Trackpad two-finger scroll, in screen pixels per unit of gesture delta. The
 ## gesture arrives in scroll units rather than pixels, so it needs scaling to feel
 ## like it is dragging the canvas.
@@ -84,8 +97,21 @@ var compiled: TrackLayout.Compiled
 ## erases, and no handles are shown or hit-tested.
 var draw_mode := false
 
+## Everything a right button does, reachable without one. A touchscreen has no
+## second button, which left erasing a stroke and removing a corner with no route
+## in at all — the two destructive edits, and the only two the canvas had put
+## behind a modifier rather than behind something to hit.
+##
+## This is the mode the canvas has otherwise avoided, and it is worth it only
+## because it is *destructive*: a mode you can see you are in is the cheap way to
+## stop a stray thumb rubbing out a circuit. The handles stay visible and still
+## take taps, so a corner can be removed by tapping the same dot that moves it.
+var erase_mode := false
+
 var _cell_px := BASE_CELL
 var _origin := Vector2.ZERO
+## Canvas size at the last resize, so the next one knows what changed.
+var _last_size := Vector2.ZERO
 var _hover_cell := Vector2i.ZERO
 var _has_hover := false
 var _panning := false
@@ -102,6 +128,26 @@ var _drag_index := -1
 var _drag_refused := false
 ## Corner count when the drag began; the drag may not go below it.
 var _drag_floor := 0
+## Whether the drag has actually changed anything yet. A press that grabs a
+## handle and lets go without moving is not an edit, and recording one leaves an
+## undo entry that undoes nothing — which matters now that a two-finger gesture
+## can interrupt a drag that never got going.
+var _drag_moved := false
+
+## Fingers currently on the canvas, by touch index, in this control's own
+## coordinates. Only fingers that landed on the canvas are tracked, so a thumb
+## resting on the panel cannot join a gesture.
+var _touches: Dictionary[int, Vector2] = {}
+## Midpoint and span of the two-finger gesture at the last event, which is what
+## the next one is measured against.
+var _gesture_centre := Vector2.ZERO
+var _gesture_span := 0.0
+## True while two or more fingers are down. The emulated mouse keeps following
+## the first of them, so without this the pinch would also be dragging a corner.
+var _gesture := false
+## Set once a touch has been seen and never cleared: it only widens hit targets,
+## and a device that has produced one touch will produce more.
+var _touch_seen := false
 
 ## Free painting, on Shift. +1 laying road, -1 erasing, 0 not painting.
 var _stroke := 0
@@ -121,6 +167,29 @@ var _centre := Vector2.ZERO
 func _ready() -> void:
 	focus_mode = Control.FOCUS_ALL
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
+	_last_size = size
+	resized.connect(_on_resized)
+
+## `_origin` and `_cell_px` are only meaningful against a given canvas size, so a
+## resize nobody accounts for leaves the circuit wherever the old numbers put it.
+## Rotating a phone more than halves the canvas width, and the track lands off
+## screen with no way back except the F key this editor cannot offer a phone.
+##
+## An ordinary resize — a dragged window edge — keeps whatever was in the middle
+## in the middle, because the player's zoom and pan are deliberate and worth
+## preserving. A change of orientation refits instead: the shape of the space has
+## changed too much for the old framing to mean anything, and refitting is what
+## the player would reach for next anyway.
+func _on_resized() -> void:
+	var previous := _last_size
+	_last_size = size
+	if previous.x <= 0.0 or previous.y <= 0.0:
+		return
+	if (previous.x >= previous.y) != (size.x >= size.y):
+		fit_view()
+		return
+	_origin += (size - previous) * 0.5
+	queue_redraw()
 
 ## Called by the editor after every recompile.
 func refresh(new_compiled: TrackLayout.Compiled) -> void:
@@ -189,41 +258,50 @@ func focus_on(cell: Vector2i) -> void:
 ## and sit on top of the road, so they have to win over the straight beneath.
 func _hit_test(pos: Vector2) -> Array:
 	var at := screen_to_cell_f(pos)
+	var grab := _grab_radius()
 	if draw_mode or _corners.is_empty():
 		return [Hit.NONE, -1]
 
 	if compiled != null and compiled.ok:
 		for i in compiled.corners.size():
 			var corner: TrackLayout.Bend = compiled.corners[i]
-			if at.distance_to(_radius_badge_at(corner)) < GRAB:
+			if at.distance_to(_radius_badge_at(corner)) < grab:
 				return [Hit.RADIUS, i]
 		for i in compiled.corners.size():
 			var corner: TrackLayout.Bend = compiled.corners[i]
-			if at.distance_to(_bank_badge_at(corner)) < GRAB:
+			if at.distance_to(_bank_badge_at(corner)) < grab:
 				return [Hit.BANK, i]
 		for i in compiled.runs.size():
 			var run: TrackLayout.Run = compiled.runs[i]
 			if run.cells.is_empty() or run.max_level <= 0:
 				continue
-			if at.distance_to(_climb_badge_at(run)) < GRAB:
+			if at.distance_to(_climb_badge_at(run)) < grab:
 				return [Hit.CLIMB, i]
 		for i in compiled.corners.size():
 			var corner: TrackLayout.Bend = compiled.corners[i]
 			if corner.max_level <= 0 and corner.level <= 0:
 				continue
-			if at.distance_to(_corner_climb_badge_at(corner)) < GRAB:
+			if at.distance_to(_corner_climb_badge_at(corner)) < grab:
 				return [Hit.CORNER_CLIMB, i]
-		if at.distance_to(Vector2(compiled.start_marker) + Vector2(0.5, 0.5)) < GRAB:
+		if at.distance_to(Vector2(compiled.start_marker) + Vector2(0.5, 0.5)) < grab:
 			return [Hit.START, 0]
 
 	for i in _corners.size():
-		if at.distance_to(Vector2(_corners[i]) + Vector2(0.5, 0.5)) < GRAB:
+		if at.distance_to(Vector2(_corners[i]) + Vector2(0.5, 0.5)) < grab:
 			return [Hit.CORNER, i]
 
 	var edge := TrackShape.edge_at(_corners, screen_to_cell(pos))
 	if edge >= 0:
 		return [Hit.EDGE, edge]
 	return [Hit.NONE, -1]
+
+## A cursor is a point and a fingertip is not, so touch needs a wider net — but
+## measured on the glass, not in cells, because a cell is whatever the zoom says
+## and a finger is always the same size. See [constant TOUCH_GRAB].
+func _grab_radius() -> float:
+	if not _touch_seen:
+		return GRAB
+	return clampf(TOUCH_GRAB / _cell_px, GRAB, TOUCH_GRAB_MAX_CELLS)
 
 ## Badges sit *off* the road, never on it. On it, they steal clicks meant for
 ## the road underneath — a climb badge at the midpoint of a straight swallowed
@@ -274,7 +352,80 @@ func _climb_badge_at(run: TrackLayout.Run) -> Vector2:
 
 # --- input ---
 
+## Raw touch is read here rather than in `_gui_input` for the same reason
+## `touch_controls.gd` does it: `emulate_mouse_from_touch` collapses every finger
+## onto one pointer, and pan and pinch need two. The pads proved this path works
+## on a device, so the editor uses it too rather than a second, untried one.
+##
+## One finger is deliberately *not* handled here. Emulation already turns it into
+## exactly the left-button drag the canvas has always understood, so drawing,
+## dragging a corner and tapping a badge all work on a phone without this script
+## knowing. Only the part emulation cannot express is taken over.
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		_touch_seen = true
+		if touch.pressed:
+			var at := _to_local(touch.position)
+			if Rect2(Vector2.ZERO, size).has_point(at):
+				_touches[touch.index] = at
+		else:
+			_touches.erase(touch.index)
+		_sync_gesture()
+	elif event is InputEventScreenDrag:
+		var drag := event as InputEventScreenDrag
+		if not _touches.has(drag.index):
+			return
+		_touches[drag.index] = _to_local(drag.position)
+		if _gesture:
+			_track_gesture()
+
+## Touch positions arrive in viewport space; everything here is in the control's
+## own space. They coincide only while every transform between the two is
+## identity, which is not a thing to rely on from a script that also has to work
+## inside a scaled canvas.
+func _to_local(pos: Vector2) -> Vector2:
+	return get_global_transform_with_canvas().affine_inverse() * pos
+
+## Starts and ends the two-finger gesture as fingers arrive and leave, and rebases
+## it whenever the pair changes so that lifting one of three fingers does not
+## teleport the view.
+func _sync_gesture() -> void:
+	var want: bool = _touches.size() >= 2
+	if want and not _gesture:
+		# The first finger has been dragging a corner or laying road through the
+		# emulated mouse this whole time. Close that edit off properly rather than
+		# leaving it half-applied — undo can take it back, and `_drag_moved` means
+		# a pinch that merely started on a handle records nothing.
+		_end_drag()
+	_gesture = want
+	if _gesture:
+		_rebase_gesture()
+	else:
+		_gesture_span = 0.0
+
+func _rebase_gesture() -> void:
+	var points: Array = _touches.values()
+	_gesture_centre = (points[0] + points[1]) * 0.5
+	_gesture_span = maxf(points[0].distance_to(points[1]), 1.0)
+
+## Pan by how far the pair moved together, zoom by how much it spread. Doing both
+## from one gesture is what makes it feel like the canvas is being handled rather
+## than driven: the point between the fingers stays under them throughout.
+func _track_gesture() -> void:
+	var points: Array = _touches.values()
+	var centre: Vector2 = (points[0] + points[1]) * 0.5
+	var span: float = maxf(points[0].distance_to(points[1]), 1.0)
+	_pan(centre - _gesture_centre)
+	_zoom_about(centre, span / _gesture_span)
+	_gesture_centre = centre
+	_gesture_span = span
+
 func _gui_input(event: InputEvent) -> void:
+	# While two fingers are down the emulated mouse is still following the first
+	# of them, and every event it sends would be read as a drag on the circuit.
+	if _gesture and (event is InputEventMouse):
+		return
 	if event is InputEventMouseButton:
 		_button(event)
 	elif event is InputEventMouseMotion:
@@ -329,19 +480,27 @@ func _button(event: InputEventMouseButton) -> void:
 		_panning = true
 		return
 
-	# Shift is a temporary override, so a stroke can be laid without leaving
-	# shaping mode.
-	if draw_mode or event.shift_pressed:
-		_stroke = -1 if event.button_index == MOUSE_BUTTON_RIGHT else 1
-		_last_painted = cell
-		_has_last_painted = true
-		_painted_any = false
-		_paint(cell)
-		return
-
 	var hit := _hit_test(event.position)
 	var kind: int = hit[0]
 	var index: int = hit[1]
+
+	# Erase is checked before drawing and before the handles, because it is the
+	# one mode whose whole point is that it overrides what is under the pointer.
+	# A corner still wins over the road it sits on, so the dot that moves a corner
+	# with erase off is the dot that removes it with erase on — one target, and
+	# the mode says which of the two it does.
+	if erase_mode and event.button_index == MOUSE_BUTTON_LEFT:
+		if kind == Hit.CORNER:
+			_straighten(index)
+			return
+		_begin_stroke(-1, cell)
+		return
+
+	# Shift is a temporary override, so a stroke can be laid without leaving
+	# shaping mode.
+	if draw_mode or event.shift_pressed:
+		_begin_stroke(-1 if event.button_index == MOUSE_BUTTON_RIGHT else 1, cell)
+		return
 
 	if event.button_index == MOUSE_BUTTON_RIGHT:
 		if kind == Hit.CORNER:
@@ -372,12 +531,20 @@ func _button(event: InputEventMouseButton) -> void:
 			_drag = kind
 			_drag_index = index
 			_drag_floor = _corners.size()
+			_drag_moved = false
 		_:
 			status.emit(
 				"Grab a corner or a straight to reshape the circuit."
 				if has_handles() else
-				"Shift-drag to lay road, shift-right-drag to erase."
+				"Turn Draw on to lay road."
 			)
+
+func _begin_stroke(direction: int, cell: Vector2i) -> void:
+	_stroke = direction
+	_last_painted = cell
+	_has_last_painted = true
+	_painted_any = false
+	_paint(cell)
 
 func _climb_cell(run_index: int) -> Vector2i:
 	var run: TrackLayout.Run = compiled.runs[run_index]
@@ -425,6 +592,7 @@ func _apply_drag(cell: Vector2i) -> void:
 	if _drag == Hit.START:
 		if layout.cells.has(cell):
 			layout.start_cell = cell
+			_drag_moved = true
 			layout_touched.emit()
 		return
 
@@ -464,6 +632,7 @@ func _apply_drag(cell: Vector2i) -> void:
 	_drag_refused = false
 	layout.cells = TrackShape.cells_from_corners(moved)
 	_corners = moved
+	_drag_moved = true
 	layout_touched.emit()
 
 ## Pushes a new bend out of a straight. Without this the handles could only move
@@ -486,6 +655,9 @@ func _insert_bend(index: int, cell: Vector2i) -> void:
 			_drag = Hit.EDGE
 			_drag_index = (index + 2) % _corners.size()
 			_drag_floor = _corners.size()
+			# The bend exists the moment it is inserted, so this is already an edit
+			# even if the drag that follows never moves.
+			_drag_moved = true
 			status.emit("New bend — drag it in or out.")
 			layout_touched.emit()
 			return
@@ -524,16 +696,20 @@ func _straighten(index: int) -> void:
 	layout_edited.emit()
 
 func _end_drag() -> void:
-	var was_dragging: bool = _drag != Hit.NONE
+	# `_drag_moved`, not merely "a drag was in progress": grabbing a handle and
+	# letting go without moving is not an edit, and recording one leaves an undo
+	# entry that undoes nothing. A pinch beginning on a handle does exactly that.
+	var changed: bool = _drag_moved
 	_drag = Hit.NONE
 	_drag_index = -1
 	_drag_refused = false
 	_drag_floor = 0
+	_drag_moved = false
 	var painted := _painted_any
 	_stroke = 0
 	_has_last_painted = false
 	_painted_any = false
-	if was_dragging or painted:
+	if changed or painted:
 		layout_edited.emit()
 	queue_redraw()
 
@@ -638,6 +814,11 @@ func _draw_cells() -> void:
 	for c in layout.cells:
 		var at := cell_to_screen(Vector2(c)) + Vector2(inset, inset)
 		var col := COL_ROAD_HOT if hot_cells.has(c) else COL_ROAD
+		# Erase is the one destructive mode, so the road it would take says so
+		# before anything is taken — fainter than a refused drag, which is an
+		# error rather than a state.
+		if erase_mode:
+			col = col.lerp(COL_REFUSED, 0.20)
 		if _drag_refused:
 			col = col.lerp(COL_REFUSED, 0.35)
 		draw_rect(Rect2(at, Vector2.ONE * (_cell_px - inset * 2.0)), col)
