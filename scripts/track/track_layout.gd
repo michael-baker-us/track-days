@@ -67,8 +67,8 @@ const FORMAT_VERSION := 1
 const CORNER_PIECES := {1: "roadCornerSmall", 2: "roadCornerLarge", 3: "roadCornerLarger"}
 const MAX_CORNER := 3
 
-## `roadStart` and `roadStartPositions`, two cells each. The run carrying the
-## start line has to find room for both before anything else.
+## `roadStartPositions` and then `roadStart`, two cells each. The run carrying
+## the start line has to find room for both before anything else.
 const START_CELLS := 4
 
 ## Cells one `roadRampLongCurved` occupies, and how much height it gains. One ramp per
@@ -533,8 +533,13 @@ func _emit_run(segments: Array, run: Run) -> void:
 	if run.is_start:
 		# The start line and grid sit on the ground, so these go down before any
 		# height is gained. `_resolve_elevation` guarantees the run enters flat.
-		segments.append(["S", "roadStart", 1])
+		#
+		# Grid first: its slots march towards its exit end, so the cars line up
+		# facing the line and cross it a moment after the lights. The other way
+		# round the whole grid reads backwards, sitting past the line pointing
+		# away from it. See `TrackBuilder.GRID_POLE_ALONG`.
 		segments.append(["S", "roadStartPositions", 1])
+		segments.append(["S", "roadStart", 1])
 		spare -= START_CELLS
 
 	var up := run.level - run.entry_level

@@ -216,6 +216,47 @@ func test_centreline_has_no_kinks() -> void:
 		check_true("%s centreline turns smoothly (worst %.1f deg)" % [name, worst],
 			worst <= step_deg + 0.5)
 
+## Which way round the driver actually goes.
+##
+## All three shipped circuits are taken from real ones that run clockwise, and a
+## lap that runs the other way is a mirror image of the circuit it is named after
+## — every corner on the wrong hand, the hairpin turning out of the pit straight
+## instead of into it. It closes, it drives, and nothing else in the suite
+## notices. The first draft of all three was mirrored exactly this way.
+##
+## Measured off the built centreline rather than counted off the layout, because
+## the layout is the thing that was wrong. The car's forward is local +Z — see
+## `car_controller`, which reads `linear_velocity.dot(basis.z)` — and for a Y-up
+## right-handed basis the driver's right is `cross(forward, up)`, which in the XZ
+## plane is `(-z, x)`. Facing south, that is west, and `TrackBuilder._rotate`
+## takes south to west for a "right". The labels mean what they say; deriving it
+## from `Vector2.rotated`, which rotates the other way, says they do not.
+func test_shipped_circuits_run_clockwise() -> void:
+	var tool_script := load("res://tools/build_track.gd")
+	for entry in [
+		["ardennes", tool_script.ARDENNES],
+		["monte_carlo", tool_script.MONTE_CARLO],
+		["la_sarthe", tool_script.LA_SARTHE],
+	]:
+		var builder := TrackBuilder.new()
+		builder.measure(entry[1])
+		var line := builder.centreline
+		var turned := 0.0
+		var first := 0.0
+		for i in range(1, line.size() - 1):
+			var d := Vector2(line[i].x - line[i - 1].x, line[i].z - line[i - 1].z)
+			var e := Vector2(line[i + 1].x - line[i].x, line[i + 1].z - line[i].z)
+			if d.length() < 0.001 or e.length() < 0.001:
+				continue
+			var turn := e.normalized().dot(Vector2(-d.y, d.x).normalized())
+			turned += turn
+			if is_zero_approx(first) and absf(turn) > 0.05:
+				first = turn
+		check_true("%s runs clockwise (net %+.1f)" % [entry[0], turned], turned > 0.0)
+		# La Source, Sainte Devote and the Dunlop chicane are all right-handers,
+		# and all three are the first corner off the line.
+		check_true("%s turns right off the pit straight" % entry[0], first > 0.0)
+
 ## The grid editor's whole premise: a painted loop closes by construction, so the
 ## builder should never disagree. If this fails the compiler and the walker have
 ## drifted apart.
@@ -595,6 +636,143 @@ func test_timing_gate_sits_on_the_start_line() -> void:
 		check_true("%s run-up is %.1f m" % [name, run_up], run_up > 8.0 and run_up < 40.0)
 		result.root.free()
 
+## Which side of the line the starting grid is on, and which way round it is.
+##
+## Two separate ways of getting it backwards, and neither breaks anything:
+##
+##  - `roadStartPositions` paints four slots marching towards the tile's *exit*
+##    end, so it belongs before `roadStart`. Emitted after the line — which is
+##    how all three circuits and the compiler first had it — the whole grid sits
+##    past the line running away from it, and the car is parked in what should
+##    be the back row.
+##  - Each slot is a U, barred at one end and open at the other, and the car
+##    noses in through the opening and stops at the bar. As authored the bar is
+##    at the end the walker drives *in* through, so the boxes have to be turned
+##    round with them: `PIECES` enters this one at S. Left alone, the grid is one
+##    the car reverses into.
+##
+## The loop still closes either way, the lap is still timed at the line, and the
+## only symptom is that the start looks wrong.
+##
+## Measured off the painted markings rather than off the tile order, because the
+## tile order is the thing that was wrong. The slots are the grey geometry inside
+## the road's own width; the kerbs are the grey geometry outside it.
+func test_starting_grid_leads_up_to_the_line() -> void:
+	var tool_script := load("res://tools/build_track.gd")
+	for entry in [
+		["ardennes", tool_script.ARDENNES],
+		["monte_carlo", tool_script.MONTE_CARLO],
+		["la_sarthe", tool_script.LA_SARTHE],
+	]:
+		var name: String = entry[0]
+		var result := TrackBuilder.new().build(name, entry[1])
+		var gantry := _gantry_position(result.root)
+		var holder := _tile_holder(result.root, "roadStartPositions")
+		check_true("%s has a grid tile to measure" % name,
+			holder != null and gantry != Vector3.INF)
+		if holder == null or gantry == Vector3.INF:
+			result.root.free()
+			continue
+
+		# The start straight is straight, so the heading at the line is also the
+		# heading across the grid.
+		var gate0: Area3D = result.root.get_node("Checkpoints/Checkpoint00")
+		var forward := Basis(Vector3.UP, gate0.rotation.y) * Vector3(0, 0, 1)
+		var right := forward.cross(Vector3.UP)
+
+		var visuals: Node3D = result.root.get_node("RoadVisuals")
+		var inst: Node3D = holder.get_child(0)
+		var mi := _first_mesh_in(inst)
+		var to_world := (
+			visuals.transform * holder.transform * inst.transform * mi.transform
+		)
+		# The painted markings as triangles in (along, across) metres relative to
+		# the gantry, so the shape of a slot can be read and not just its extent.
+		# Negative along is behind the line.
+		var paint := []
+		var along := []
+		for si in mi.mesh.get_surface_count():
+			var mat: Material = mi.mesh.surface_get_material(si)
+			if mat == null or mat.resource_name != "grey":
+				continue
+			var arrays := mi.mesh.surface_get_arrays(si)
+			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+			for t in idx.size() / 3:
+				var tri := []
+				# Inside the road, so the kerbs down either side are left out.
+				var inside := true
+				for c in 3:
+					var v: Vector3 = verts[idx[t * 3 + c]]
+					if v.x < 0.2 or v.x > 0.8:
+						inside = false
+						break
+					var offset: Vector3 = (to_world * v) - gantry
+					tri.append(Vector2(offset.dot(forward), offset.dot(right)))
+				if not inside:
+					continue
+				paint.append(tri)
+				for p: Vector2 in tri:
+					along.append(p.x)
+		check_true("%s paints slots on the grid tile" % name, paint.size() >= 8)
+		if paint.is_empty():
+			result.root.free()
+			continue
+
+		var front: float = along.max()
+		check_true("%s starts the grid behind the line (front slot %.1f m)"
+			% [name, front], front < 0.0)
+		# Two tile units of grid plus the gap to the line: any further back and
+		# something has been emitted between them.
+		check_true("%s runs the grid up to the line (back slot %.1f m)"
+			% [name, along.min()], along.min() > -45.0)
+
+		# The pole slot is the frontmost one. Its neighbour ends 7 m further
+		# back, and a slot is under 5 m long, so 5 m of the front separates them.
+		var lo := Vector2(INF, INF)
+		var hi := Vector2(-INF, -INF)
+		for tri in paint:
+			for p: Vector2 in tri:
+				if p.x < front - 5.0:
+					continue
+				lo = Vector2(minf(lo.x, p.x), minf(lo.y, p.y))
+				hi = Vector2(maxf(hi.x, p.x), maxf(hi.y, p.y))
+		var mid := (lo.y + hi.y) * 0.5
+		var pole := gantry + forward * ((lo.x + hi.x) * 0.5) + right * mid
+
+		# Which way the U faces, sampled half a metre in from either end of the
+		# slot, down its middle. The bar spans the full width and the sides do
+		# not reach the middle, so exactly one of these two points is painted —
+		# and it has to be the one the car's nose ends up against.
+		check_true("%s bars the front of the pole slot" % name,
+			_paint_covers(paint, Vector2(hi.x - 0.5, mid)))
+		check_true("%s leaves the back of the pole slot open to drive into" % name,
+			not _paint_covers(paint, Vector2(lo.x + 0.5, mid)))
+
+		# And the car is parked in it, rather than straddling the paint.
+		var spawn: Marker3D = result.root.get_node("SpawnPoint")
+		var off := Vector2(spawn.position.x - pole.x, spawn.position.z - pole.z).length()
+		check_true("%s parks the car in the pole slot (%.2f m off centre)"
+			% [name, off], off < 1.0)
+		result.root.free()
+
+## Whether any of the painted triangles covers a point, both in (along, across).
+func _paint_covers(paint: Array, at: Vector2) -> bool:
+	for tri in paint:
+		var a: Vector2 = tri[0]
+		var b: Vector2 = tri[1]
+		var c: Vector2 = tri[2]
+		# Inside means on the same side of all three edges; the winding of one
+		# triangle in isolation is not worth assuming either way.
+		var d1 := (at - a).cross(b - a)
+		var d2 := (at - b).cross(c - b)
+		var d3 := (at - c).cross(a - c)
+		var any_neg := d1 < 0.0 or d2 < 0.0 or d3 < 0.0
+		var any_pos := d1 > 0.0 or d2 > 0.0 or d3 > 0.0
+		if not (any_neg and any_pos):
+			return true
+	return false
+
 ## Gates must stay evenly spaced around the lap after being offset onto the line,
 ## or a mis-wrapped arc would bunch them without breaking anything visibly.
 func test_gates_stay_evenly_spaced() -> void:
@@ -617,10 +795,15 @@ func test_gates_stay_evenly_spaced() -> void:
 	result.root.free()
 
 ## Centre of the gantry over the start line, from the tall grey geometry of the
-## first road tile. Deliberately reads the art rather than the builder's own
+## `roadStart` tile. Deliberately reads the art rather than the builder's own
 ## constant, so a wrong constant cannot make the test agree with itself.
+##
+## Found by name rather than taken as the first tile: `roadStartPositions` goes
+## down ahead of it, so the first tile of the lap is the grid, not the line.
 func _gantry_position(root_node: Node3D) -> Vector3:
-	var holder: Node3D = root_node.get_node("RoadVisuals").get_child(0)
+	var holder := _tile_holder(root_node, "roadStart")
+	if holder == null:
+		return Vector3.INF
 	var inst: Node3D = holder.get_child(0)
 	var mi := _first_mesh_in(inst)
 	if mi == null:
@@ -642,6 +825,15 @@ func _gantry_position(root_node: Node3D) -> Vector3:
 	return visuals.transform * (
 		holder.transform * (inst.transform * (mi.transform * local))
 	)
+
+## The holder wrapping the first tile of the given piece. Every holder is an
+## unnamed `Node3D` carrying one instanced glb, and the instance keeps the
+## piece's own name, so that is what identifies it.
+func _tile_holder(root_node: Node3D, piece: String) -> Node3D:
+	for holder in root_node.get_node("RoadVisuals").get_children():
+		if holder.get_child_count() > 0 and holder.get_child(0).name == piece:
+			return holder
+	return null
 
 func _first_mesh_in(n: Node) -> MeshInstance3D:
 	if n is MeshInstance3D:
@@ -2605,6 +2797,7 @@ func _physics_process(_delta: float) -> bool:
 		test_checkpoints()
 		test_road_surface_follows_elevation()
 		test_centreline_has_no_kinks()
+		test_shipped_circuits_run_clockwise()
 		test_painted_loops_close()
 		test_bad_loops_are_rejected()
 		test_corner_sizing()
@@ -2618,6 +2811,7 @@ func _physics_process(_delta: float) -> bool:
 		test_close_gap()
 		test_stroke_fill_is_orthogonal()
 		test_timing_gate_sits_on_the_start_line()
+		test_starting_grid_leads_up_to_the_line()
 		test_gates_stay_evenly_spaced()
 		test_title_offers_editing_of_custom_tracks()
 		test_title_deletes_a_custom_track()

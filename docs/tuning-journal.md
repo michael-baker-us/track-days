@@ -583,6 +583,28 @@ and the straight after it has to cross back over the road that fed it. Ordering
 it as a staircase down the hill and a staircase back along the harbour is both
 what the real circuit does and the arrangement that closes.
 
+**All three shipped mirrored, and every check passed.** Spa, Monaco and Le Mans
+run clockwise; the first draft of all three ran anticlockwise, with La Source and
+Sainte Devote as left-handers turning out of the pit straight instead of into it.
+They closed, they drove, and nothing in the suite objected — a mirror image has
+the same length, the same corner count, the same closure gap and the same
+banking. It took someone driving them to say they looked backwards.
+
+The reasoning that produced it: the car's forward is local +Z, and for a Y-up
+right-handed basis the driver's right is `cross(forward, up)` = −X, so facing
+south the driver's right is *west*. Godot's `Vector2.rotated` turns south to east
+for −90°, so the builder's "right" looked inverted, and the layouts were written
+with every label flipped to compensate. But `TrackBuilder._rotate` is **not**
+`Vector2.rotated` — it is `(x·c + y·s, −x·s + y·c)`, deliberately the other way
+round to match a Y rotation acting on (x, z) — and it takes south to west. The
+labels always meant what they say. Two correct derivations, one wrong premise
+about which function was being called.
+
+`test_shipped_circuits_run_clockwise` now reads the direction off the built
+centreline, per point, and asserts the first corner off the line is a right. The
+lesson is narrower than "check your signs": the property was derivable and was
+derived, twice, and the derivation was still worth nothing next to a measurement.
+
 **Elevation is capped at one level by the art, not by the grammar.**
 `roadStraightBridge` is modelled with 0.5 tile units of structure below its deck
 — exactly one level of climb. Raised by one it stands on the ground; raised by

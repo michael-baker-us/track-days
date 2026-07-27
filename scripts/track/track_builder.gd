@@ -178,22 +178,37 @@ const CHECKPOINT_W := 4.0 * SCALE
 const CHECKPOINT_H := 12.0  # tall enough to still catch the car on a slope
 const CHECKPOINT_T := 4.0
 
-## How far behind the start line the car is placed. Far enough to get rolling,
-## close enough that the lap timer starts within a couple of seconds.
-const SPAWN_BEHIND_LINE := 22.0
+## Where the pole slot sits, in tile units: how far along `roadStartPositions`,
+## and how far to the driver's right of the centreline.
+##
+## Read off the art. The tile paints four slots alternating sides, at 0.077..0.423,
+## 0.577..0.923, 1.077..1.423 and 1.577..1.923 along it, across a cell whose road
+## runs 0.155..0.845. Driven as `PIECES` lays it — in through S — the slots march
+## towards the exit, the last of them spanning x 0.224..0.431. So pole is 1.75
+## along and 0.1725 to the driver's right of the middle of the road.
+##
+## Which is also what says the grid tile belongs before the line rather than
+## after it: the slots lead up to the tile's exit, and the exit is where
+## `roadStart` joins.
+const GRID_POLE_ALONG := 1.75
+const GRID_POLE_ACROSS := 0.1725
 
 ## Where the start/finish line sits along the layout, in tile units.
 ##
-## Not zero, which is the trap. The walker starts at the *leading edge* of the
-## `roadStart` tile, but that tile is 2 units long and carries the line across
-## the middle of itself: the painted stripe spans z 0.905..0.954 and the gantry
-## straddles it at 0.905..1.085. Timing from arc 0 therefore started and stopped
-## the clock 13 m before the car reached anything the player can see.
+## Not zero, which is the trap, and no longer under 1 either.
 ##
-## The value is the midpoint of that whole assembly, so the trigger is within
-## half a metre of both the stripe and the middle of the arch rather than exact
-## on one and a metre out on the other.
-const START_LINE_ALONG := 0.96
+## The walker starts at the *leading edge* of the first tile of the start run,
+## and that tile is `roadStartPositions`, 2 units of grid slots. The line itself
+## is on the `roadStart` tile behind it, which is another 2 units long and carries
+## the line across the middle of itself: the painted stripe spans z 0.905..0.954
+## of that tile and the gantry straddles it at 0.905..1.095. Timing from arc 0
+## therefore started and stopped the clock most of 40 m before the car reached
+## anything the player can see.
+##
+## The fractional part is the midpoint of that whole assembly, so the trigger is
+## within half a metre of both the stripe and the middle of the arch rather than
+## exact on one and a metre out on the other.
+const START_LINE_ALONG := 2.0 + 0.96
 const START_LINE_ARC := START_LINE_ALONG * SCALE
 
 const DIRS := {
@@ -212,15 +227,33 @@ const DIRS := {
 const BRIDGE_CORNER_DECK := 0.107
 
 # name -> cell size, origin shift, connection points in normalised cell coords,
-# connection heights in tile units, and for corners the arc centre.
+# connection heights in tile units, and for corners the arc centre. An `entry`
+# names the connection the piece must be driven in through, for art that is not
+# symmetric end to end.
 const PIECES := {
 	"roadStart": {
 		"cell": Vector2(1.26, 2.0), "shift": Vector2(0.35, 2.65),
 		"conns": {"N": Vector2(0.63, 0.0), "S": Vector2(0.63, 2.0)},
 	},
+	## Laid backwards on purpose — driven in through S and out through N, which
+	## is a 180-degree turn of the art within the same two cells.
+	##
+	## Each slot is painted as a U: a bar closing one end and a strip down either
+	## side, open at the other end. The car noses in through the open end and
+	## stops at the bar, so the bar has to be the *forward* edge. As the tile is
+	## authored the bar is at the low-z end and the opening faces high z, which is
+	## the way the walker drives it — every box open behind the car and barred
+	## across its nose, a grid you reverse into.
+	##
+	## The tile survives being turned round because everything else on it is
+	## symmetric about the cell centre: the road, both kerbs and both verges map
+	## onto themselves, and the four slots map onto each other's places (they
+	## alternate sides, so mirroring across and along together lands each one
+	## where another was). Only the U's opening changes hand, which is the point.
 	"roadStartPositions": {
 		"cell": Vector2(1.0, 2.0), "shift": Vector2(0.35, 2.65),
 		"conns": {"N": Vector2(0.5, 0.0), "S": Vector2(0.5, 2.0)},
+		"entry": "S",
 	},
 	"roadStraightLong": {
 		"cell": Vector2(1.0, 2.0), "shift": Vector2(0.35, 2.65),
@@ -449,15 +482,20 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 		_build_ground(root_node)
 		_build_lighting(root_node)
 
-		# Start just *behind* the line rather than just past it, so the timer
-		# starts a second or two in instead of after a full out lap. Measured
-		# back from the line itself, so moving the line moves the grid with it.
-		var grid := _point_at_arc(START_LINE_ARC - SPAWN_BEHIND_LINE)
+		# In the pole slot, which is behind the line rather than past it: the
+		# timer starts a second or two in instead of after a full out lap, and
+		# the car starts on the one painted box that is drawn for it. Measured
+		# from arc zero — the leading edge of the grid tile — rather than back
+		# from the line, so it stays in the box the art puts there.
+		var grid := _point_at_arc(GRID_POLE_ALONG * SCALE)
 		var spawn := Marker3D.new()
 		spawn.name = "SpawnPoint"
-		spawn.position = (grid[0] as Vector3) + Vector3(0.0, 1.0, 0.0)
 		# The car model faces local +Z, so align +Z with the track tangent.
 		var tan: Vector2 = grid[1]
+		# Driver's right for a Y-up right-handed basis is cross(forward, up),
+		# which for a tangent (x, z) is (-z, x).
+		var across := Vector3(-tan.y, 0.0, tan.x) * (GRID_POLE_ACROSS * SCALE)
+		spawn.position = (grid[0] as Vector3) + across + Vector3(0.0, 1.0, 0.0)
 		spawn.rotation.y = atan2(tan.x, tan.y)
 		root_node.add_child(spawn)
 
@@ -492,9 +530,16 @@ func _place(
 	var conns: Dictionary = desc["conns"]
 	var conn_y: Dictionary = desc.get("conn_y", {})
 	var keys: Array = conns.keys()
+	# A piece whose art is not symmetric end to end says which way it is driven.
+	# Without one, the first rotation that fits wins, and for a straight piece
+	# that is always the untuned one — the search would never turn a tile round
+	# on its own however wrong the result looked.
+	var entry: String = desc.get("entry", "")
 
 	for theta in [0.0, 90.0, 180.0, 270.0]:
 		for a in keys:
+			if entry != "" and a != entry:
+				continue
 			for b in keys:
 				if a == b:
 					continue

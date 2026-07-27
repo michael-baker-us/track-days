@@ -684,24 +684,48 @@ block the car; ordering is enforced in `lap_tracker.gd`, and an out-of-order
 gate is ignored so a skipped gate has to be gone back for.
 
 The car spawns just *behind* the line rather than past it, so the timer starts
-about two seconds in instead of after a full out lap.
+about two seconds in instead of after a full out lap. Specifically it spawns in
+the pole slot painted on the `roadStartPositions` tile.
+
+> **The grid tile goes down before the start tile, and turned round.** Two
+> separate ways of getting the start backwards, neither of which breaks anything:
+>
+> - `roadStartPositions` paints four slots that alternate sides and march
+>   towards its own exit end, so laid ahead of `roadStart` they lead up to the
+>   line with pole nearest it. Emitted the other way round — which is how the
+>   shipped circuits and the compiler both had it — the whole grid sits *past*
+>   the line running away from it.
+> - Each slot is a **U**: a bar closing one end, a strip down either side, open
+>   at the other. The car noses in through the opening and stops at the bar, so
+>   the bar belongs at the front. As Kenney authored it the bar is at the end the
+>   walker drives in through, so the tile has to be driven backwards — hence
+>   `"entry": "S"` in `PIECES`, which forces `_place` to pick the 180-degree
+>   rotation instead of the first one that fits. Everything else on the tile is
+>   symmetric about the cell centre, so nothing else moves.
+>
+> The loop still closes either way and the lap is still timed at the line; the
+> only symptom is a grid you would have to reverse into. `GRID_POLE_ALONG` and
+> `GRID_POLE_ACROSS` are read off the art, and are also where the car is put —
+> the suite locates the paint in the built scene and samples the middle of the
+> pole slot at each end, which is the difference between a bar and an opening.
 
 > **The gates hang off the start line, not off arc zero — and it is their leading
 > face that counts.** Two separate mistakes once put the clock 13.85 m ahead of
 > the line the player can see, so a lap both started and finished before the car
 > reached the gantry:
 >
-> - Arc zero is the *leading edge* of the `roadStart` tile, but that tile is two
->   units long and carries its painted stripe and gantry across the middle of
->   itself. `START_LINE_ALONG` is the midpoint of that assembly, and everything —
->   gates and grid slot alike — is measured from there.
+> - Arc zero is the *leading edge* of the first tile of the start run. That is
+>   the grid tile, two units of it, and the `roadStart` tile behind it is another
+>   two units carrying its painted stripe and gantry across the middle of itself.
+>   `START_LINE_ALONG` is the midpoint of that assembly, and everything — gates
+>   and grid slot alike — is measured from there.
 > - `Area3D.body_entered` fires when the car first touches the box's *leading
 >   face*, not its centre. The gates are deliberately 4 m deep so nothing tunnels
 >   through at speed, and every metre of that depth was a metre timed early, so
 >   each box is pushed forward by half its own depth to put that face on the line.
 >
 > Neither was visible from behind the wheel: the HUD has no reference to disagree
-> with, and the car is 22 m back on the grid so the clock starting "about when you
+> with, and the car is 17 m back on the grid so the clock starting "about when you
 > set off" looked right. The suite now locates the gantry from its own mesh
 > vertices in the built scene and asserts the trigger plane is within 2 m of it —
 > deliberately reading the art rather than the constant, so a wrong constant
