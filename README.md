@@ -10,7 +10,7 @@ own circuit and chase a time on that.
 ![The title screen](docs/screenshots/title.webp)
 
 Built in Godot 4.7 and GDScript on the engine's `VehicleBody3D` physics, with
-Kenney's CC0 racing kit for the art. Everything else — the track builder, the
+Kenney's CC0 racing and car kits for the art. Everything else — the track builder, the
 editor, the lap timing, the UI theme — is written for this project, which was
 the point: it is a learning exercise as much as it is a game.
 
@@ -32,6 +32,14 @@ only when provoked. Top speed 165 km/h, 0–100 km/h in 3.5 s, 100–0 in 24 m
 (1.6 g), corners held at 98–127 km/h. Every one of those numbers was measured
 rather than guessed; [`docs/tuning-journal.md`](docs/tuning-journal.md) records
 each sweep, including the ones that were tried and thrown away.
+
+![Out on the lap at Ardennes](docs/screenshots/trackside.webp)
+
+The circuit dresses itself. Barrier, lighting columns, trees and a paddock of
+grandstands are all placed from the finished centreline rather than authored per
+track, so a circuit drawn in the editor gets the same treatment as a shipped one
+— and none of it can end up on the racing line, because every prop is checked
+against the whole loop before it goes down.
 
 Laps are timed over sixteen checkpoints that have to be crossed **in order**, so
 cutting a corner does not shorten a lap. Best laps are kept per circuit and

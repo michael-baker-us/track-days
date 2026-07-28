@@ -35,6 +35,12 @@ GODOT=/path/to/Godot.app/Contents/MacOS/Godot
 # @onready paths in scripts/ui/hud.gd.
 "$GODOT" --headless --path . --script tools/build_ui.gd
 
+# Rebuild car.tscn from race.glb. Only needed after changing the car's geometry
+# or its visuals -- the wheel positions, radii and collision box in there are
+# what docs/tuning-journal.md measured the handling against, so a change to a
+# number in that file is a change to how the car drives.
+"$GODOT" --headless --path . --script tools/build_car.gd
+
 # Rebuild the title screen (track list comes from GameState at runtime).
 "$GODOT" --headless --path . --script tools/build_title.gd
 

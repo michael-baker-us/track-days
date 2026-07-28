@@ -49,6 +49,7 @@ regenerated rather than hand-edited (see `tools/README.md`). Order matters:
 `hud.tscn`.
 
 ```bash
+"$GODOT" --headless --path . --script tools/build_car.gd     # car.tscn
 "$GODOT" --headless --path . --script tools/build_theme.gd   # ui_theme.tres
 "$GODOT" --headless --path . --script tools/build_track.gd   # all three circuits
 "$GODOT" --headless --path . --script tools/build_ui.gd      # hud.tscn
@@ -151,6 +152,7 @@ with the same name.
 painted cells  →  TrackShape.walk (the single definition of a valid loop)
                →  TrackLayout.compile → Compiled{segments, corners, elevation}
                →  TrackBuilder.build → tiles + collision ribbon + 16 gates
+                                       + scenery
 ```
 
 - `TrackShape` (static, `RefCounted`) treats the cells as a rectilinear polygon
@@ -171,6 +173,13 @@ painted cells  →  TrackShape.walk (the single definition of a valid loop)
   out of each tile separately made a 0→3 climb arrive as three humps. The
   correction lives in the centreline, so the tile meshes are lifted onto it by
   the same per-vertex path banking uses (`_reshape_tiles`).
+- **Scenery** — barrier, lighting columns, trees, paddock — is placed from the
+  finished centreline and carries no collision, because `car_controller` finds
+  "up" by casting a ray down and would read a solid prop as banking. Two traps
+  live here and are written up in `docs/architecture.md`: a `MultiMesh` built
+  under `--headless` loses every instance transform, and a surface override on an
+  instanced tile does not survive being packed (which is why the tarmac material
+  is applied by `race.gd`, not by the builder).
 - **Banking** is a per-corner choice, `["C", piece, turn, degrees]`, and corners
   are **flat by default** everywhere — a missing 4th element and `0.0` mean the
   same thing, and nothing infers an angle from a corner's radius. The editor

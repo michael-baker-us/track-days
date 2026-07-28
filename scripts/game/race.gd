@@ -18,6 +18,11 @@ func _ready() -> void:
 
 	var track: Node3D = _make_track(track_info)
 	track.name = "Track"
+	# Done here rather than in the builder because a surface override set on an
+	# instanced tile does not survive being packed into a .tscn — see
+	# TrackBuilder.surface_road. Applying it on load treats a shipped circuit and
+	# a player's the same way.
+	TrackBuilder.surface_road(track)
 	# Ahead of the car so the car keeps rendering order and group lookups work.
 	add_child(track)
 	move_child(track, 0)
