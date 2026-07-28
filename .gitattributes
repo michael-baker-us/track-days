@@ -9,6 +9,7 @@
 # Binary assets
 *.glb binary
 *.png binary
+*.webp binary
 *.jpg binary
 *.ogg binary
 *.wav binary
