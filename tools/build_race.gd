@@ -6,17 +6,17 @@ extends SceneTree
 #
 # Built programmatically rather than hand-edited so it carries no stale instance
 # overrides - an earlier hand-made main.tscn pinned center_of_mass to
-# (0, -0.3, 0), which silently beat the corrected value in car.tscn because
+# (0, -0.3, 0), which silently beat the corrected value in the car scene because
 # instance overrides win over the source scene.
+#
+# The **car is no longer baked in either**, for the same reason the track is not:
+# which car this is depends on what the title screen chose, so `race.gd`
+# instances it at runtime from the selected `CarSpec`.
 
 func _initialize() -> void:
 	var root_node := Node3D.new()
 	root_node.name = "Race"
 	root_node.set_script(load("res://scripts/game/race.gd"))
-
-	var car: VehicleBody3D = load("res://scenes/car/car.tscn").instantiate()
-	car.name = "Car"
-	root_node.add_child(car)
 
 	var cam: Camera3D = load("res://scenes/camera/chase_camera.tscn").instantiate()
 	root_node.add_child(cam)

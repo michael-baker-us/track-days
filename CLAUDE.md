@@ -51,7 +51,7 @@ regenerated rather than hand-edited (see `tools/README.md`). Order matters:
 
 ```bash
 "$GODOT" --headless --path . --script tools/build_audio.gd   # engine/tyre .tres
-"$GODOT" --headless --path . --script tools/build_car.gd     # car.tscn
+"$GODOT" --headless --path . --script tools/build_car.gd     # one .tscn per CarSpec
 "$GODOT" --headless --path . --script tools/build_theme.gd   # ui_theme.tres
 "$GODOT" --headless --path . --script tools/build_track.gd   # all three circuits
 "$GODOT" --headless --path . --script tools/build_ui.gd      # hud.tscn

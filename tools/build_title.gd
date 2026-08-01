@@ -81,6 +81,21 @@ func _initialize() -> void:
 
 	rows.add_child(_spacer(6))
 
+	# The garage. One button that cycles rather than a list: there are two cars,
+	# the choice belongs next to the circuits it applies to, and the menu has a
+	# fixed height that a second scrolling list would eat. It sits *below* the
+	# track list because a circuit is what you pick first and a car is what you
+	# pick it in.
+	#
+	# The label is written by title_screen.gd from the selected spec.
+	var car_button := Button.new()
+	car_button.name = "CarButton"
+	car_button.text = "Car"
+	car_button.custom_minimum_size = Vector2(MENU_W, 40.0)
+	rows.add_child(car_button)
+
+	rows.add_child(_spacer(4))
+
 	var editor_button := Button.new()
 	editor_button.name = "EditorButton"
 	editor_button.text = "+   Build a track"

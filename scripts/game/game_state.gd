@@ -181,11 +181,43 @@ static func selected() -> Dictionary:
 const DEFAULT_CAR := "default"
 const DEFAULT_SURFACE := "tarmac"
 
-## What the next lap will be recorded against. Placeholders until the garage and
-## the surface work make them real choices (`docs/roadmap.md`, M14 and M17); they
-## exist now so every caller is already keying correctly.
+## The garage. Order is the order the title screen offers them in, and the first
+## is what a new player drives.
+##
+## Each entry is a `CarSpec`: which model it is made of and how it drives. The
+## geometry is measured out of the model by `tools/build_car.gd` rather than
+## written down, so adding a car is a spec and a tuning preset.
+const CAR_SPECS := [
+	"res://resources/cars/race.tres",
+	"res://resources/cars/race_future.tres",
+]
+
+static func cars() -> Array[CarSpec]:
+	var out: Array[CarSpec] = []
+	for path in CAR_SPECS:
+		out.append(load(path))
+	return out
+
+static func car_spec(car_id: String) -> CarSpec:
+	for spec in cars():
+		if spec.id == car_id:
+			return spec
+	return load(CAR_SPECS[0])
+
+## What the next lap is recorded against, and what gets driven.
+##
+## `selected_car` is a real choice now; `selected_surface` is still a placeholder
+## until M17. Both were in the record key from the start so that adding them
+## needed no save migration — which is exactly what happened here: a second car
+## arrived and every existing record kept meaning what it meant.
 static var selected_car: String = DEFAULT_CAR
 static var selected_surface: String = DEFAULT_SURFACE
+
+## The spec being driven. `DEFAULT_CAR` is not a car id, it is the "nothing chosen
+## yet" value the record key has always used, and it resolves to the first car —
+## so a save written before the garage existed keeps its records.
+static func selected_car_spec() -> CarSpec:
+	return car_spec(selected_car)
 
 static func record_section(track_id: String) -> String:
 	return "record:%s" % track_id

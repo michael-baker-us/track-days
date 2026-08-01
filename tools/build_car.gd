@@ -17,45 +17,54 @@ extends SceneTree
 # changes how the car drives. The visuals are the only part meant to be edited
 # freely.
 
-## Straight off race.glb's own AABB — the box is the body's bounding volume, and
-## it sits at half its own height so it rests on the ground rather than sinking.
-const BODY_SIZE := Vector3(1.2, 0.6325443, 2.5597725)
+## How far the body sits above the wheel line, and how much suspension travel the
+## wheels are given. Both measured in M1 and unchanged since; unlike the rest of
+## the geometry they are *decisions* rather than facts about the art, so they stay
+## here rather than being read out of a `.glb`.
 const BODY_LIFT := 0.1
-
-## Kenney's kit paints every model from one 512x512 palette atlas, referenced by
-## the GLBs as an external file. Only the .glb files were vendored originally, so
-## the texture was missing and the material fell back to untextured white.
-const COLORMAP := "res://assets/kenney/car_kit/Textures/colormap.png"
-
-const SOURCE := "res://assets/kenney/car_kit/race.glb"
-const OUTPUT := "res://scenes/car/car.tscn"
-
-## Front wheels steer, rear wheels drive. Positions are the source model's own
-## wheel origins, so the visuals line up with the suspension that carries them.
-const WHEELS := [
-	{"name": "WheelFrontLeft", "mesh": "wheel-front-left", "pos": Vector3(0.35, 0.3, 0.6398862), "steer": true},
-	{"name": "WheelFrontRight", "mesh": "wheel-front-right", "pos": Vector3(-0.35, 0.3, 0.6398862), "steer": true},
-	{"name": "WheelBackLeft", "mesh": "wheel-back-left", "pos": Vector3(0.35, 0.3, -0.8801137), "steer": false},
-	{"name": "WheelBackRight", "mesh": "wheel-back-right", "pos": Vector3(-0.35, 0.3, -0.8801137), "steer": false},
-]
-
-const WHEEL_RADIUS := 0.3
 const WHEEL_REST_LENGTH := 0.1
 
+## Kenney paints every model from one 512x512 palette atlas, referenced by the
+## GLBs as an external file. Only the .glb files were vendored originally, so the
+## texture was missing and the material fell back to untextured white.
+const COLORMAP := "res://assets/kenney/car_kit/Textures/colormap.png"
+
+## Every car the garage offers. The geometry is *not* here: it is measured out of
+## each spec's own model, which reproduces the constants this file used to
+## hard-code exactly. See `CarSpec`.
+const SPECS := [
+	"res://resources/cars/race.tres",
+	"res://resources/cars/race_future.tres",
+]
+
 func _initialize() -> void:
-	var source: Node3D = load(SOURCE).instantiate()
+	var failed := false
+	for path in SPECS:
+		if not _bake(load(path)):
+			failed = true
+	quit(1 if failed else 0)
+
+func _bake(spec: CarSpec) -> bool:
+	var source: Node3D = load(spec.source).instantiate()
 	var mat := _material()
 
 	var car := VehicleBody3D.new()
 	car.name = "Car"
-	# The default of 1.0 kg is unusable; see docs/tuning-journal.md.
-	car.mass = 1200.0
+	car.mass = spec.mass
 	# Custom rather than computed: the computed centre sat high enough that the
 	# inside wheels hopped in a turn. The custom value is the (0, 0, 0) default,
 	# which is body centre — deliberately, not by omission.
 	car.center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
 	car.set_script(load("res://scripts/car/car_controller.gd"))
-	car.tuning = load("res://resources/tuning/grippy.tres")
+	car.tuning = spec.tuning
+
+	var body_mesh := _find_mesh(source, "body")
+	if body_mesh == null:
+		push_error("%s has no 'body' mesh" % spec.source)
+		source.free()
+		car.free()
+		return false
+	var body_size := body_mesh.mesh.get_aabb().size
 
 	var body := _mesh_copy(source, "body", mat)
 	body.name = "body"
@@ -65,25 +74,53 @@ func _initialize() -> void:
 	var col := CollisionShape3D.new()
 	col.name = "CollisionShape3D"
 	var box := BoxShape3D.new()
-	box.size = BODY_SIZE
+	box.size = body_size
 	col.shape = box
-	col.position = Vector3(0.0, BODY_LIFT + BODY_SIZE.y * 0.5, 0.0)
+	col.position = Vector3(0.0, BODY_LIFT + body_size.y * 0.5, 0.0)
 	car.add_child(col)
 
-	for spec in WHEELS:
+	# Wheels, front pair first and left before right, because the GLBs list them
+	# in whatever order they were authored in and two builds of the same car have
+	# to produce the same scene. This particular order is not arbitrary: it is the
+	# one the hand-written constants used, so regenerating `race` reproduces the
+	# committed scene exactly rather than merely equivalently.
+	var wheels := []
+	for child in source.get_children():
+		if child is MeshInstance3D and String(child.name).begins_with("wheel"):
+			wheels.append(child)
+	wheels.sort_custom(func(a, b): return _wheel_order(a) < _wheel_order(b))
+	if wheels.size() != 4:
+		push_error("%s has %d wheels, expected 4" % [spec.source, wheels.size()])
+		source.free()
+		car.free()
+		return false
+
+	for mesh_node: MeshInstance3D in wheels:
+		var mesh_name := String(mesh_node.name)
+		# "wheel-front-left" -> "WheelFrontLeft", so the built scene reads the way
+		# it always has and the front/back split comes from the art's own naming.
+		var node_name := ""
+		for part in mesh_name.split("-"):
+			node_name += String(part).capitalize()
+		var steers := mesh_name.contains("front")
+
 		var wheel := VehicleWheel3D.new()
-		wheel.name = spec["name"]
-		wheel.position = spec["pos"]
-		wheel.use_as_steering = spec["steer"]
-		wheel.use_as_traction = not spec["steer"]
-		wheel.wheel_radius = WHEEL_RADIUS
+		wheel.name = node_name
+		wheel.position = mesh_node.position
+		wheel.use_as_steering = steers
+		wheel.use_as_traction = not steers
+		# A wheel is a disc in the XZ-facing plane, so its radius is half its
+		# larger cross-section — read off the art rather than assumed, which is
+		# what lets a car with different wheels arrive without an edit here.
+		var wheel_box := mesh_node.mesh.get_aabb().size
+		wheel.wheel_radius = maxf(wheel_box.y, wheel_box.z) * 0.5
 		wheel.wheel_rest_length = WHEEL_REST_LENGTH
 		car.add_child(wheel)
 
 		# Parented to the wheel, not the body, so it turns with the steering and
 		# rises with the suspension travel.
-		var mi := _mesh_copy(source, spec["mesh"], mat)
-		mi.name = spec["mesh"]
+		var mi := _mesh_copy(source, mesh_name, mat)
+		mi.name = mesh_name
 		wheel.add_child(mi)
 
 	car.add_child(_audio())
@@ -92,11 +129,27 @@ func _initialize() -> void:
 
 	var packed := PackedScene.new()
 	packed.pack(car)
-	var err := ResourceSaver.save(packed, OUTPUT)
-	print("car.tscn: %s (%d nodes)" % ["ok" if err == OK else "FAILED %s" % err, _count(car)])
+	DirAccess.make_dir_recursive_absolute(
+		ProjectSettings.globalize_path("res://scenes/car")
+	)
+	var err := ResourceSaver.save(packed, spec.scene_path())
+	print("%s: %s (%d nodes, body %.3f x %.3f x %.3f)" % [
+		spec.scene_path().get_file(), "ok" if err == OK else "FAILED %s" % err,
+		_count(car), body_size.x, body_size.y, body_size.z,
+	])
 	source.free()
 	car.free()
-	quit(0 if err == OK else 1)
+	return err == OK
+
+func _wheel_order(node: Node) -> String:
+	var mesh_name := String(node.name)
+	return ("0" if mesh_name.contains("front") else "1") + mesh_name
+
+func _find_mesh(source: Node3D, mesh_name: String) -> MeshInstance3D:
+	for child in source.get_children():
+		if child is MeshInstance3D and String(child.name) == mesh_name:
+			return child
+	return null
 
 const ENGINE_STREAM := "res://resources/audio/engine.tres"
 const TYRE_STREAM := "res://resources/audio/tyre.tres"

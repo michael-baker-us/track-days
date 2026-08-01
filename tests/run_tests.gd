@@ -1697,6 +1697,101 @@ func test_custom_circuits_get_a_par_of_their_own() -> void:
 	check_near("that matches the model",
 		par, ParTime.ideal_lap(builder.centreline), 0.05)
 
+## Every car in the garage has to be buildable and driveable, and its geometry
+## has to come out of its own model.
+##
+## `tools/build_car.gd` used to hard-code the body size, wheel positions and
+## wheel radius, with a warning that they were load-bearing. Measuring the same
+## numbers off `race.glb` reproduces every one exactly — the constants were a copy
+## of the art, not a decision about it — which is what makes a garage a spec and
+## a tuning preset rather than a transcription job.
+func test_every_car_is_built_from_its_own_model() -> void:
+	var specs := GameState.cars()
+	check_true("there is more than one car", specs.size() > 1)
+
+	var seen_ids := {}
+	var seen_tuning := {}
+	for spec in specs:
+		check_true("%s has an id" % spec.display_name, not spec.id.is_empty())
+		check("%s's id is unique" % spec.id, seen_ids.has(spec.id), false)
+		seen_ids[spec.id] = true
+
+		# Two cars sharing a preset feel like one car in two costumes, which is
+		# the whole failure mode a garage has to avoid.
+		check_true("%s has tuning of its own" % spec.id, spec.tuning != null)
+		if spec.tuning != null:
+			check("%s's tuning is not shared" % spec.id,
+				seen_tuning.has(spec.tuning.resource_path), false)
+			seen_tuning[spec.tuning.resource_path] = true
+
+		var scene: PackedScene = load(spec.scene_path())
+		check_true("%s is baked" % spec.id, scene != null)
+		if scene == null:
+			continue
+		var car: VehicleBody3D = scene.instantiate()
+		check_near("%s carries its mass" % spec.id, car.mass, spec.mass, 0.01)
+
+		# Geometry, against the model it was built from.
+		var source: Node3D = load(spec.source).instantiate()
+		var wheels := 0
+		var steering := 0
+		for child in car.get_children():
+			if not (child is VehicleWheel3D):
+				continue
+			wheels += 1
+			if child.use_as_steering:
+				steering += 1
+			var art: MeshInstance3D = source.get_node_or_null(
+				NodePath(String(child.get_child(0).name))
+			)
+			check_true("%s's %s matches the art" % [spec.id, child.name],
+				art != null and child.position.is_equal_approx(art.position))
+		check("%s has four wheels" % spec.id, wheels, 4)
+		# The trap that once shipped this car with eight of them.
+		check("%s has exactly two that steer" % spec.id, steering, 2)
+
+		var body: MeshInstance3D = source.get_node_or_null("body")
+		var shape: CollisionShape3D = car.get_node_or_null("CollisionShape3D")
+		check_true("%s has a collision box" % spec.id, shape != null)
+		if shape != null and body != null:
+			check_true("%s's box is the body's own size" % spec.id,
+				(shape.shape as BoxShape3D).size.is_equal_approx(
+					body.mesh.get_aabb().size))
+		source.free()
+		car.free()
+
+## Records are per car, which is what the composite key was built for. A second
+## car arriving must not disturb what the first one recorded.
+func test_lap_records_are_kept_per_car() -> void:
+	var was := GameState.selected_car
+	var specs := GameState.cars()
+	if specs.size() < 2:
+		return
+
+	GameState.selected_car = specs[0].id
+	GameState.save_best_lap("test_garage", 60.0, PackedFloat32Array())
+	GameState.selected_car = specs[1].id
+	GameState.save_best_lap("test_garage", 55.0, PackedFloat32Array())
+
+	GameState.selected_car = specs[0].id
+	check_near("the first car keeps its own time",
+		GameState.best_lap_for("test_garage"), 60.0, 0.001)
+	GameState.selected_car = specs[1].id
+	check_near("and the second keeps its own",
+		GameState.best_lap_for("test_garage"), 55.0, 0.001)
+
+	# And the medal is read against the same par, so a quicker car earns a better
+	# medal on the same circuit rather than a different target.
+	# Par 55 puts gold at 58.3, so the two times fall either side of it.
+	var par := 55.0
+	check("the slower car misses gold",
+		GameState.medal_for(60.0, par), GameState.Medal.SILVER)
+	check("the quicker one takes it",
+		GameState.medal_for(55.0, par), GameState.Medal.GOLD)
+
+	GameState.clear_best_lap("test_garage")
+	GameState.selected_car = was
+
 ## Every entry the title screen offers must actually load and be a usable
 ## circuit. A broken entry here is a dead button on the menu.
 func test_all_tracks_usable() -> void:
@@ -4443,6 +4538,8 @@ func _physics_process(_delta: float) -> bool:
 		test_shipped_par_times_match_the_model()
 		test_medals_are_derived_from_the_lap_time()
 		test_custom_circuits_get_a_par_of_their_own()
+		test_every_car_is_built_from_its_own_model()
+		test_lap_records_are_kept_per_car()
 		test_a_popped_section_can_be_flattened_from_any_of_its_corners()
 		test_par_time_refuses_a_degenerate_circuit()
 		test_the_editor_readout_is_affordable_per_mouse_move()

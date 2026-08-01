@@ -7,8 +7,12 @@ extends Node3D
 ## scene serves every circuit — including the ones the player built, which have
 ## no scene file at all and are constructed on the spot from their layout.
 
-@onready var _car: VehicleBody3D = $Car
 @onready var _tracker: Node = $LapTracker
+
+## Instanced at runtime rather than baked into race.tscn, for the same reason the
+## track is: which car this is depends on what the title screen chose, and one
+## race scene serves every combination.
+var _car: VehicleBody3D
 
 func _ready() -> void:
 	ViewportScaling.attach(get_window())
@@ -26,6 +30,10 @@ func _ready() -> void:
 	# Ahead of the car so the car keeps rendering order and group lookups work.
 	add_child(track)
 	move_child(track, 0)
+
+	_car = load(GameState.selected_car_spec().scene_path()).instantiate()
+	_car.name = "Car"
+	add_child(_car)
 
 	var spawn: Marker3D = track.get_node("SpawnPoint")
 	_place_car(spawn.position, spawn.rotation.y)

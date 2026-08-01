@@ -5,7 +5,7 @@ extends Node3D
 ##
 ## ## It is meshes and nothing else
 ##
-## Built by stripping `car.tscn` down to its `MeshInstance3D`s, so what is added
+## Built by stripping the driven car down to its `MeshInstance3D`s, so what is added
 ## to the scene has **no collision body, no wheels and no script**. That is not
 ## just economy:
 ##
@@ -75,7 +75,11 @@ static func build_visual_from(car: Node) -> Node3D:
 	return holder
 
 func _build_visual() -> Node3D:
-	var source: Node = load("res://scenes/car/car.tscn").instantiate()
+	# Whichever car is being driven, so the ghost is the same shape as the thing
+	# chasing it rather than always the first car in the garage.
+	var source: Node = load(
+		GameState.selected_car_spec().scene_path()
+	).instantiate()
 	var visual := build_visual_from(source)
 	source.free()
 	return visual

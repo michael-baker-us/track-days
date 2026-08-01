@@ -54,6 +54,7 @@ const TRACK_LIST_MAX_H := CARD_H * 3.0 + ROW_GAP * 2.0
 @onready var _scroll: ScrollContainer = $Centre/Rows/TrackScroll
 @onready var _tracks: VBoxContainer = $Centre/Rows/TrackScroll/Tracks
 @onready var _count: Label = $Centre/Rows/ListHeader/Count
+@onready var _car_button: Button = $Centre/Rows/CarButton
 @onready var _editor_button: Button = $Centre/Rows/EditorButton
 
 var _entries: Array[Dictionary] = []
@@ -73,6 +74,7 @@ func _ready() -> void:
 	# here.
 	GameState.return_scene = TITLE_SCENE
 	_populate()
+	_car_button.pressed.connect(_on_car_pressed)
 	_editor_button.pressed.connect(_on_editor_pressed)
 	# So the keyboard works without touching the mouse first.
 	_focus_row(0)
@@ -100,6 +102,7 @@ func _populate() -> void:
 		_tracks.get_combined_minimum_size().y, TRACK_LIST_MAX_H
 	)
 	_count.text = _count_text()
+	_refresh_car()
 	_reveal()
 
 ## How many circuits, and how many of them are the player's. Two shipped tracks
@@ -346,6 +349,31 @@ func _on_edit_pressed(track_id: String) -> void:
 func _on_track_pressed(index: int) -> void:
 	GameState.selected_index = index
 	get_tree().change_scene_to_file(RACE_SCENE)
+
+## Cycles the garage.
+##
+## The lap times on the rows are per car — the record key has always included one
+## — so changing the car re-reads every row. That is the point of showing it here
+## rather than in the race: which car you are in changes what your best lap on
+## each circuit *is*, and the menu should say so before you set off.
+func _on_car_pressed() -> void:
+	var specs := GameState.cars()
+	var at := 0
+	for i in specs.size():
+		if specs[i].id == GameState.selected_car:
+			at = i
+	GameState.selected_car = specs[(at + 1) % specs.size()].id
+	_populate()
+	_car_button.grab_focus()
+
+func _refresh_car() -> void:
+	var spec := GameState.selected_car_spec()
+	var blurb := spec.blurb
+	_car_button.text = (
+		"Car:  %s" % spec.display_name if blurb.is_empty()
+		else "Car:  %s  -  %s" % [spec.display_name, blurb]
+	)
+	_car_button.tooltip_text = "Change car. Lap records are kept per car."
 
 func _on_editor_pressed() -> void:
 	GameState.editing_id = ""

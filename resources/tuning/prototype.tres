@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CarTuning" format=3]
+
+[ext_resource type="Script" path="res://resources/tuning/car_tuning.gd" id="1_hmcfy"]
+
+[resource]
+resource_name = "Prototype"
+script = ExtResource("1_hmcfy")
+engine_force = 8600.0
+drag_coefficient = 4.2
+friction_front = 4.4
+friction_rear = 4.9
+handbrake_rear_friction = 1.3
+steer_falloff_reference_kmh = 215.0
+camera_fov_reference_kmh = 180.0

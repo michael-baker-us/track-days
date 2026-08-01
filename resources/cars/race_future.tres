@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CarSpec" format=3]
+
+[ext_resource type="Script" path="res://scripts/car/car_spec.gd" id="1_spec"]
+[ext_resource type="Resource" path="res://resources/tuning/prototype.tres" id="2_tune"]
+
+[resource]
+resource_name = "Prototype"
+script = ExtResource("1_spec")
+id = "race_future"
+display_name = "Prototype"
+source = "res://assets/kenney/car_kit/race-future.glb"
+blurb = "More grip, more top end, less forgiving"
+tuning = ExtResource("2_tune")
+mass = 1150.0

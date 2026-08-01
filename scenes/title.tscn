@@ -13,21 +13,21 @@ fill = 1
 fill_from = Vector2(0.5, 0.42)
 fill_to = Vector2(1, 1)
 
-[node name="Title" type="Control" unique_id=191180358]
+[node name="Title" type="Control" unique_id=723162974]
 layout_mode = 3
 anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_4ignj")
 
-[node name="Background" type="ColorRect" parent="." unique_id=633840254]
+[node name="Background" type="ColorRect" parent="." unique_id=606350704]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 color = Color(0.043, 0.055, 0.075, 1)
 
-[node name="Glow" type="TextureRect" parent="." unique_id=1742133601]
+[node name="Glow" type="TextureRect" parent="." unique_id=112054343]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -35,107 +35,116 @@ mouse_filter = 2
 texture = SubResource("GradientTexture2D_p6dhs")
 expand_mode = 1
 
-[node name="Centre" type="CenterContainer" parent="." unique_id=304034908]
+[node name="Centre" type="CenterContainer" parent="." unique_id=386637947]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="Rows" type="VBoxContainer" parent="Centre" unique_id=734982939]
+[node name="Rows" type="VBoxContainer" parent="Centre" unique_id=2025607502]
 custom_minimum_size = Vector2(600, 0)
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="Masthead" type="VBoxContainer" parent="Centre/Rows" unique_id=1276050481]
+[node name="Masthead" type="VBoxContainer" parent="Centre/Rows" unique_id=837978441]
 layout_mode = 2
 theme_override_constants/separation = 0
 
-[node name="Wordmark" type="HBoxContainer" parent="Centre/Rows/Masthead" unique_id=2051303088]
+[node name="Wordmark" type="HBoxContainer" parent="Centre/Rows/Masthead" unique_id=577923708]
 layout_mode = 2
 theme_override_constants/separation = 20
 alignment = 1
 
-[node name="Track" type="Label" parent="Centre/Rows/Masthead/Wordmark" unique_id=85799475]
+[node name="Track" type="Label" parent="Centre/Rows/Masthead/Wordmark" unique_id=2015661855]
 layout_mode = 2
 theme_type_variation = &"Wordmark"
 theme_override_colors/font_color = Color(0.894, 0.914, 0.945, 1)
 text = "T R A C K"
 
-[node name="Days" type="Label" parent="Centre/Rows/Masthead/Wordmark" unique_id=275584370]
+[node name="Days" type="Label" parent="Centre/Rows/Masthead/Wordmark" unique_id=1672791599]
 layout_mode = 2
 theme_type_variation = &"Wordmark"
 theme_override_colors/font_color = Color(0.95, 0.72, 0.3, 1)
 text = "D A Y S"
 
-[node name="@Control@2" type="Control" parent="Centre/Rows/Masthead" unique_id=424382758]
+[node name="@Control@2" type="Control" parent="Centre/Rows/Masthead" unique_id=1653592093]
 custom_minimum_size = Vector2(0, 14)
 layout_mode = 2
 
-[node name="RuleCentre" type="CenterContainer" parent="Centre/Rows/Masthead" unique_id=1824015871]
+[node name="RuleCentre" type="CenterContainer" parent="Centre/Rows/Masthead" unique_id=177683131]
 layout_mode = 2
 
-[node name="Rule" type="ColorRect" parent="Centre/Rows/Masthead/RuleCentre" unique_id=2008832618]
+[node name="Rule" type="ColorRect" parent="Centre/Rows/Masthead/RuleCentre" unique_id=864142704]
 custom_minimum_size = Vector2(84, 3)
 layout_mode = 2
 color = Color(0.95, 0.72, 0.3, 1)
 
-[node name="@Control@3" type="Control" parent="Centre/Rows/Masthead" unique_id=1243291691]
+[node name="@Control@3" type="Control" parent="Centre/Rows/Masthead" unique_id=487293202]
 custom_minimum_size = Vector2(0, 12)
 layout_mode = 2
 
-[node name="Sub" type="Label" parent="Centre/Rows/Masthead" unique_id=853670809]
+[node name="Sub" type="Label" parent="Centre/Rows/Masthead" unique_id=1321074136]
 layout_mode = 2
 theme_type_variation = &"Muted"
 text = "arcade circuit racing"
 horizontal_alignment = 1
 
-[node name="@Control@4" type="Control" parent="Centre/Rows" unique_id=557919514]
+[node name="@Control@4" type="Control" parent="Centre/Rows" unique_id=184227701]
 custom_minimum_size = Vector2(0, 10)
 layout_mode = 2
 
-[node name="ListHeader" type="HBoxContainer" parent="Centre/Rows" unique_id=2107221028]
+[node name="ListHeader" type="HBoxContainer" parent="Centre/Rows" unique_id=2134989506]
 layout_mode = 2
 
-[node name="Section" type="Label" parent="Centre/Rows/ListHeader" unique_id=1392296775]
+[node name="Section" type="Label" parent="Centre/Rows/ListHeader" unique_id=444770571]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"SectionLabel"
 text = "CIRCUITS"
 
-[node name="Count" type="Label" parent="Centre/Rows/ListHeader" unique_id=2090998635]
+[node name="Count" type="Label" parent="Centre/Rows/ListHeader" unique_id=1788275767]
 layout_mode = 2
 theme_type_variation = &"SectionLabel"
 horizontal_alignment = 2
 
-[node name="TrackScroll" type="ScrollContainer" parent="Centre/Rows" unique_id=1122405893]
+[node name="TrackScroll" type="ScrollContainer" parent="Centre/Rows" unique_id=639973500]
 custom_minimum_size = Vector2(600, 0)
 layout_mode = 2
 horizontal_scroll_mode = 0
 
-[node name="Tracks" type="VBoxContainer" parent="Centre/Rows/TrackScroll" unique_id=1691236242]
+[node name="Tracks" type="VBoxContainer" parent="Centre/Rows/TrackScroll" unique_id=994162806]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 10
 
-[node name="@Control@7" type="Control" parent="Centre/Rows" unique_id=2067545447]
+[node name="@Control@7" type="Control" parent="Centre/Rows" unique_id=2069359588]
 custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 
-[node name="EditorButton" type="Button" parent="Centre/Rows" unique_id=145802101]
+[node name="CarButton" type="Button" parent="Centre/Rows" unique_id=2131878584]
+custom_minimum_size = Vector2(600, 40)
+layout_mode = 2
+text = "Car"
+
+[node name="@Control@8" type="Control" parent="Centre/Rows" unique_id=1219060142]
+custom_minimum_size = Vector2(0, 4)
+layout_mode = 2
+
+[node name="EditorButton" type="Button" parent="Centre/Rows" unique_id=809328025]
 custom_minimum_size = Vector2(600, 48)
 layout_mode = 2
 text = "+   Build a track"
 
-[node name="@Control@8" type="Control" parent="Centre/Rows" unique_id=404498183]
+[node name="@Control@9" type="Control" parent="Centre/Rows" unique_id=729770632]
 custom_minimum_size = Vector2(0, 4)
 layout_mode = 2
 
-[node name="Hint" type="Label" parent="Centre/Rows" unique_id=1157809096]
+[node name="Hint" type="Label" parent="Centre/Rows" unique_id=646267624]
 layout_mode = 2
 theme_type_variation = &"Muted"
 text = "arrows select  ·  enter drives  ·  esc returns here from a race"
 horizontal_alignment = 1
 
-[node name="Badge" type="Label" parent="." unique_id=317223942]
+[node name="Badge" type="Label" parent="." unique_id=794868583]
 custom_minimum_size = Vector2(120, 0)
 layout_mode = 0
 anchor_left = 1.0

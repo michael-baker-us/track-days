@@ -378,6 +378,17 @@ rectilinear model is why closure is arithmetic rather than trial and error.
 1. **A `CarSpec` resource** — display name, source `.glb`, wheel positions, wheel
    radius, collision extents, and a `CarTuning` to pair with it. The natural
    extension of the decision that already put feel in a resource.
+
+> **Correction, from building it: the geometry does not belong in the spec.**
+> `build_car.gd` hard-coded the body size, wheel positions and wheel radius with
+> a warning that they were load-bearing. Measuring the same numbers off
+> `race.glb` reproduces **every one exactly** — they were a copy of the art, not
+> a decision about it. So a spec names a `.glb` and the builder reads the
+> geometry out of it, and the regenerated `race` scene is byte-identical to the
+> hand-specified one once Godot's generated resource ids are normalised.
+>
+> A spec is therefore an id, a name, a model and a tuning preset. Feel is the
+> only thing that cannot be derived, and it is the only thing left to author.
 2. **`tools/build_car.gd` generalised** to bake one scene per spec.
 3. **A second car**, chosen from the title screen at first, and tuned properly.
    A kart and a truck sharing `grippy.tres` feel like one car in two costumes.
@@ -388,6 +399,21 @@ rectilinear model is why closure is arithmetic rather than trial and error.
 
 The scale question has to be answered here: the road is 14 m wide and the car is
 2.56 m long. A truck and a kart on the same road make that stop being subtle.
+
+**Status: garage built, pit lane not.** Two cars — `race` (the measured baseline)
+and `race-future` (a prototype: more grip, more top end). Chosen from a button on
+the title screen, which re-reads every row's lap time because **records were
+already keyed per car**, so a second car arrived with no save migration at all.
+That is the composite-key decision from M8 paying for itself.
+
+**The scale question is deferred, not answered.** Every car shipped is within 12%
+of the same size and all four candidate models use a 0.3 m wheel, so nothing
+forces it yet. A kart or a truck would, and that is when it has to be settled.
+
+**Not done:** the prototype's tuning is a plausible starting point, not a
+measured one — the same sweeps M1 and M2 ran (top speed, braking, corner speeds)
+have to be run for it, or it is a guess wearing measured clothes. And the pit
+lane is untouched.
 
 ---
 
