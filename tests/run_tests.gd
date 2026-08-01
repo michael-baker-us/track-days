@@ -472,6 +472,120 @@ func test_the_editor_readout_is_affordable_per_mouse_move() -> void:
 	check_true("measure plus estimate fits in a frame (%.2f ms)" % each_ms,
 		each_ms < 16.0)
 
+## A circuit has to survive being turned into a string and back, including every
+## per-corner choice -- radius, banking and elevation are the interesting half of
+## a layout, and a code that carried only the painted cells would lose the design
+## and keep the outline.
+func test_a_circuit_round_trips_through_a_share_code() -> void:
+	var layout := sample_layout()
+	layout.display_name = "Shared Circuit"
+	layout.id = "user_the_senders_id"
+	var corners := layout.compile().corners
+	check_true("the sample circuit has corners to decorate", corners.size() > 2)
+	layout.corner_sizes[corners[0].cell] = 1
+	layout.elevation[layout.compile().runs[1].key] = 2
+
+	var code := ShareCode.encode(layout)
+	check_true("a code is recognisable on sight", code.begins_with(ShareCode.PREFIX))
+	# Small enough to paste into a message, which is the entire point of the
+	# format. Measured at 372 characters for this circuit; the bound is loose
+	# because it is guarding the order of magnitude, not the exact number.
+	check_true("and is short enough to paste (%d chars)" % code.length(),
+		code.length() < 2000)
+
+	var result := ShareCode.decode(code)
+	check_true("it decodes: %s" % result.error, result.ok)
+	if not result.ok:
+		return
+	check("same name", result.layout.display_name, "Shared Circuit")
+	check("same cells", result.layout.cells.size(), layout.cells.size())
+	check("corner radius survives",
+		result.layout.corner_sizes.get(corners[0].cell, -1), 1)
+	check("banking survives",
+		result.layout.corner_banks.size(), layout.corner_banks.size())
+	check("elevation survives", result.layout.elevation.size(), 1)
+	check_true("and it still compiles", result.layout.compile().ok)
+
+	# Ids are local: they key lap records, and `TrackStore` hands them out. An
+	# imported circuit arriving under the sender's id would inherit whatever this
+	# player had already recorded against that name.
+	check("the sender's id does not travel", result.layout.id, "")
+
+## Pasting goes through chat windows and email, which wrap lines and add spaces.
+## A code that failed because of what the transport did to it would be
+## indistinguishable from one that was never valid.
+func test_a_share_code_survives_being_pasted_badly() -> void:
+	var code := ShareCode.encode(sample_layout())
+	var mangled := "  " + code.substr(0, 20) + "\n" + code.substr(20, 20) \
+		+ "\r\n " + code.substr(40) + "  \n"
+	var result := ShareCode.decode(mangled)
+	check_true("line breaks and spaces are ignored: %s" % result.error, result.ok)
+	if result.ok:
+		check("and it is the same circuit",
+			result.layout.cells.size(), sample_layout().cells.size())
+
+## Codes come from other people, so every field is a claim rather than a fact.
+## Each of these has to fail *politely* -- with something a player can read --
+## rather than silently, or by taking the editor down with it.
+func test_a_bad_share_code_fails_politely() -> void:
+	var good := ShareCode.encode(sample_layout())
+	for bad in [
+		"", "hello", "TD1-", "TD1-not-base64-at-all|99",
+		good.substr(0, good.length() / 2),
+		good.replace("|", ""),
+	]:
+		var result := ShareCode.decode(bad)
+		check("%s is refused" % (bad.substr(0, 12) if not bad.is_empty() else "an empty paste"),
+			result.ok, false)
+		check_true("and says why", not result.error.is_empty())
+
+	# A size field is what an allocation gets sized from, so an absurd one has to
+	# be refused before it is believed rather than after.
+	var huge := good.substr(0, good.rfind("|")) + "|999999999"
+	check("an impossible size is refused", ShareCode.decode(huge).ok, false)
+
+	# The one that matters most: a code that decodes cleanly but is not a
+	# circuit. `TrackLayout.compile` calls the same `TrackShape.walk` the editor
+	# does, so this can never become a track -- but the player has to be told.
+	var broken := TrackLayout.new()
+	broken.cells = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(5, 5)]
+	broken.display_name = "Not A Loop"
+	var result := ShareCode.decode(ShareCode.encode(broken))
+	check("a decodable non-circuit is refused", result.ok, false)
+	check_true("and is refused for being a bad circuit, not a bad code",
+		result.error.contains("not a valid circuit"))
+
+## Ghosts can ride along, and measurement is why they do not by default: a
+## two-minute lap makes the code about 128,000 characters against the circuit's
+## 372, which is past what anyone pastes into a message.
+func test_a_share_code_can_carry_a_ghost_but_does_not_by_default() -> void:
+	var layout := sample_layout()
+	var plain := ShareCode.encode(layout)
+	check("a plain code carries no lap", ShareCode.decode(plain).ghost, null)
+
+	var ghost := Ghost.new()
+	for i in 200:
+		ghost.add(Transform3D(
+			Basis(Vector3.UP, float(i) * 0.07),
+			Vector3(float(i) * 1.7, 1.0 + sin(float(i) * 0.3), cos(float(i) * 0.2) * 40.0)
+		))
+	var with_ghost := ShareCode.encode(layout, ghost)
+	# Only "bigger" is asserted, not by how much: this ghost is 200 synthetic
+	# samples and deflate is very good at those. The figure that decided the
+	# design is a *real* lap -- 128,000 characters against a circuit's 372, which
+	# is why a shared circuit does not carry one by default. That measurement is
+	# in the tuning journal, not pinned here, because pinning it would be pinning
+	# how well a compressor happens to do on made-up data.
+	check_true("attaching one makes the code bigger",
+		with_ghost.length() > plain.length())
+
+	var result := ShareCode.decode(with_ghost)
+	check_true("and it comes back: %s" % result.error, result.ok)
+	if result.ok and result.ghost != null:
+		check("with every sample", result.ghost.count(), ghost.count())
+		check_near("and the right shape",
+			result.ghost.pose_at(100.0 / Ghost.HZ).origin.x, 100.0 * 1.7, 0.01)
+
 ## Every entry the title screen offers must actually load and be a usable
 ## circuit. A broken entry here is a dead button on the menu.
 func test_all_tracks_usable() -> void:
@@ -3144,6 +3258,10 @@ func _physics_process(_delta: float) -> bool:
 		test_par_time_is_plausible_on_the_shipped_circuits()
 		test_par_time_refuses_a_degenerate_circuit()
 		test_the_editor_readout_is_affordable_per_mouse_move()
+		test_a_circuit_round_trips_through_a_share_code()
+		test_a_share_code_survives_being_pasted_badly()
+		test_a_bad_share_code_fails_politely()
+		test_a_share_code_can_carry_a_ghost_but_does_not_by_default()
 		test_all_tracks_usable()
 		test_no_duplicated_instances()
 		test_spawn_is_behind_the_line()

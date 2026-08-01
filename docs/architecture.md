@@ -1001,6 +1001,51 @@ file — and the compressed body's length is in the header purely so a truncated
 file is caught by arithmetic instead of by handing bad data to `decompress`,
 which logs an engine error on its way to failing.
 
+### Share codes
+
+Custom tracks were stored as JSON so they could be swapped, and then swapping was
+never built. The obvious form — hand someone the file — fails on the target that
+matters: the web export has no filesystem, `user://` there is browser storage, and
+a download-and-upload flow needs UI on both sides. A code works identically on
+desktop and in a browser and needs nothing but the clipboard.
+
+`TD1-<base64>|<uncompressed size>`. The prefix sits outside the base64 so a code
+is recognisable on sight, the version can be read before anything is decoded, and
+a paste that was never a code is rejected cheaply rather than deep inside a
+decompressor. The size sits after a `|` because `decompress` needs it up front —
+and it is bounded before it is believed, since the whole purpose of a size field
+is to size an allocation.
+
+Four things it deliberately does:
+
+- **The sender's id does not travel.** Ids are local: `TrackStore` hands them out
+  and lap records are keyed on them, so importing under the sender's id would let
+  the circuit inherit whatever the receiving player had recorded against that
+  name. The importer allocates a fresh one, and an imported circuit arrives
+  unsaved.
+- **Whitespace is stripped before anything else.** Chat windows and email wrap
+  lines, and a code that failed because of what the transport did to it would be
+  indistinguishable from one that was never valid.
+- **The base64 alphabet is checked before `Marshalls` sees it.** Marshalls logs an
+  engine error on its way to returning nothing, and a mistyped code is the most
+  ordinary failure this has — it should not look like a fault in the game. Same
+  reasoning as the length field in `Ghost`.
+- **Validity is the last check, and it is the compiler's.** `TrackLayout.compile`
+  calls the same `TrackShape.walk` the editor does, so a decodable non-circuit
+  can never be built — but it fails with a sentence saying so rather than a
+  button that appears not to work.
+
+**Ghosts do not ride along by default, and that was settled by measuring rather
+than by taste.** A circuit is 372 characters. The same code carrying a two-minute
+lap is 128,000 — 343 times larger, and past what anyone pastes into a message.
+The capability exists and is opt-in, for a transport that can carry it.
+
+Importing lives in the circuit **picker** rather than behind a button, partly
+because it belongs there — the picker answers "which circuit am I working on" and
+a pasted code is one way to answer it, like "New circuit" beside it — and partly
+because the panel has no room. A share row of its own measured 35 units against a
+column that had none to spare.
+
 ### How a record is keyed, and why the track is a section
 
 A time is only comparable to another set **in the same car on the same surface**,

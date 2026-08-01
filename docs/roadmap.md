@@ -69,7 +69,7 @@ the next circuit to reuse the id inherits them.
 |---|---|
 | Does the car kit scale up to the road, or the road down to the car? | M14, and it gets harder with every car added |
 | Self-crossing at the same level, or only at different levels? | M13 |
-| Do shared circuits carry the author's ghost by default? | M11 |
+| ~~Do shared circuits carry the author's ghost by default?~~ | **Answered in M11: no.** A circuit is 372 characters; a two-minute ghost makes the code 128,000. Not a preference — a size fact. Attaching one is possible and opt-in, for a transport that is not a chat message. |
 | Per-circuit LUT or one global grade? | M16 (M8 does the global push, which is the cheap half) |
 | Surface per circuit or per segment? | M17 |
 | Do the barriers finally need collision? | M17, when grass stops gripping |
@@ -186,6 +186,18 @@ a time from their first lap.
 and a malformed or hand-edited code **fails politely** rather than silently —
 `TrackLayout.compile` calls `walk`, so an invalid one cannot build, but the player
 has to be told why.
+
+**Status: built.** `TD1-<base64>|<size>` — 372 characters for a real circuit,
+carrying every per-corner choice, not just the painted outline. Copy is a button
+in the editor; paste is an entry in the circuit picker, because the picker is the
+control that answers "which circuit am I working on" and a pasted code is one way
+to answer it. Every failure path is tested and each returns a sentence a player
+can read.
+
+**Ghosts are opt-in, and the measurement is why.** See the decisions table above.
+Attaching a real lap makes the code 128,000 characters, so "share your ghost"
+needs a transport that is not a message — a file or a paste-bin — which is not
+built.
 
 ---
 

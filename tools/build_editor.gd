@@ -236,6 +236,7 @@ func _actions() -> VBoxContainer:
 		_button("SaveButton", "Save  (ctrl+S)")
 	))
 
+
 	# The payoff. Everything else in the panel exists to make this button work.
 	var test_button := _button("TestButton", "Test drive")
 	test_button.theme_type_variation = UiTheme.V_PRIMARY
@@ -244,8 +245,17 @@ func _actions() -> VBoxContainer:
 
 	var delete_button := _button("DeleteButton", "Delete")
 	delete_button.theme_type_variation = UiTheme.V_DANGER
-	actions.add_child(_pair("ExitRow", delete_button,
-		_button("BackButton", "Back  (esc)")))
+	# Copy joins this row rather than getting one of its own. A row of its own
+	# cost 35 units and the column only has 720 on every window, so it pushed the
+	# panel past its budget — see docs/architecture.md. Sharing a circuit belongs
+	# with the other things you do *to* a circuit rather than to the drawing, and
+	# these three have the shortest labels in the panel, so they take a third each
+	# without clipping.
+	actions.add_child(_row("ExitRow", [
+		_button("CopyCodeButton", "Copy code"),
+		delete_button,
+		_button("BackButton", "Back"),
+	]))
 	return actions
 
 ## Two buttons sharing a row. Named, because two containers called the same thing

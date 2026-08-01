@@ -40,6 +40,7 @@ const UNDO_LIMIT := 64
 @onready var _undo_button: Button = $Split/Side/Rows/Actions/UndoRow/UndoButton
 @onready var _save_button: Button = $Split/Side/Rows/Actions/UndoRow/SaveButton
 @onready var _test_button: Button = $Split/Side/Rows/Actions/TestButton
+@onready var _copy_code_button: Button = $Split/Side/Rows/Actions/ExitRow/CopyCodeButton
 @onready var _delete_button: Button = $Split/Side/Rows/Actions/ExitRow/DeleteButton
 @onready var _back_button: Button = $Split/Side/Rows/Actions/ExitRow/BackButton
 
@@ -89,6 +90,7 @@ func _ready() -> void:
 	_undo_button.pressed.connect(_undo_last)
 	_save_button.pressed.connect(_on_save)
 	_test_button.pressed.connect(_on_test)
+	_copy_code_button.pressed.connect(_on_copy_code)
 	_delete_button.pressed.connect(_on_delete)
 	_back_button.pressed.connect(func(): get_tree().change_scene_to_file(TITLE_SCENE))
 
@@ -680,10 +682,23 @@ func _pathology(result: TrackBuilder.BuildResult, straight: float) -> String:
 
 # --- files ---
 
+## Importing lives in the picker rather than behind a button of its own, and not
+## only because the column has no room for one. The picker is the control that
+## answers "which circuit am I working on", and pasting a code someone sent is
+## one of the ways to answer it — the same kind of act as "New circuit", which
+## already sits here.
+##
+## The metadata is a sentinel rather than an id, and it cannot collide with a
+## real one: `TrackStore.new_id` namespaces every custom id with `user_` and
+## draws them from `[a-z0-9_]`.
+const PASTE_ITEM := "paste-a-code"
+
 func _refresh_picker() -> void:
 	_picker.clear()
 	_picker.add_item("New circuit")
 	_picker.set_item_metadata(0, "")
+	_picker.add_item("Paste a circuit code")
+	_picker.set_item_metadata(1, PASTE_ITEM)
 	var selected := 0
 	for layout in TrackStore.list_layouts():
 		_picker.add_item(layout.display_name)
@@ -696,6 +711,12 @@ func _refresh_picker() -> void:
 
 func _on_picked(index: int) -> void:
 	var id: String = _picker.get_item_metadata(index)
+	if id == PASTE_ITEM:
+		# Pasting is an action, not a selection, so whatever it does it must not
+		# leave the picker sitting on an entry that is not a circuit. Both paths
+		# out of `_on_paste_code` end in `_refresh_picker`.
+		_on_paste_code()
+		return
 	_layout = TrackStore.load_layout(id) if not id.is_empty() else _starter_layout()
 	GameState.editing_id = _layout.id
 	_grid.layout = _layout
@@ -704,6 +725,54 @@ func _on_picked(index: int) -> void:
 	_reset_undo()
 	_recompile()
 	_grid.fit_view()
+
+## Puts the circuit on the clipboard as a code someone can paste into a message.
+##
+## The clipboard rather than a file because the web export has no filesystem to
+## hand a file from — `user://` there is browser storage — and this is the one
+## route that behaves the same on a desktop and in a browser.
+##
+## The recorded ghost is deliberately not attached. It would work, but a
+## two-minute lap measures 128,000 characters against the circuit's 372, and
+## nobody pastes that into a message. See `ShareCode`.
+func _on_copy_code() -> void:
+	_layout.display_name = _name_edit.text.strip_edges()
+	if not _compiled.ok:
+		_flash("Finish the circuit before sharing it — see below.")
+		_update_panel()
+		return
+	var code := ShareCode.encode(_layout)
+	DisplayServer.clipboard_set(code)
+	_flash("Code copied (%d characters). Paste it to a friend." % code.length())
+	_update_panel()
+
+## Reads a code off the clipboard and opens it as a new circuit.
+##
+## It arrives as an *unsaved* circuit with no id, exactly as "New circuit" does.
+## Two reasons: the sender's id would let the imported track inherit whatever lap
+## record this player had against that name, and landing straight in the editor
+## means an imported circuit can be looked at before it is kept.
+func _on_paste_code() -> void:
+	var result := ShareCode.decode(DisplayServer.clipboard_get())
+	if not result.ok:
+		# The failure is the whole feature here: a code that quietly did nothing
+		# would be indistinguishable from a broken button.
+		_flash(result.error)
+		_refresh_picker()
+		_update_panel()
+		return
+
+	_layout = result.layout
+	GameState.editing_id = ""
+	_grid.layout = _layout
+	_name_edit.text = _layout.display_name
+	_delete_button.disabled = true
+	_reset_undo()
+	_refresh_picker()
+	_recompile()
+	_grid.fit_view()
+	_flash("Opened \"%s\" from a code. Save it to keep it." % _layout.display_name)
+	_update_panel()
 
 func _on_save() -> void:
 	_layout.display_name = _name_edit.text.strip_edges()
