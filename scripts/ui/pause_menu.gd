@@ -38,6 +38,7 @@ const TITLE_SCENE := "res://scenes/title.tscn"
 @onready var _resume_button: Button = $Panel/Rows/ResumeButton
 @onready var _quit_button: Button = $Panel/Rows/QuitButton
 @onready var _throttle_button: Button = $Panel/Rows/ThrottleButton
+@onready var _sound_button: Button = $Panel/Rows/SoundButton
 ## A sibling, not a child: it has to be on screen while this menu is not.
 @onready var _open_button: Button = get_parent().get_node_or_null("PauseButton")
 
@@ -46,7 +47,9 @@ func _ready() -> void:
 	_resume_button.pressed.connect(_resume)
 	_quit_button.pressed.connect(_leave)
 	_throttle_button.pressed.connect(_toggle_throttle)
+	_sound_button.pressed.connect(_toggle_sound)
 	_refresh_throttle()
+	_refresh_sound()
 	if _open_button != null:
 		_open_button.pressed.connect(_toggle)
 	set_button_visible_for_device()
@@ -61,6 +64,19 @@ func _toggle_throttle() -> void:
 func _refresh_throttle() -> void:
 	_throttle_button.text = (
 		"Throttle: Analogue" if GameState.analogue_input() else "Throttle: Binary"
+	)
+
+## Engine and tyre noise, off by default while the sounds are still synthesised
+## rather than recorded. The car picks the change up on its next physics frame,
+## which runs even while the tree is paused, so the switch takes effect without
+## having to leave this menu.
+func _toggle_sound() -> void:
+	GameState.set_audio_enabled(not GameState.audio_enabled())
+	_refresh_sound()
+
+func _refresh_sound() -> void:
+	_sound_button.text = (
+		"Sound: On" if GameState.audio_enabled() else "Sound: Off"
 	)
 
 ## Shown only where there is a touchscreen, on the same rule as the driving pads:

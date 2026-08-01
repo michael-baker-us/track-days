@@ -216,6 +216,38 @@ Engine pitch from wheel RPM, tyre squeal from the skid values every wheel alread
 reports, and music that matches the palette. Nothing else makes the existing
 driving feel this much better per line of code.
 
+**Status: built, heard, and judged not good enough. Off by default.**
+
+The first person to listen to it called it annoying, which is the only listening
+test that counts and the one no amount of headless assertion substitutes for.
+What is there is a buzz and a hiss keyed to speed — structurally correct, tuned
+against measured handling numbers, and not a car. **Sound is now opt-in** via a
+switch on the pause menu, because shipping something irritating as the default is
+worse than shipping silence.
+
+**This milestone is not closed.** It wants a real audio pass: recorded or properly
+modelled engine samples with load and overrun, tyre scrub that varies with
+surface and slip angle, and the rest of the game's sound — collisions, kerbs,
+the start-light sequence, UI. When that exists the default flips in one constant
+(`GameState.audio_enabled`) and nothing else changes.
+
+Both sounds are **synthesised** — there is no audio in the Kenney kits, so
+`SoundBank` generates them and `tools/build_audio.gd` bakes two looping
+`AudioStreamWAV` resources. 32 KB together, 0.5% of the web `.pck`.
+
+One correction to the item above: pitch is **not** taken from wheel RPM. Wheel
+speed rises monotonically, so that gives one twenty-second slide rather than an
+engine; the speed range is divided into bands and the note sweeps each. See
+`docs/architecture.md`.
+
+**Music is deliberately not attempted.** A synthesised buzz is a sound effect and
+a chiptune is composition — a different kind of work, and one where generating it
+procedurally would produce something worse than silence. It wants either an
+authored track or a real decision to build a sequencer.
+
+**Unheard.** Every assertion here is about sample data and pitch arithmetic. Nobody
+has listened to either sound.
+
 ---
 
 ## M13 — Crossings and bridges

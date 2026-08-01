@@ -188,6 +188,14 @@ func _pause_menu() -> Control:
 	throttle.custom_minimum_size = Vector2(0.0, 44.0)
 	rows.add_child(throttle)
 
+	# Sound is off by default while it is still a synthesised buzz rather than a
+	# recording, so this is the switch that turns it *on*. Same place as the
+	# throttle setting for the same reason: this is the only menu reachable while
+	# driving, so the effect of flipping it is one press away from being heard.
+	var sound := _label_button("SoundButton", "Sound: Off")
+	sound.custom_minimum_size = Vector2(0.0, 44.0)
+	rows.add_child(sound)
+
 	# Not styled as the danger action: leaving a race destroys nothing, and
 	# painting it red would say it does. It is second because the safe one should
 	# be what a pad has focus on when the menu opens.

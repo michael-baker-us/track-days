@@ -586,6 +586,162 @@ func test_a_share_code_can_carry_a_ghost_but_does_not_by_default() -> void:
 		check_near("and the right shape",
 			result.ghost.pose_at(100.0 / Ghost.HZ).origin.x, 100.0 * 1.7, 0.01)
 
+## The committed sound must match what `tools/build_audio.gd` produces now, the
+## same rule the generated theme and circuits follow: editing the synthesis and
+## forgetting to re-run the tool would leave the game playing the old sound with
+## no sign anything was wrong.
+func test_audio_resources_match_their_source() -> void:
+	# `SoundBank`, not `tools/build_audio.gd`: the tool extends SceneTree, so
+	# `new()`-ing it here allocates a second viewport and scenario and leaks them
+	# at exit. The synthesis lives in the class for exactly this reason.
+	for pair in [["engine", SoundBank.engine()], ["tyre", SoundBank.tyre()]]:
+		var committed: AudioStreamWAV = load(
+			"res://resources/audio/%s.tres" % pair[0]
+		)
+		var fresh: AudioStreamWAV = pair[1]
+		check_true("%s.tres exists" % pair[0], committed != null)
+		if committed == null:
+			continue
+		check("%s is the committed length" % pair[0],
+			committed.data.size(), fresh.data.size())
+		check("%s is byte-for-byte the built one" % pair[0],
+			committed.data, fresh.data)
+		check("%s loops" % pair[0],
+			committed.loop_mode, AudioStreamWAV.LOOP_FORWARD)
+		# The loop must cover the whole buffer. A loop end short of the data is
+		# the classic way a generated tone develops a tick.
+		check("%s loops over all of itself" % pair[0],
+			committed.loop_end, committed.data.size() / 2)
+
+## Every partial in a generated loop has to complete whole cycles inside the
+## buffer, or the waveform arrives at its own start mid-swing and clicks once per
+## loop -- forever, and inaudibly enough in isolation to ship.
+##
+## The wrap is compared against the buffer's *own* biggest sample-to-sample step
+## rather than against a fixed threshold. An absolute limit does not work across
+## both sounds: the engine is a low buzz whose neighbouring samples barely
+## differ, while the tyre is a band of noise up to 3.3 kHz, where a full swing
+## between adjacent samples is completely normal. What makes a click is the wrap
+## being an *outlier* for that particular waveform, not being large.
+func test_generated_loops_meet_their_own_start() -> void:
+	for name in ["engine", "tyre"]:
+		var wav: AudioStreamWAV = load("res://resources/audio/%s.tres" % name)
+		if wav == null:
+			continue
+		var frames := wav.data.size() / 2
+		var biggest_step := 0
+		for i in range(1, frames):
+			biggest_step = maxi(biggest_step, absi(
+				wav.data.decode_s16(i * 2) - wav.data.decode_s16((i - 1) * 2)
+			))
+		var wrap := absi(
+			wav.data.decode_s16(0) - wav.data.decode_s16((frames - 1) * 2)
+		)
+		check_true(
+			"%s wraps no harder than it moves anywhere else (%d vs %d)"
+				% [name, wrap, biggest_step],
+			wrap <= biggest_step
+		)
+
+## Sound is off unless it has been asked for, and the choice survives a restart.
+##
+## The default is off because the sounds are synthesised and, on the only
+## listening anyone has done, annoying. That is a placeholder for a proper audio
+## pass rather than a considered preference — but while it stands, it is worth
+## pinning, because "silent by default" is the sort of thing that gets flipped
+## back accidentally.
+func test_sound_is_off_until_asked_for() -> void:
+	GameState.forget_cached_settings()
+	check("silent unless asked", GameState.audio_enabled(), false)
+
+	GameState.set_audio_enabled(true)
+	GameState.forget_cached_settings()
+	check("turning it on persists", GameState.audio_enabled(), true)
+	GameState.set_audio_enabled(false)
+	GameState.forget_cached_settings()
+	check("and turning it off again persists", GameState.audio_enabled(), false)
+
+## With sound off, nothing plays -- stopped rather than muted, because a silent
+## loop still costs a mix on every frame and the point of the switch is that
+## someone did not want it running.
+func test_the_car_is_silent_when_sound_is_off() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	var audio: Node = car.get_node_or_null("Audio") if car != null else null
+	if audio == null:
+		return
+	GameState.set_audio_enabled(false)
+	audio._physics_process(1.0 / 120.0)
+	check("engine stopped", audio._engine.playing, false)
+	check("tyres stopped", audio._tyre.playing, false)
+
+## The car carries its own sound, and it must not be a second physics body or a
+## second anything -- the owner rule that once shipped this car with eight wheels
+## applies to whatever gets added to it.
+func test_the_car_carries_its_audio() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	check_true("there is a car", car != null)
+	if car == null:
+		return
+	var audio: Node = car.get_node_or_null("Audio")
+	check_true("with an audio node", audio != null)
+	if audio == null:
+		return
+	# Runs while the tree is paused, which is the only way it can silence itself
+	# when the game stops. A menu over a droning engine is the bug this prevents.
+	check("that keeps running while paused",
+		audio.process_mode, Node.PROCESS_MODE_ALWAYS)
+	for node_name in ["Engine", "Tyre"]:
+		var player: AudioStreamPlayer3D = audio.get_node_or_null(node_name)
+		check_true("%s player exists" % node_name, player != null)
+		check_true("%s has a stream" % node_name,
+			player != null and player.stream != null)
+
+## Pitch follows speed, and it does so by sweeping a band repeatedly rather than
+## climbing once. Straight wheel RPM would rise monotonically from a standstill
+## to top speed -- one long slide over twenty seconds, which is the thing an
+## engine most obviously does not do.
+func test_engine_pitch_sweeps_rather_than_climbing_once() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	var audio: Node = car.get_node_or_null("Audio") if car != null else null
+	if audio == null:
+		return
+
+	var pitches: Array[float] = []
+	for kmh in [0.0, 20.0, 40.0, 60.0, 80.0, 100.0, 120.0, 140.0, 165.0]:
+		pitches.append(audio._target_pitch(kmh))
+
+	var drops := 0
+	for i in range(1, pitches.size()):
+		if pitches[i] < pitches[i - 1]:
+			drops += 1
+	check_true("the note falls back at least once, as a shift (%s)"
+		% ", ".join(pitches.map(func(p): return "%.2f" % p)), drops > 0)
+
+	# And it stays inside the range the loop was baked for, at both extremes.
+	for p in pitches:
+		check_true("pitch %.2f is usable" % p,
+			p >= CarAudio.PITCH_IDLE - 0.01 and p <= CarAudio.PITCH_REDLINE + 0.01)
+	check_true("standing still idles",
+		is_equal_approx(audio._target_pitch(0.0), CarAudio.PITCH_IDLE))
+	# Past the top of the range is still the top of it, not beyond: a car pushed
+	# downhill over its measured top speed must not shriek.
+	check_near("and beyond top speed it holds",
+		audio._target_pitch(400.0), CarAudio.PITCH_REDLINE, 0.001)
+
+## Tyre noise means a tyre losing the fight, not a tyre working. Squealing
+## through every corner would make the sound carry no information at all.
+func test_tyres_only_squeal_when_they_are_sliding() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	var audio: Node = car.get_node_or_null("Audio") if car != null else null
+	if audio == null:
+		return
+	# Stationary, whatever the wheels are doing.
+	check_near("parked is silent", audio._squeal(0.0), 0.0, 0.001)
+	# The wheels in the suite's car are gripping, so at speed it is still silent.
+	check_near("gripping at speed is silent", audio._squeal(80.0), 0.0, 0.001)
+	check_true("and the threshold is below full grip",
+		CarAudio.SQUEAL_FROM < 1.0)
+
 ## Every entry the title screen offers must actually load and be a usable
 ## circuit. A broken entry here is a dead button on the menu.
 func test_all_tracks_usable() -> void:
@@ -3305,6 +3461,13 @@ func _physics_process(_delta: float) -> bool:
 		test_a_share_code_survives_being_pasted_badly()
 		test_a_bad_share_code_fails_politely()
 		test_a_share_code_can_carry_a_ghost_but_does_not_by_default()
+		test_audio_resources_match_their_source()
+		test_generated_loops_meet_their_own_start()
+		test_sound_is_off_until_asked_for()
+		test_the_car_is_silent_when_sound_is_off()
+		test_the_car_carries_its_audio()
+		test_engine_pitch_sweeps_rather_than_climbing_once()
+		test_tyres_only_squeal_when_they_are_sliding()
 		test_all_tracks_usable()
 		test_no_duplicated_instances()
 		test_spawn_is_behind_the_line()
@@ -3439,7 +3602,15 @@ func _physics_process(_delta: float) -> bool:
 		test_pausing_stops_the_race()
 		return false
 
-	if frame == 24:
+	# Frame 30 rather than 24, which is 13 physics frames after the staging
+	# instead of 7. The recovery this waits for happens on an *idle* frame and
+	# this runner counts physics ones, so the gap between them is what the test
+	# is really depending on — and on a cold run, where importing has just
+	# stalled the process, physics can catch up several frames in a row without
+	# an idle frame in between. That produced one failure in three runs. A wider
+	# window makes it rare rather than impossible; the honest fix would be for
+	# the watch to expose that it has run, rather than for this to guess.
+	if frame == 30:
 		test_a_stale_rotation_corrects_itself()
 		return false
 

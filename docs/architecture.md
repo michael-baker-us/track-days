@@ -869,6 +869,76 @@ time-of-day preset is the right home for them and is scheduled (`docs/roadmap.md
 M16); building that structure now, with one circuit's worth of values and nothing
 to vary, would be fitting a socket before there is a bulb.
 
+## Audio
+
+> **Off by default, and that is a verdict rather than a setting.** The synthesised
+> sounds below were listened to once and called annoying. They are structurally
+> right — seamless loops, pitch keyed to measured speeds — and they are a buzz
+> and a hiss rather than a car. `GameState.audio_enabled` defaults to false, with
+> a switch on the pause menu, until a proper audio pass replaces them. Flipping
+> the default is a one-line change when that happens.
+>
+> Everything below describes what is there and why it is shaped that way. None of
+> it argues that it sounds good.
+
+There was none at all, and there is no audio in the Kenney kits — they are art.
+So it is **synthesised** by `SoundBank` and baked into two looping
+`AudioStreamWAV` resources by `tools/build_audio.gd`. That keeps the game
+buildable from what is committed, the same reason the theme, the circuits and the
+car are baked by scripts, and it means the sounds can be tuned against handling
+numbers that are measured rather than against whatever a downloaded loop was.
+
+Saved as `.tres`, not `.wav`: a `.wav` in the project is an *import*, cached
+under `.godot/`, which is neither committed nor stable. A resource carries its
+samples inline, so what is committed is exactly what the game loads. Together
+they are 32 KB, or 0.5% of the web `.pck`.
+
+**The rule that makes a generated loop seamless:** every partial's frequency must
+be an integer multiple of the buffer's own fundamental (mix rate ÷ frame count).
+A component that does not complete whole cycles inside the buffer arrives at the
+loop point mid-swing and clicks — once per loop, forever, and quietly enough in
+isolation to ship. It is also why the tyre "noise" is 240 summed partials rather
+than a random number generator: random samples cannot be made to meet their own
+start.
+
+The suite checks this by comparing the wrap against the buffer's own largest
+sample-to-sample step, not against a fixed threshold. An absolute limit cannot
+serve both sounds — the engine is a low buzz whose neighbouring samples barely
+differ, while the tyre runs to 3.3 kHz where a full swing between adjacent
+samples is normal. What makes a click is the wrap being an *outlier for that
+waveform*, not being large.
+
+### The gearbox is a lie, and deliberately
+
+Engine pitch could come from `VehicleWheel3D.get_rpm()`, and it would be wrong:
+wheel speed rises monotonically from a standstill to top speed, so the note would
+climb one long slide over twenty seconds and never do the thing an engine does.
+The speed range is divided into five bands and the note sweeps each one, so
+acceleration is sold by repetition.
+
+There is no gearbox in the physics — `engine_force` is applied directly, with no
+clutch or torque curve — so this is honestly a sound effect keyed to speed. The
+band is found by dividing the speed range rather than by tracking a current gear,
+which means it cannot get stuck in one: braking drops the note the way
+accelerating raises it, with no state to unwind.
+
+Two smaller decisions:
+
+- **Tyre noise reports the worst-behaved wheel, not the average.** One wheel
+  breaking away is the moment worth hearing, and averaging hides it behind the
+  three still gripping. It is also gated above a threshold and a minimum speed —
+  squealing through every corner would carry no information.
+- **The audio node runs `PROCESS_MODE_ALWAYS`.** Audio does not stop when
+  `get_tree().paused` is set, so something has to keep running in order to
+  silence it, and a node that paused with everything else could not. Same
+  reasoning as the pause menu, which runs always so it can dismiss itself.
+
+Playback does not start under `--headless`, where the audio driver is a stub that
+never mixes. The playback objects it creates are still held by the audio server
+at shutdown, which ended every suite run with "2 resources still in use". None of
+the *logic* is skipped — pitch and gain are still computed and applied every
+frame, so the suite asserts on exactly what the game does.
+
 ## Lap timing
 
 16 `Area3D` gates along the centreline, index 0 on the start line. They never

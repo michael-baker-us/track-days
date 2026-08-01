@@ -208,11 +208,40 @@ static func set_analogue_input(on: bool) -> void:
 	cfg.set_value(SETTINGS_SECTION, ANALOGUE_INPUT_KEY, on)
 	cfg.save(records_path)
 
-## Drops the cached setting so the next read comes off disk again. For the test
+## Whether the car makes any noise.
+##
+## **Off by default, on purpose.** The engine and tyre sounds are synthesised
+## (see `docs/architecture.md`) and the honest verdict on them is that they are
+## annoying — they are a buzz and a hiss keyed to speed, not a recording of a
+## car. Shipping something irritating as the default is worse than shipping
+## silence, so the sound is opt-in until it is worth opting out of.
+##
+## This is a placeholder for a proper audio pass, not a considered preference.
+## When the sounds are worth hearing, the default flips here and nothing else
+## changes.
+const AUDIO_ENABLED_KEY := "audio_enabled"
+
+static var _audio_enabled: int = -1
+
+static func audio_enabled() -> bool:
+	if _audio_enabled < 0:
+		var cfg := _open()
+		var on: bool = cfg.get_value(SETTINGS_SECTION, AUDIO_ENABLED_KEY, false)
+		_audio_enabled = 1 if on else 0
+	return _audio_enabled == 1
+
+static func set_audio_enabled(on: bool) -> void:
+	_audio_enabled = 1 if on else 0
+	var cfg := _open()
+	cfg.set_value(SETTINGS_SECTION, AUDIO_ENABLED_KEY, on)
+	cfg.save(records_path)
+
+## Drops the cached settings so the next read comes off disk again. For the test
 ## suite, which repoints `records_path` after this class may already have been
 ## touched — without it a cached answer would outlive the file it came from.
 static func forget_cached_settings() -> void:
 	_analogue_input = -1
+	_audio_enabled = -1
 
 ## Loads the save, bringing it up to date first. Every read and write goes
 ## through here so there is exactly one place that can encounter an old file.

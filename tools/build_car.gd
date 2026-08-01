@@ -86,6 +86,8 @@ func _initialize() -> void:
 		mi.name = spec["mesh"]
 		wheel.add_child(mi)
 
+	car.add_child(_audio())
+
 	TrackBuilder.set_owner_recursive(car, car)
 
 	var packed := PackedScene.new()
@@ -95,6 +97,45 @@ func _initialize() -> void:
 	source.free()
 	car.free()
 	quit(0 if err == OK else 1)
+
+const ENGINE_STREAM := "res://resources/audio/engine.tres"
+const TYRE_STREAM := "res://resources/audio/tyre.tres"
+
+## The engine note and the tyre scrub, as children of the car so they travel with
+## it and are positioned in 3D by being where the car is.
+##
+## `PROCESS_MODE_ALWAYS` is load-bearing rather than incidental: audio does not
+## stop when `get_tree().paused` is set, so something has to keep running in
+## order to silence it, and a node that paused with everything else could not.
+## Same reasoning as the pause menu, which runs always so it can dismiss itself.
+##
+## Plain nodes, not an instanced sub-scene. Setting `owner` on the internals of
+## an instance makes them serialise on top of it and everything appears twice —
+## the trap that once shipped this car with eight wheels.
+func _audio() -> Node3D:
+	var holder := Node3D.new()
+	holder.name = "Audio"
+	holder.process_mode = Node.PROCESS_MODE_ALWAYS
+	holder.set_script(load("res://scripts/car/car_audio.gd"))
+
+	# Node names must match the @onready paths in scripts/car/car_audio.gd.
+	holder.add_child(_player("Engine", ENGINE_STREAM, 34.0))
+	holder.add_child(_player("Tyre", TYRE_STREAM, 26.0))
+	return holder
+
+## `unit_size` is how far the sound carries. The engine is set well beyond the
+## chase camera's ~4 m so the car does not fade as the camera lags behind it in a
+## corner; the tyres are nearer, because scrub is a thing happening at the
+## contact patches rather than a thing filling the scene.
+func _player(node_name: String, stream_path: String, unit_size: float) -> AudioStreamPlayer3D:
+	var player := AudioStreamPlayer3D.new()
+	player.name = node_name
+	player.stream = load(stream_path)
+	player.unit_size = unit_size
+	# Started muted by `car_audio.gd`'s first update; without this the first
+	# frame is a full-volume blip before anything has been worked out.
+	player.volume_db = -80.0
+	return player
 
 ## One material shared by every surface, mirroring how the kit is authored: the
 ## mesh UVs pick a flat swatch out of the atlas, so there is nothing per-part to
