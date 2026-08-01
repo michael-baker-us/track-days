@@ -103,8 +103,18 @@ func _initialize() -> void:
 	draw_button.toggle_mode = true
 	var erase_button := _button("EraseButton", "Erase")
 	erase_button.toggle_mode = true
+	# Crossing is a per-circuit choice rather than a mode, and it is off unless
+	# asked for because it gives up the editor's strongest guarantee: with it off
+	# no drag can produce a shape that will not build, and with it on a drag can
+	# lay one leg across another and leave the circuit needing a bridge before it
+	# compiles. That is a fair trade to opt into and a poor one to be given.
+	#
+	# It joins this row rather than getting one of its own: the column is 720
+	# units on every window and has no spare height. See docs/architecture.md.
+	var cross_button := _button("CrossButton", "Cross")
+	cross_button.toggle_mode = true
 	rows.add_child(_row("ToolRow", [draw_button, erase_button,
-		_button("FitButton", "Fit")]))
+		_button("FitButton", "Fit"), cross_button]))
 
 	# What to do next. Deliberately the most prominent thing after the heading -
 	# it is the only answer to "the editor is open, now what". In its own framed

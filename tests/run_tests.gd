@@ -910,6 +910,130 @@ func test_the_compiler_refuses_crossings_by_default() -> void:
 	var round_tripped := TrackLayout.from_dict(raised.to_dict())
 	check("the flag round-trips", round_tripped.allow_crossings, true)
 
+## The editor's strongest guarantee is that no drag can leave a shape which will
+## not build. Crossings give that up deliberately, so the opt-in has to reach all
+## the way down: with it off a handle edit that would cross is still refused.
+func test_handle_edits_only_cross_when_asked() -> void:
+	var corners: Array[Vector2i] = [
+		Vector2i(0, 0), Vector2i(12, 0), Vector2i(12, 8), Vector2i(0, 8),
+	]
+	check_true("the rectangle is valid to begin with",
+		TrackShape.corners_valid(corners))
+
+	# Everything `corners_valid` guarded before still has to be refused with the
+	# opt-in on: allowing a crossing must not become a licence for a diagonal, a
+	# degenerate edge, or a ring too small to be a circuit.
+	var diagonal: Array[Vector2i] = [
+		Vector2i(0, 0), Vector2i(12, 4), Vector2i(12, 8), Vector2i(0, 8),
+	]
+	check("a diagonal edge is refused",
+		TrackShape.corners_valid(diagonal, true), false)
+	var stubby: Array[Vector2i] = [
+		Vector2i(0, 0), Vector2i(1, 0), Vector2i(1, 8), Vector2i(0, 8),
+	]
+	check("an edge below the minimum is refused",
+		TrackShape.corners_valid(stubby, true), false)
+	check("too few corners is refused",
+		TrackShape.corners_valid(corners.slice(0, 3), true), false)
+
+	# The real thing: an outline that genuinely crosses itself is accepted only
+	# with the opt-in.
+	var eight := _eight_layout(14)
+	var eight_corners := TrackShape.corners_of(eight.cells, true)
+	check_true("a figure of eight has corners to read", eight_corners.size() >= 4)
+	check("its outline is refused by default",
+		TrackShape.corners_valid(eight_corners), false)
+	check_true("and accepted when asked",
+		TrackShape.corners_valid(eight_corners, true))
+
+	# And the cells it traces are a *set*: a crossing cell appears once, or the
+	# layout it is written back into would be corrupt rather than crossed.
+	var traced := TrackShape.cells_from_corners(eight_corners)
+	var seen := {}
+	var doubled := 0
+	for c in traced:
+		if seen.has(c):
+			doubled += 1
+		seen[c] = true
+	check("no cell is traced twice", doubled, 0)
+	check_true("and the traced cells still walk as a crossing circuit",
+		not TrackShape.walk(traced, true).is_empty())
+
+## A crossing belongs to no straight, the way a corner does not: two straights
+## run through it and there is no telling which one a drag meant to grab.
+func test_a_crossing_cannot_be_grabbed_as_a_straight() -> void:
+	var eight := _eight_layout(14)
+	var corners := TrackShape.corners_of(eight.cells, true)
+	var crossing: Vector2i = TrackShape.crossings_in(eight.cells)[0]
+	check("the crossing is not grabbable",
+		TrackShape.edge_at(corners, crossing), -1)
+
+	# Ordinary road on the same circuit still is, or the whole circuit would
+	# become undraggable rather than just the one cell.
+	var grabbable := 0
+	for c in eight.cells:
+		if TrackShape.edge_at(corners, c) >= 0:
+			grabbable += 1
+	check_true("but the rest of the road still is (%d cells)" % grabbable,
+		grabbable > 20)
+
+## The start straight is pinned to the ground so the lap's height closes, so it
+## must report **no** headroom.
+##
+## It used to report two or three levels of it, because the probe ran before the
+## pinning was accounted for. The editor believed the number: clicking the badge
+## on the start straight flashed "held at +2", the resolver put it straight back
+## to zero, and nothing changed. Harmless on an ordinary circuit and the reason a
+## crossing could not be made to validate — half the time the leg you are told to
+## raise is the one that silently refuses to rise.
+func test_the_start_straight_offers_no_headroom() -> void:
+	var plain := sample_layout().compile()
+	check_true("the sample circuit compiles", plain.ok)
+	for run in plain.runs:
+		if run.is_start:
+			check("the start straight offers no climb", run.max_level, 0)
+	# And something else on the circuit still does, or the check above would pass
+	# by the whole circuit being unraisable.
+	var raisable := 0
+	for run in plain.runs:
+		if not run.is_start and run.max_level > 0:
+			raisable += 1
+	check_true("but other straights still can be raised (%d)" % raisable,
+		raisable > 0)
+
+	# The same on a crossing circuit, which is where it bites.
+	var eight := _eight_layout(14)
+	var crossing: Vector2i = TrackShape.crossings_in(eight.cells)[0]
+	var compiled := eight.compile()
+	var over := 0
+	for run in compiled.runs:
+		if not run.cells.has(crossing):
+			continue
+		if run.is_start:
+			check("the crossing's start leg cannot rise", run.max_level, 0)
+		elif run.max_level >= TrackLayout.CROSSING_CLEARANCE_LEVELS:
+			over += 1
+	check_true("and the other leg can rise far enough to bridge", over > 0)
+
+## The readout says what is wrong; the guide card has to say which control puts
+## it right. A correct diagnosis with nowhere to click is why this was reported
+## as unusable rather than as broken.
+func test_the_editor_says_how_to_fix_a_crossing() -> void:
+	var editor: Control = staged_editor
+	if editor == null:
+		return
+	var eight := _eight_layout(14)
+	editor._layout = eight
+	editor._grid.layout = eight
+	editor._recompile()
+
+	check("a flat crossing does not compile", editor._compiled.ok, false)
+	var guide: String = editor._guide.text
+	check_true("the guide names the fix (%s)" % guide,
+		guide.contains("bridge over") and guide.contains("dot"))
+	check_true("and warns which straight will not rise",
+		guide.contains("start line"))
+
 ## The relaxation is opt-in, and with it off nothing whatsoever changes. This is
 ## the guard that matters most in M13: `TrackShape.walk` refusing bad shapes is
 ## what makes the editor safe, and the editor has not been switched over yet.
@@ -3879,6 +4003,9 @@ func _physics_process(_delta: float) -> bool:
 		test_a_painted_crossing_builds_with_real_clearance()
 		test_one_level_of_crossing_clearance_is_refused()
 		test_the_compiler_refuses_crossings_by_default()
+		test_handle_edits_only_cross_when_asked()
+		test_a_crossing_cannot_be_grabbed_as_a_straight()
+		test_the_start_straight_offers_no_headroom()
 		test_corner_sizing()
 		test_elevation()
 		test_layout_round_trip()
@@ -3939,6 +4066,7 @@ func _physics_process(_delta: float) -> bool:
 		# final some frames after the scene is added.
 		test_title_menu_fits_however_many_tracks()
 		test_a_pasted_code_opens_through_the_field()
+		test_the_editor_says_how_to_fix_a_crossing()
 		test_editor_panel_is_wired_and_fits()
 		return false
 

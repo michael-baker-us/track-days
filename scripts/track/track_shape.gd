@@ -173,9 +173,11 @@ static func bend_indices(cycle: Array[Vector2i]) -> Array[int]:
 	return out
 
 ## The loop's corner points, in order. Empty if the cells are not a valid loop.
-static func corners_of(cells: Array[Vector2i]) -> Array[Vector2i]:
+static func corners_of(
+	cells: Array[Vector2i], allow_crossings: bool = false
+) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
-	var cycle := walk(cells)
+	var cycle := walk(cells, allow_crossings)
 	if cycle.is_empty():
 		return out
 	for i in bend_indices(cycle):
@@ -184,8 +186,19 @@ static func corners_of(cells: Array[Vector2i]) -> Array[Vector2i]:
 
 ## The cells a corner list traces out. Assumes consecutive corners are
 ## axis-aligned, which every edit here maintains.
+##
+## A **set**: where the outline crosses itself the same cell is on two edges, and
+## this returns it once. That matters because the result is written straight back
+## to `TrackLayout.cells`, which is a set of painted cells — a cell listed twice
+## there is not a circuit with a crossing, it is a corrupt circuit.
+##
+## Deduplicating here does not weaken `corners_valid`, which used to lean on the
+## duplicate to catch an outline folded onto itself. `walk` does that work
+## properly: road doubling back along its own line leaves cells with one or three
+## neighbours, and only a clean transverse crossing leaves four.
 static func cells_from_corners(corners: Array[Vector2i]) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
+	var seen := {}
 	var n := corners.size()
 	for i in n:
 		var a := corners[i]
@@ -197,14 +210,18 @@ static func cells_from_corners(corners: Array[Vector2i]) -> Array[Vector2i]:
 		var at := a
 		# Stop before b; the next edge contributes it.
 		while at != b:
-			out.append(at)
+			if not seen.has(at):
+				seen[at] = true
+				out.append(at)
 			at += step
 	return out
 
 # --- validating an edit ---
 
 ## True if this corner list describes a circuit the builder can be handed.
-static func corners_valid(corners: Array[Vector2i]) -> bool:
+static func corners_valid(
+	corners: Array[Vector2i], allow_crossings: bool = false
+) -> bool:
 	var n := corners.size()
 	if n < MIN_CORNERS:
 		return false
@@ -217,7 +234,7 @@ static func corners_valid(corners: Array[Vector2i]) -> bool:
 			return false
 	# The cells are the real test: this is what catches a loop folded onto
 	# itself, where every edge is legal but the ring touches or crosses.
-	return not walk(cells_from_corners(corners)).is_empty()
+	return not walk(cells_from_corners(corners), allow_crossings).is_empty()
 
 ## Drops corners the loop does not turn at. Moving one corner onto a neighbour's
 ## line leaves a vertex that is no longer a bend, and left in place it would
@@ -248,7 +265,8 @@ static func prune(corners: Array[Vector2i]) -> Array[Vector2i]:
 ## Returns an empty array if the result would not be a valid loop, so a caller
 ## can simply refuse the drag.
 static func move_corner(
-	corners: Array[Vector2i], index: int, to: Vector2i
+	corners: Array[Vector2i], index: int, to: Vector2i,
+	allow_crossings: bool = false
 ) -> Array[Vector2i]:
 	var n := corners.size()
 	var out: Array[Vector2i] = corners.duplicate()
@@ -266,11 +284,12 @@ static func move_corner(
 	else:
 		out[next] = Vector2i(to.x, corners[next].y)
 
-	return _accept(out)
+	return _accept(out, allow_crossings)
 
 ## Slides a whole straight sideways, carrying the corners at both ends.
 static func move_edge(
-	corners: Array[Vector2i], index: int, to: Vector2i
+	corners: Array[Vector2i], index: int, to: Vector2i,
+	allow_crossings: bool = false
 ) -> Array[Vector2i]:
 	var n := corners.size()
 	var out: Array[Vector2i] = corners.duplicate()
@@ -282,13 +301,14 @@ static func move_edge(
 	else:
 		out[index] = Vector2i(to.x, a.y)
 		out[(index + 1) % n] = Vector2i(to.x, b.y)
-	return _accept(out)
+	return _accept(out, allow_crossings)
 
 ## Pushes a section of a straight out sideways, adding four corners — the way a
 ## chicane or a new loop of track gets made. `at` is where along the straight to
 ## put it; `depth` how far out, signed.
 static func insert_bump(
-	corners: Array[Vector2i], index: int, at: Vector2i, depth: int
+	corners: Array[Vector2i], index: int, at: Vector2i, depth: int,
+	allow_crossings: bool = false
 ) -> Array[Vector2i]:
 	var n := corners.size()
 	var a := corners[index]
@@ -334,12 +354,14 @@ static func insert_bump(
 	out.assign(
 		corners.slice(0, index + 1) + inserted + corners.slice(index + 1)
 	)
-	return _accept(out)
+	return _accept(out, allow_crossings)
 
 ## Straightens the jog a corner belongs to. A single corner cannot be removed
 ## from a rectilinear ring on its own — they come in pairs — so this tries the
 ## corner with each of its neighbours and takes whichever leaves a valid loop.
-static func straighten_at(corners: Array[Vector2i], index: int) -> Array[Vector2i]:
+static func straighten_at(
+	corners: Array[Vector2i], index: int, allow_crossings: bool = false
+) -> Array[Vector2i]:
 	var n := corners.size()
 	for pair_start in [index, (index - 1 + n) % n]:
 		var out: Array[Vector2i] = []
@@ -347,17 +369,19 @@ static func straighten_at(corners: Array[Vector2i], index: int) -> Array[Vector2
 			if i == pair_start or i == (pair_start + 1) % n:
 				continue
 			out.append(corners[i])
-		var accepted := _accept(out)
+		var accepted := _accept(out, allow_crossings)
 		if not accepted.is_empty():
 			return accepted
 	return []
 
 ## Prune, then validate. Every edit goes through here, so "would this break the
 ## circuit" is answered in exactly one place.
-static func _accept(corners: Array[Vector2i]) -> Array[Vector2i]:
+static func _accept(
+	corners: Array[Vector2i], allow_crossings: bool = false
+) -> Array[Vector2i]:
 	var pruned := prune(corners)
 	var empty: Array[Vector2i] = []
-	return pruned if corners_valid(pruned) else empty
+	return pruned if corners_valid(pruned, allow_crossings) else empty
 
 ## Joins the two loose ends of a half-drawn loop with a right-angled path.
 ##
@@ -447,22 +471,31 @@ static func _leg(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 
 ## Index of the straight a cell lies on, or -1. Corners belong to no straight,
 ## so grabbing near a bend never slides the wrong piece of road.
+##
+## **A crossing belongs to no straight either, for the same reason.** Two
+## straights run through it, and there is no way to tell which one a player
+## meant to grab — so it returns -1 rather than picking the first and sliding
+## whichever leg happened to be earlier in the list. Both legs are still
+## grabbable anywhere else along their length.
 static func edge_at(corners: Array[Vector2i], cell: Vector2i) -> int:
+	var found := -1
 	var n := corners.size()
 	for i in n:
 		var a := corners[i]
 		var b := corners[(i + 1) % n]
+		var on := false
 		if a.y == b.y:
-			if cell.y != a.y:
-				continue
-			if cell.x > mini(a.x, b.x) and cell.x < maxi(a.x, b.x):
-				return i
+			on = (cell.y == a.y
+				and cell.x > mini(a.x, b.x) and cell.x < maxi(a.x, b.x))
 		else:
-			if cell.x != a.x:
-				continue
-			if cell.y > mini(a.y, b.y) and cell.y < maxi(a.y, b.y):
-				return i
-	return -1
+			on = (cell.x == a.x
+				and cell.y > mini(a.y, b.y) and cell.y < maxi(a.y, b.y))
+		if not on:
+			continue
+		if found >= 0:
+			return -1  # two straights here: a crossing, and ambiguous to grab
+		found = i
+	return found
 
 ## The midpoint of a straight, where its badge sits.
 static func edge_midpoint(corners: Array[Vector2i], index: int) -> Vector2:

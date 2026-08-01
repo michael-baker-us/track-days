@@ -313,6 +313,43 @@ on the way in and comes back on the way out with nothing lit or unlit specially.
 > A real tunnel therefore needs a hole in both the ground mesh and its collider,
 > a signed elevation level, and geometry — a milestone, not a feature.
 
+### Drawing a crossing, and the trap in it
+
+The **Cross** toggle in the editor's tool row sets `TrackLayout.allow_crossings`
+per circuit. Off by default because it gives up the editor's strongest guarantee:
+with it off no drag can produce a shape that will not build.
+
+The compiler then refuses a crossing with less than
+`CROSSING_CLEARANCE_LEVELS` (two) between the legs — a measurement, since
+`roadStraightBridge` carries exactly one level of structure below its deck.
+
+> **The start straight reports no headroom, and that was a bug worth recording.**
+> `_resolve_elevation` pins run zero to the ground so the lap's height closes,
+> but `_measure_headroom` probed without accounting for it and advertised two or
+> three levels the run would never be given. The editor believed the number:
+> clicking the elevation badge on the start straight flashed "held at +2", the
+> resolver put it straight back to zero, and nothing changed.
+>
+> Harmless on an ordinary circuit — nobody misses a climb they did not plan — and
+> the reason a crossing could not be made to validate. **Half the time, the leg
+> you are told to raise is the one that silently refuses to rise**, and the
+> editor gave no sign which half you were in.
+
+Three things follow from that, and all three are about the failure being
+*actionable* rather than merely correct:
+
+- The readout says what is wrong; the **guide card says which control fixes it**
+  — click the faint dot in the middle of the straight that should go over, twice,
+  and not the one carrying the start line. A correct diagnosis with nowhere to
+  click is why this was first reported as unintuitive rather than as broken.
+- Clicking to `+1` on a crossing leg says **"one more to clear the crossing"**.
+  Reporting only "held at +1" reads as success while the circuit is still
+  refused, and doing as you were told and being told no again is where people
+  stop.
+- Clicking the start straight now explains that it stays down so the lap's
+  height closes, rather than reusing the "too short for a climb" message, which
+  was not true and suggested the wrong remedy.
+
 ### Closed is not the same as simple
 
 `BuildResult.closed` used to mean "the walk returned to its start **and**

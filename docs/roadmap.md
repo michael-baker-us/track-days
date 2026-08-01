@@ -334,13 +334,39 @@ Suzuka is what made this cheap. Shipping a crossover circuit as an authored
 segment list proved the builder handled overlapping geometry *before* any of the
 painted path existed, which turned step 3 from the risky one into a test.
 
-### Remaining
+### Step 4 done — the editor. M13 is complete.
 
-4. **The editor.** `TrackShape._accept` and `corners_valid` still refuse
-   crossings, so no handle edit can produce one — `corners_valid` re-walks
-   `cells_from_corners`, which emits a crossing cell twice. `edge_at` assumes a
-   cell lies on at most one straight. The canvas has to draw a crossing as a
-   crossing. And the player needs a way to turn `allow_crossings` on.
+A **Cross** toggle sits in the tool row beside Draw, Erase and Fit, and sets
+`TrackLayout.allow_crossings` for that circuit — saved with it, and carried in
+its share code.
+
+**Per circuit and off by default, because it gives something up.** With it off,
+no drag can produce a shape that will not build: that is the editor's strongest
+guarantee. With it on, a drag can lay one leg across another and leave a circuit
+that needs a bridge before it compiles. A fair trade to opt into and a poor one
+to be handed.
+
+Turning it back *off* is refused while a crossing is drawn, rather than silently
+making the circuit unbuildable — the switch would appear to work and the reason
+would surface as an error somewhere else entirely.
+
+Three smaller things it needed:
+
+- **`cells_from_corners` now returns a set.** Its output is written straight back
+  to `TrackLayout.cells`, and a cell listed twice there is not a circuit with a
+  crossing, it is a corrupt circuit. Deduplicating does not weaken
+  `corners_valid`: `walk` does that work properly, since road doubling back along
+  its own line leaves cells with one or three neighbours and only a clean
+  transverse crossing leaves four.
+- **`edge_at` returns -1 at a crossing**, the way it already does at a corner.
+  Two straights run through it and there is no telling which one a drag meant.
+  Both legs stay grabbable everywhere else.
+- The opt-in threads through every edit, so `TrackShape` stays conservative by
+  default and the policy lives in one place.
+
+Pinned by tests: diagonals, degenerate edges and too-few-corners are all still
+refused **with the opt-in on**; a figure of eight's outline is refused without it
+and accepted with it; and the cells it traces contain no duplicates.
 
 **Explicitly not doing:** diagonals. `roadStraightSkew` exists and is a trap — the
 rectilinear model is why closure is arithmetic rather than trial and error.

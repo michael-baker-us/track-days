@@ -194,7 +194,7 @@ func _on_resized() -> void:
 ## Called by the editor after every recompile.
 func refresh(new_compiled: TrackLayout.Compiled) -> void:
 	compiled = new_compiled
-	_corners = TrackShape.corners_of(layout.cells)
+	_corners = TrackShape.corners_of(layout.cells, layout.allow_crossings)
 	_centre = Vector2.ZERO
 	for c in layout.cells:
 		_centre += Vector2(c)
@@ -597,8 +597,9 @@ func _apply_drag(cell: Vector2i) -> void:
 		return
 
 	var moved: Array[Vector2i] = (
-		TrackShape.move_corner(_corners, _drag_index, cell) if _drag == Hit.CORNER
-		else TrackShape.move_edge(_corners, _drag_index, cell)
+		TrackShape.move_corner(_corners, _drag_index, cell, layout.allow_crossings)
+		if _drag == Hit.CORNER
+		else TrackShape.move_edge(_corners, _drag_index, cell, layout.allow_crossings)
 	)
 
 	# Dragging a bend from one side of its straight to the other has to pass
@@ -610,7 +611,7 @@ func _apply_drag(cell: Vector2i) -> void:
 	if _drag == Hit.EDGE and moved.size() < _drag_floor:
 		var past := _step_past_flat(cell)
 		if past != cell:
-			moved = TrackShape.move_edge(_corners, _drag_index, past)
+			moved = TrackShape.move_edge(_corners, _drag_index, past, layout.allow_crossings)
 	# A drag reshapes; it never changes how many corners there are. Letting a
 	# prune dissolve the handle mid-gesture would renumber the list under the
 	# drag, and a new bend dragged back through flat would die on the way rather
@@ -645,7 +646,8 @@ func _apply_drag(cell: Vector2i) -> void:
 func _insert_bend(index: int, cell: Vector2i) -> void:
 	for depth in [TrackShape.MIN_EDGE, 3, 4]:
 		for towards in [_outward_sign(index), -_outward_sign(index)]:
-			var out := TrackShape.insert_bump(_corners, index, cell, depth * towards)
+			var out := TrackShape.insert_bump(
+				_corners, index, cell, depth * towards, layout.allow_crossings)
 			if out.is_empty():
 				continue
 			layout.cells = TrackShape.cells_from_corners(out)
@@ -687,7 +689,7 @@ func _outward_sign(index: int) -> int:
 	return 1 if off >= 0.0 else -1
 
 func _straighten(index: int) -> void:
-	var out := TrackShape.straighten_at(_corners, index)
+	var out := TrackShape.straighten_at(_corners, index, layout.allow_crossings)
 	if out.is_empty():
 		status.emit("That corner cannot be removed — a circuit needs at least four.")
 		return

@@ -31,6 +31,7 @@ const UNDO_LIMIT := 64
 @onready var _draw_button: Button = $Split/Side/Rows/ToolRow/DrawButton
 @onready var _erase_button: Button = $Split/Side/Rows/ToolRow/EraseButton
 @onready var _fit_button: Button = $Split/Side/Rows/ToolRow/FitButton
+@onready var _cross_button: Button = $Split/Side/Rows/ToolRow/CrossButton
 @onready var _guide: Label = $Split/Side/Rows/GuideCard/Rows/Guide
 @onready var _status: Label = $Split/Side/Rows/Status
 @onready var _readout: Label = $Split/Side/Rows/ReadoutCard/Rows/Readout
@@ -87,6 +88,7 @@ func _ready() -> void:
 	_draw_button.toggled.connect(_set_draw_mode)
 	_erase_button.toggled.connect(_set_erase_mode)
 	_fit_button.pressed.connect(_grid.fit_view)
+	_cross_button.toggled.connect(_set_allow_crossings)
 	_legend_toggle.toggled.connect(_show_legend)
 	_close_button.pressed.connect(_close_gap)
 	_name_edit.text_changed.connect(func(t): _layout.display_name = t)
@@ -106,6 +108,7 @@ func _ready() -> void:
 	_more_button.pressed.connect(_toggle_side_panel)
 
 	_name_edit.text = _layout.display_name
+	_cross_button.button_pressed = _layout.allow_crossings
 	_refresh_picker()
 	_reset_undo()
 	_recompile()
@@ -402,6 +405,7 @@ func _undo_last() -> void:
 	_layout = restored
 	_grid.layout = _layout
 	_name_edit.text = _layout.display_name
+	_cross_button.button_pressed = _layout.allow_crossings
 	_undo_button.disabled = _undo.size() < 2
 	_recompile()
 
@@ -475,6 +479,14 @@ func _cycle_elevation(cell: Vector2i) -> void:
 	for run in _compiled.runs:
 		if not run.cells.has(cell):
 			continue
+		if run.is_start:
+			# Not "too short": it is the right length and still cannot rise. The
+			# lap's height has to come back to zero somewhere, and this is where.
+			_flash(
+				"The start straight stays on the ground so the lap's height "
+				+ "closes. Raise the other side instead."
+			)
+			return
 		if run.max_level <= 0:
 			_flash("This straight is too short for a climb.")
 			return
@@ -484,7 +496,18 @@ func _cycle_elevation(cell: Vector2i) -> void:
 			_layout.elevation.erase(c)
 		var next := (run.level + 1) % (run.max_level + 1)
 		_set_level(cell, next)
-		_flash("Straight %s." % ("back on the ground" if next == 0 else "held at +%d" % next))
+		# On a crossing, "+1" is a step towards the answer rather than the
+		# answer, and reporting only "held at +1" reads as success while the
+		# circuit is still refused. Doing what you were told and being told no
+		# again is where people give up.
+		var short := false
+		for c in TrackShape.crossings_in(_layout.cells):
+			if run.cells.has(c):
+				short = next > 0 and next < TrackLayout.CROSSING_CLEARANCE_LEVELS
+		_flash("Straight %s.%s" % [
+			"back on the ground" if next == 0 else "held at +%d" % next,
+			"  One more to clear the crossing." if short else "",
+		])
 		_on_edited()
 		return
 
@@ -530,6 +553,17 @@ func _guidance() -> String:
 			+ "then Join the ends up, or switch Draw off to drag it into shape."
 		)
 	if not _compiled.ok:
+		# A crossing is the one failure with a non-obvious fix. The readout below
+		# says what is wrong; this has to say which control puts it right, or the
+		# player is left with a correct diagnosis and nowhere to click.
+		for e in _compiled.errors:
+			if e.contains("crosses itself"):
+				return (
+					"The road crosses itself, so one side has to bridge over the "
+					+ "other. Click the faint dot in the middle of the straight "
+					+ "that should go over — twice, up to +2. The straight with "
+					+ "the start line on it cannot be raised, so use the other one."
+				)
 		return "Fix the circuit first — see below."
 	if not _grid.has_handles():
 		return "Turn Draw on to lay road, or drag the green dots to reshape."
@@ -730,6 +764,7 @@ func _on_picked(index: int) -> void:
 	GameState.editing_id = _layout.id
 	_grid.layout = _layout
 	_name_edit.text = _layout.display_name
+	_cross_button.button_pressed = _layout.allow_crossings
 	_delete_button.disabled = _layout.id.is_empty()
 	_reset_undo()
 	_recompile()
@@ -818,6 +853,7 @@ func _on_paste_open() -> void:
 	GameState.editing_id = ""
 	_grid.layout = _layout
 	_name_edit.text = _layout.display_name
+	_cross_button.button_pressed = _layout.allow_crossings
 	_delete_button.disabled = true
 	_reset_undo()
 	_refresh_picker()
@@ -825,6 +861,28 @@ func _on_paste_open() -> void:
 	_grid.fit_view()
 	_flash("Opened \"%s\" from a code. Save it to keep it." % _layout.display_name)
 	_update_panel()
+
+## Lets this circuit's road run over itself.
+##
+## Per circuit, not per session, so it is saved and shared with the layout — a
+## circuit that needs a crossing to make sense would otherwise arrive somewhere
+## else as an invalid one.
+##
+## Turning it *off* again is refused while a crossing is drawn, rather than
+## silently making the circuit unbuildable: the switch would appear to work and
+## the reason would show up as an error somewhere else.
+func _set_allow_crossings(on: bool) -> void:
+	if not on and not TrackShape.crossings_in(_layout.cells).is_empty():
+		_cross_button.button_pressed = true
+		_flash("Erase the crossing first, then this can go back off.")
+		_update_panel()
+		return
+	_layout.allow_crossings = on
+	_flash(
+		"Crossings on - drag one leg over another, then raise it to bridge over."
+		if on else "Crossings off."
+	)
+	_recompile()
 
 func _on_save() -> void:
 	_layout.display_name = _name_edit.text.strip_edges()
@@ -861,6 +919,7 @@ func _on_delete() -> void:
 	_layout = _starter_layout()
 	_grid.layout = _layout
 	_name_edit.text = _layout.display_name
+	_cross_button.button_pressed = _layout.allow_crossings
 	_reset_undo()
 	_refresh_picker()
 	_recompile()

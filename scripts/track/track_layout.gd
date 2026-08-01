@@ -518,6 +518,16 @@ func _measure_headroom(out: Compiled) -> void:
 	var n := out.corners.size()
 	_refresh_run_bounds(out)
 	for i in n:
+		# The start run is pinned to the ground by `_resolve_elevation` so the
+		# lap's height closes, and probing it happily reports two or three levels
+		# of headroom it will never be given. The editor believed that: clicking
+		# the badge on the start straight flashed "held at +2", the resolver put
+		# it straight back to 0, and nothing changed. On a crossing that is the
+		# difference between "raise this leg" working and appearing to do nothing.
+		if out.runs[i].is_start:
+			out.runs[i].max_level = 0
+			out.corners[i].max_level = out.corners[i].level
+			continue
 		out.runs[i].max_level = out.runs[i].level
 		for probe in range(out.runs[i].level + 1, MAX_LEVEL + 1):
 			var was: int = out.runs[i].level
