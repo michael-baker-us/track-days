@@ -2398,6 +2398,49 @@ func test_portrait_gives_the_canvas_the_screen() -> void:
 ## there and still reachable. And the panel has to clear MORE itself — a panel
 ## covering its own switch is one that cannot be shut again, which is what the
 ## first version did.
+## Importing goes through a text field rather than straight off the clipboard.
+##
+## That is a web-build decision, not a preference. `DisplayServer.clipboard_get`
+## is reliable on desktop; in a browser it returns only what was last pasted into
+## the canvas, because reading the system clipboard needs an async permissions
+## API Godot's web platform does not expose. A focused `LineEdit` receives the
+## browser's own paste event, so the field is the one route that behaves the same
+## on both -- and this asserts the field is actually the thing being read.
+func test_a_pasted_code_opens_through_the_field() -> void:
+	var editor: Control = staged_editor
+	if editor == null:
+		return
+	var flyout: Control = editor.get_node_or_null("PasteFlyout")
+	var field: LineEdit = editor.get_node_or_null("PasteFlyout/Rows/CodeEdit")
+	var open_button: Button = editor.get_node_or_null(
+		"PasteFlyout/Rows/PasteButtons/PasteOpenButton")
+	check_true("the editor has somewhere to paste a code",
+		flyout != null and field != null and open_button != null)
+	if flyout == null or field == null or open_button == null:
+		return
+	check("and it starts closed", flyout.visible, false)
+
+	# A bad code leaves the box open, so the text can be corrected rather than
+	# having to be pasted again.
+	editor._on_paste_code()
+	check_true("choosing paste opens the box", flyout.visible)
+	field.text = "TD1-obviously-not-a-code|12"
+	open_button.pressed.emit()
+	check_true("a bad code keeps the box open to be fixed", flyout.visible)
+	check_true("and says what was wrong", not editor._status.text.is_empty())
+
+	var shared := sample_layout()
+	shared.display_name = "Pasted In"
+	field.text = ShareCode.encode(shared)
+	open_button.pressed.emit()
+	check("a good code closes the box", flyout.visible, false)
+	check("and the circuit is open in the editor",
+		editor._layout.display_name, "Pasted In")
+	# Unsaved and unnamed by id, exactly as "New circuit" arrives: an imported
+	# circuit must not inherit a lap record from a local track of the same name.
+	check("as an unsaved circuit", editor._layout.id, "")
+	check_true("and it compiles", editor._compiled.ok)
+
 func test_more_panel_holds_the_rest() -> void:
 	var editor: Control = staged_editor
 	if editor == null:
@@ -3330,6 +3373,7 @@ func _physics_process(_delta: float) -> bool:
 		# Containers lay out on a later frame, so sizes and positions are only
 		# final some frames after the scene is added.
 		test_title_menu_fits_however_many_tracks()
+		test_a_pasted_code_opens_through_the_field()
 		test_editor_panel_is_wired_and_fits()
 		return false
 

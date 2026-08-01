@@ -36,6 +36,10 @@ const UNDO_LIMIT := 64
 @onready var _readout: Label = $Split/Side/Rows/ReadoutCard/Rows/Readout
 @onready var _legend_toggle: Button = $Split/Side/Rows/LegendToggle
 @onready var _legend: PanelContainer = $LegendFlyout
+@onready var _paste_flyout: PanelContainer = $PasteFlyout
+@onready var _code_edit: LineEdit = $PasteFlyout/Rows/CodeEdit
+@onready var _paste_open_button: Button = $PasteFlyout/Rows/PasteButtons/PasteOpenButton
+@onready var _paste_cancel_button: Button = $PasteFlyout/Rows/PasteButtons/PasteCancelButton
 @onready var _close_button: Button = $Split/Side/Rows/Actions/CloseButton
 @onready var _undo_button: Button = $Split/Side/Rows/Actions/UndoRow/UndoButton
 @onready var _save_button: Button = $Split/Side/Rows/Actions/UndoRow/SaveButton
@@ -91,6 +95,11 @@ func _ready() -> void:
 	_save_button.pressed.connect(_on_save)
 	_test_button.pressed.connect(_on_test)
 	_copy_code_button.pressed.connect(_on_copy_code)
+	_paste_open_button.pressed.connect(_on_paste_open)
+	_paste_cancel_button.pressed.connect(_close_paste)
+	# Enter in the box does what Open does; a one-field form should not need
+	# the mouse to finish.
+	_code_edit.text_submitted.connect(func(_t): _on_paste_open())
 	_delete_button.pressed.connect(_on_delete)
 	_back_button.pressed.connect(func(): get_tree().change_scene_to_file(TITLE_SCENE))
 
@@ -742,26 +751,69 @@ func _on_copy_code() -> void:
 		_update_panel()
 		return
 	var code := ShareCode.encode(_layout)
+	if not _has_clipboard():
+		# Nowhere to put it, so put it somewhere it can be selected by hand
+		# rather than reporting a success that did not happen.
+		_code_edit.text = code
+		_paste_flyout.visible = true
+		_code_edit.grab_focus()
+		_code_edit.select_all()
+		_flash("This device has no clipboard — copy the code from the box.")
+		_update_panel()
+		return
 	DisplayServer.clipboard_set(code)
 	_flash("Code copied (%d characters). Paste it to a friend." % code.length())
 	_update_panel()
 
-## Reads a code off the clipboard and opens it as a new circuit.
+## Whether the clipboard can be read or written at all. False under `--headless`,
+## where asking anyway logs an engine error — and a suite whose log carries
+## expected errors is a suite people stop reading.
+func _has_clipboard() -> bool:
+	return DisplayServer.has_feature(DisplayServer.FEATURE_CLIPBOARD)
+
+## Opens the box a code is pasted into, pre-filled from the clipboard where that
+## works.
+##
+## It does not simply read the clipboard and go. On desktop that would be fine;
+## in a browser, `clipboard_get` returns only what was last pasted into the
+## canvas, because reading the system clipboard needs an async permissions API
+## Godot's web platform does not expose. A focused `LineEdit` receives the
+## browser's own paste event, so the field is the route that works on both — and
+## the pre-fill keeps the desktop flow to a single click anyway.
+func _on_paste_code() -> void:
+	_refresh_picker()
+	# Pre-filled only when the clipboard already holds something that looks like
+	# a code, so the desktop flow is one click and the box is never opened with
+	# somebody's unrelated copied text sitting in it.
+	var clipboard := DisplayServer.clipboard_get() if _has_clipboard() else ""
+	_code_edit.text = clipboard if clipboard.strip_edges().begins_with(
+		ShareCode.PREFIX
+	) else ""
+	_paste_flyout.visible = true
+	_code_edit.grab_focus()
+	_code_edit.select_all()
+
+func _close_paste() -> void:
+	_paste_flyout.visible = false
+	_code_edit.text = ""
+
+## Turns whatever is in the box into a circuit, or says why it could not.
 ##
 ## It arrives as an *unsaved* circuit with no id, exactly as "New circuit" does.
 ## Two reasons: the sender's id would let the imported track inherit whatever lap
 ## record this player had against that name, and landing straight in the editor
 ## means an imported circuit can be looked at before it is kept.
-func _on_paste_code() -> void:
-	var result := ShareCode.decode(DisplayServer.clipboard_get())
+func _on_paste_open() -> void:
+	var result := ShareCode.decode(_code_edit.text)
 	if not result.ok:
 		# The failure is the whole feature here: a code that quietly did nothing
-		# would be indistinguishable from a broken button.
+		# would be indistinguishable from a broken button. The box stays open so
+		# the text can be corrected rather than pasted again.
 		_flash(result.error)
-		_refresh_picker()
 		_update_panel()
 		return
 
+	_close_paste()
 	_layout = result.layout
 	GameState.editing_id = ""
 	_grid.layout = _layout

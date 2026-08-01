@@ -1046,6 +1046,33 @@ a pasted code is one way to answer it, like "New circuit" beside it — and part
 because the panel has no room. A share row of its own measured 35 units against a
 column that had none to spare.
 
+#### Why importing goes through a text field, not the clipboard
+
+The picker opens a small flyout with a `LineEdit` in it, and **that field is what
+gets decoded** — not `DisplayServer.clipboard_get()`. This is a web-build
+constraint, and it is the same constraint that made a code the right format in
+the first place:
+
+- On desktop, `clipboard_get` is reliable.
+- **In a browser it is not.** Reading the system clipboard needs an async
+  permissions API that Godot's web platform does not expose, so what
+  `clipboard_get` returns there is whatever was last pasted *into the canvas*. A
+  button that read it would come back empty until the player had already pressed
+  ctrl+V somewhere, which is a rule nobody could guess.
+- A focused `LineEdit` receives the browser's own paste event directly. It is the
+  one route that behaves identically on both targets.
+
+The field is still **pre-filled from the clipboard when that works**, so the
+desktop flow stays a single click — and only when the clipboard already holds
+something starting with the prefix, so the box never opens with somebody's
+unrelated copied text in it.
+
+Both directions check `DisplayServer.has_feature(FEATURE_CLIPBOARD)` first.
+Asking a display server that has no clipboard logs an engine error, which the
+suite would then carry in its log for as long as it existed. Copy falls back to
+putting the code *in the same box* to be selected by hand, rather than reporting
+a success that did not happen.
+
 ### How a record is keyed, and why the track is a section
 
 A time is only comparable to another set **in the same car on the same surface**,

@@ -194,6 +194,13 @@ control that answers "which circuit am I working on" and a pasted code is one wa
 to answer it. Every failure path is tested and each returns a sentence a player
 can read.
 
+Importing goes through a **text field**, not a clipboard read. In a browser,
+`clipboard_get` only returns what was last pasted into the canvas — reading the
+system clipboard needs a permissions API Godot's web platform does not expose —
+so a button that read it would come back empty. A focused `LineEdit` gets the
+browser's paste event directly and behaves the same on both targets. The field is
+pre-filled from the clipboard where that works, so desktop stays one click.
+
 **Ghosts are opt-in, and the measurement is why.** See the decisions table above.
 Attaching a real lap makes the code 128,000 characters, so "share your ghost"
 needs a transport that is not a message — a file or a paste-bin — which is not

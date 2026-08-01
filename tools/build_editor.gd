@@ -146,6 +146,7 @@ func _initialize() -> void:
 
 	# Added after the split, so it draws over the canvas rather than under it.
 	root_ctrl.add_child(_legend())
+	root_ctrl.add_child(_paste_flyout())
 
 	_set_owner(root_ctrl, root_ctrl)
 	var packed := PackedScene.new()
@@ -214,6 +215,60 @@ func _legend() -> PanelContainer:
 		["item", "pinch zooms \u00b7 two fingers drag the canvas \u00b7 Fit reframes"],
 	]:
 		legend.add_child(_legend_row(row[0], row[1]))
+	return flyout
+
+## Where a shared circuit is pasted in.
+##
+## A field rather than a straight read of the clipboard, and that is about the
+## web build rather than about taste. On desktop `DisplayServer.clipboard_get`
+## is reliable. In a browser, reading the clipboard is gated behind an async
+## permissions API that Godot's web platform does not expose — what
+## `clipboard_get` returns there is whatever was last pasted *into the canvas*,
+## so a button that reads it would come back empty until the player had already
+## pressed ctrl+V somewhere. A focused `LineEdit` gets the browser's paste event
+## directly, which is the one route that behaves the same on both.
+##
+## It is still pre-filled from the clipboard where that works, so the desktop
+## flow stays a single click.
+##
+## A flyout rather than a row in the panel because the column has no spare
+## height — the same reason Copy shares a row and importing lives in the picker.
+func _paste_flyout() -> PanelContainer:
+	var flyout := PanelContainer.new()
+	flyout.name = "PasteFlyout"
+	flyout.visible = false
+	# Centred over the canvas: this one is a modal errand rather than a reference
+	# card, and it wants to be the thing being looked at while it is open.
+	flyout.set_anchors_preset(Control.PRESET_CENTER)
+	flyout.offset_left = -(PANEL_W + 40.0) * 0.5
+	flyout.offset_right = (PANEL_W + 40.0) * 0.5
+	flyout.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	flyout.grow_vertical = Control.GROW_DIRECTION_BOTH
+
+	var rows := VBoxContainer.new()
+	rows.name = "Rows"
+	rows.add_theme_constant_override("separation", 8)
+	flyout.add_child(rows)
+
+	var heading := _label("Heading", "Paste a circuit code")
+	heading.theme_type_variation = UiTheme.V_HEADING
+	rows.add_child(heading)
+
+	var hint := _label("Hint", "Press ctrl+V (or cmd+V) in the box, then Open.")
+	hint.theme_type_variation = UiTheme.V_MUTED
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	rows.add_child(hint)
+
+	var field := LineEdit.new()
+	field.name = "CodeEdit"
+	field.placeholder_text = "TD1-..."
+	field.custom_minimum_size = Vector2(0.0, 36.0)
+	rows.add_child(field)
+
+	rows.add_child(_pair("PasteButtons",
+		_button("PasteCancelButton", "Cancel"),
+		_button("PasteOpenButton", "Open")
+	))
 	return flyout
 
 ## Six actions in three rows rather than six stacked buttons: stacked, they ate

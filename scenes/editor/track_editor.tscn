@@ -3,172 +3,172 @@
 [ext_resource type="Script" path="res://scripts/ui/track_editor.gd" id="1_64auw"]
 [ext_resource type="Script" path="res://scripts/ui/track_grid.gd" id="2_7d7mg"]
 
-[node name="TrackEditor" type="Control" unique_id=1787002265]
+[node name="TrackEditor" type="Control" unique_id=1315453000]
 layout_mode = 3
 anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_64auw")
 
-[node name="Background" type="ColorRect" parent="." unique_id=735515000]
+[node name="Background" type="ColorRect" parent="." unique_id=816819026]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 color = Color(0.043, 0.055, 0.075, 1)
 
-[node name="Split" type="HBoxContainer" parent="." unique_id=2044864436]
+[node name="Split" type="HBoxContainer" parent="." unique_id=1288114857]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_constants/separation = 0
 
-[node name="Stack" type="VBoxContainer" parent="Split" unique_id=941623715]
+[node name="Stack" type="VBoxContainer" parent="Split" unique_id=1150044690]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 0
 
-[node name="TopBar" type="PanelContainer" parent="Split/Stack" unique_id=2123579681]
+[node name="TopBar" type="PanelContainer" parent="Split/Stack" unique_id=1615709866]
 visible = false
 layout_mode = 2
 theme_type_variation = &"EdgeBar"
 
-[node name="Slots" type="VBoxContainer" parent="Split/Stack/TopBar" unique_id=1705489400]
+[node name="Slots" type="VBoxContainer" parent="Split/Stack/TopBar" unique_id=549493010]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Tools" type="HBoxContainer" parent="Split/Stack/TopBar/Slots" unique_id=693340096]
+[node name="Tools" type="HBoxContainer" parent="Split/Stack/TopBar/Slots" unique_id=1257115017]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="MoreButton" type="Button" parent="Split/Stack/TopBar/Slots/Tools" unique_id=1964811746]
+[node name="MoreButton" type="Button" parent="Split/Stack/TopBar/Slots/Tools" unique_id=385122547]
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "MORE"
 
-[node name="Grid" type="Control" parent="Split/Stack" unique_id=1127362052]
+[node name="Grid" type="Control" parent="Split/Stack" unique_id=1047238824]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("2_7d7mg")
 
-[node name="BottomBar" type="PanelContainer" parent="Split/Stack" unique_id=1074397415]
+[node name="BottomBar" type="PanelContainer" parent="Split/Stack" unique_id=1186864143]
 visible = false
 layout_mode = 2
 theme_type_variation = &"EdgeBar"
 
-[node name="Slots" type="VBoxContainer" parent="Split/Stack/BottomBar" unique_id=31240502]
+[node name="Slots" type="VBoxContainer" parent="Split/Stack/BottomBar" unique_id=855714014]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="PhoneActions" type="HBoxContainer" parent="Split/Stack/BottomBar/Slots" unique_id=1031365184]
+[node name="PhoneActions" type="HBoxContainer" parent="Split/Stack/BottomBar/Slots" unique_id=1598972595]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Side" type="PanelContainer" parent="Split" unique_id=218038487]
+[node name="Side" type="PanelContainer" parent="Split" unique_id=1769782720]
 custom_minimum_size = Vector2(364, 0)
 layout_mode = 2
 theme_type_variation = &"Sidebar"
 
-[node name="Rows" type="VBoxContainer" parent="Split/Side" unique_id=1738161233]
+[node name="Rows" type="VBoxContainer" parent="Split/Side" unique_id=554515540]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Header" type="VBoxContainer" parent="Split/Side/Rows" unique_id=586958459]
+[node name="Header" type="VBoxContainer" parent="Split/Side/Rows" unique_id=1610482643]
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="Heading" type="Label" parent="Split/Side/Rows/Header" unique_id=236927297]
+[node name="Heading" type="Label" parent="Split/Side/Rows/Header" unique_id=1461311180]
 layout_mode = 2
 theme_type_variation = &"Heading"
 text = "TRACK EDITOR"
 
-[node name="Sub" type="Label" parent="Split/Side/Rows/Header" unique_id=2045150486]
+[node name="Sub" type="Label" parent="Split/Side/Rows/Header" unique_id=941700392]
 layout_mode = 2
 theme_type_variation = &"Muted"
 text = "draw a circuit, then drive it"
 
-[node name="NameEdit" type="LineEdit" parent="Split/Side/Rows" unique_id=190430472]
+[node name="NameEdit" type="LineEdit" parent="Split/Side/Rows" unique_id=1179847110]
 layout_mode = 2
 placeholder_text = "Circuit name"
 
-[node name="Picker" type="OptionButton" parent="Split/Side/Rows" unique_id=1067904020]
+[node name="Picker" type="OptionButton" parent="Split/Side/Rows" unique_id=1767936492]
 layout_mode = 2
 
-[node name="ToolRow" type="HBoxContainer" parent="Split/Side/Rows" unique_id=289252508]
+[node name="ToolRow" type="HBoxContainer" parent="Split/Side/Rows" unique_id=1498036253]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="DrawButton" type="Button" parent="Split/Side/Rows/ToolRow" unique_id=2129388606]
+[node name="DrawButton" type="Button" parent="Split/Side/Rows/ToolRow" unique_id=855999230]
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 toggle_mode = true
 text = "Draw"
 
-[node name="EraseButton" type="Button" parent="Split/Side/Rows/ToolRow" unique_id=1895606621]
+[node name="EraseButton" type="Button" parent="Split/Side/Rows/ToolRow" unique_id=2103617600]
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 toggle_mode = true
 text = "Erase"
 
-[node name="FitButton" type="Button" parent="Split/Side/Rows/ToolRow" unique_id=1727875068]
+[node name="FitButton" type="Button" parent="Split/Side/Rows/ToolRow" unique_id=1849983472]
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Fit"
 
-[node name="GuideCard" type="PanelContainer" parent="Split/Side/Rows" unique_id=1371121339]
+[node name="GuideCard" type="PanelContainer" parent="Split/Side/Rows" unique_id=1784481019]
 layout_mode = 2
 theme_type_variation = &"CardPanel"
 
-[node name="Rows" type="VBoxContainer" parent="Split/Side/Rows/GuideCard" unique_id=121820397]
+[node name="Rows" type="VBoxContainer" parent="Split/Side/Rows/GuideCard" unique_id=244560286]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="Caption" type="Label" parent="Split/Side/Rows/GuideCard/Rows" unique_id=2124560676]
+[node name="Caption" type="Label" parent="Split/Side/Rows/GuideCard/Rows" unique_id=135555097]
 layout_mode = 2
 theme_type_variation = &"SectionLabel"
 text = "DO THIS NEXT"
 
-[node name="Guide" type="Label" parent="Split/Side/Rows/GuideCard/Rows" unique_id=1499831822]
+[node name="Guide" type="Label" parent="Split/Side/Rows/GuideCard/Rows" unique_id=1487997520]
 custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"PanelBody"
 autowrap_mode = 3
 
-[node name="ReadoutCard" type="PanelContainer" parent="Split/Side/Rows" unique_id=1663312606]
+[node name="ReadoutCard" type="PanelContainer" parent="Split/Side/Rows" unique_id=850150907]
 layout_mode = 2
 theme_type_variation = &"CardPanel"
 
-[node name="Rows" type="VBoxContainer" parent="Split/Side/Rows/ReadoutCard" unique_id=1931204854]
+[node name="Rows" type="VBoxContainer" parent="Split/Side/Rows/ReadoutCard" unique_id=1542889534]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="Caption" type="Label" parent="Split/Side/Rows/ReadoutCard/Rows" unique_id=1548579632]
+[node name="Caption" type="Label" parent="Split/Side/Rows/ReadoutCard/Rows" unique_id=1235311565]
 layout_mode = 2
 theme_type_variation = &"SectionLabel"
 text = "THIS CIRCUIT"
 
-[node name="Readout" type="Label" parent="Split/Side/Rows/ReadoutCard/Rows" unique_id=1996346534]
+[node name="Readout" type="Label" parent="Split/Side/Rows/ReadoutCard/Rows" unique_id=904119832]
 custom_minimum_size = Vector2(0, 84)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"PanelBody"
 autowrap_mode = 3
 
-[node name="Status" type="Label" parent="Split/Side/Rows" unique_id=1263672159]
+[node name="Status" type="Label" parent="Split/Side/Rows" unique_id=563541922]
 custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"FineText"
 autowrap_mode = 3
 
-[node name="LegendToggle" type="Button" parent="Split/Side/Rows" unique_id=628744833]
+[node name="LegendToggle" type="Button" parent="Split/Side/Rows" unique_id=265571047]
 custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 theme_type_variation = &"Disclosure"
@@ -176,63 +176,63 @@ toggle_mode = true
 text = "TIPS"
 alignment = 0
 
-[node name="Actions" type="VBoxContainer" parent="Split/Side/Rows" unique_id=80496960]
+[node name="Actions" type="VBoxContainer" parent="Split/Side/Rows" unique_id=206416870]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="CloseButton" type="Button" parent="Split/Side/Rows/Actions" unique_id=642409735]
+[node name="CloseButton" type="Button" parent="Split/Side/Rows/Actions" unique_id=1657066638]
 visible = false
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 theme_type_variation = &"PrimaryButton"
 text = "Join the ends up"
 
-[node name="UndoRow" type="HBoxContainer" parent="Split/Side/Rows/Actions" unique_id=360281741]
+[node name="UndoRow" type="HBoxContainer" parent="Split/Side/Rows/Actions" unique_id=204769948]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="UndoButton" type="Button" parent="Split/Side/Rows/Actions/UndoRow" unique_id=560807494]
+[node name="UndoButton" type="Button" parent="Split/Side/Rows/Actions/UndoRow" unique_id=1497791412]
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Undo  (ctrl+Z)"
 
-[node name="SaveButton" type="Button" parent="Split/Side/Rows/Actions/UndoRow" unique_id=567748825]
+[node name="SaveButton" type="Button" parent="Split/Side/Rows/Actions/UndoRow" unique_id=609644472]
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Save  (ctrl+S)"
 
-[node name="TestButton" type="Button" parent="Split/Side/Rows/Actions" unique_id=155237990]
+[node name="TestButton" type="Button" parent="Split/Side/Rows/Actions" unique_id=2031621318]
 custom_minimum_size = Vector2(0, 38)
 layout_mode = 2
 theme_type_variation = &"PrimaryButton"
 text = "Test drive"
 
-[node name="ExitRow" type="HBoxContainer" parent="Split/Side/Rows/Actions" unique_id=1726982055]
+[node name="ExitRow" type="HBoxContainer" parent="Split/Side/Rows/Actions" unique_id=305934443]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="CopyCodeButton" type="Button" parent="Split/Side/Rows/Actions/ExitRow" unique_id=2059830210]
+[node name="CopyCodeButton" type="Button" parent="Split/Side/Rows/Actions/ExitRow" unique_id=1970253569]
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Copy code"
 
-[node name="DeleteButton" type="Button" parent="Split/Side/Rows/Actions/ExitRow" unique_id=1415660918]
+[node name="DeleteButton" type="Button" parent="Split/Side/Rows/Actions/ExitRow" unique_id=1274238172]
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"DangerButton"
 text = "Delete"
 
-[node name="BackButton" type="Button" parent="Split/Side/Rows/Actions/ExitRow" unique_id=461121432]
+[node name="BackButton" type="Button" parent="Split/Side/Rows/Actions/ExitRow" unique_id=531901047]
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Back"
 
-[node name="Keys" type="Label" parent="Split/Side/Rows" unique_id=1642498670]
+[node name="Keys" type="Label" parent="Split/Side/Rows" unique_id=799731657]
 custom_minimum_size = Vector2(0, 28)
 layout_mode = 2
 size_flags_horizontal = 3
@@ -240,7 +240,7 @@ theme_type_variation = &"FineText"
 text = "wheel or pinch zooms · middle-drag, two-finger drag or cmd-drag pans · F refits · D draws · E erases · shift-drag draws"
 autowrap_mode = 3
 
-[node name="LegendFlyout" type="PanelContainer" parent="." unique_id=2131584304]
+[node name="LegendFlyout" type="PanelContainer" parent="." unique_id=77653375]
 visible = false
 layout_mode = 0
 anchor_left = 1.0
@@ -254,161 +254,209 @@ offset_bottom = -16.0
 grow_horizontal = 0
 grow_vertical = 0
 
-[node name="Panel" type="VBoxContainer" parent="LegendFlyout" unique_id=772980931]
+[node name="Panel" type="VBoxContainer" parent="LegendFlyout" unique_id=803629278]
 custom_minimum_size = Vector2(316, 0)
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="Legend" type="VBoxContainer" parent="LegendFlyout/Panel" unique_id=1010270175]
+[node name="Legend" type="VBoxContainer" parent="LegendFlyout/Panel" unique_id=1068355367]
 layout_mode = 2
 theme_override_constants/separation = 3
 
-[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend" unique_id=1629221763]
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend" unique_id=1939319184]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"SectionLabel"
 text = "DRAW"
 autowrap_mode = 3
 
-[node name="LegendIndent" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=1248637732]
+[node name="LegendIndent" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=1547002905]
 layout_mode = 2
 theme_override_constants/margin_left = 10
 
-[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/LegendIndent" unique_id=734786253]
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/LegendIndent" unique_id=1377962158]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"Muted"
 text = "drag lays road"
 autowrap_mode = 3
 
-[node name="Spacer" type="Control" parent="LegendFlyout/Panel/Legend" unique_id=19055008]
+[node name="Spacer" type="Control" parent="LegendFlyout/Panel/Legend" unique_id=1138011388]
 custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 
-[node name="@Label@12" type="Label" parent="LegendFlyout/Panel/Legend" unique_id=44681900]
+[node name="@Label@12" type="Label" parent="LegendFlyout/Panel/Legend" unique_id=1459751515]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"SectionLabel"
 text = "ERASE"
 autowrap_mode = 3
 
-[node name="@MarginContainer@13" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=441726721]
+[node name="@MarginContainer@13" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=850760871]
 layout_mode = 2
 theme_override_constants/margin_left = 10
 
-[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@13" unique_id=84441291]
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@13" unique_id=1830963611]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"Muted"
 text = "drag rubs road out"
 autowrap_mode = 3
 
-[node name="@MarginContainer@14" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=1582487310]
+[node name="@MarginContainer@14" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=1454313238]
 layout_mode = 2
 theme_override_constants/margin_left = 10
 
-[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@14" unique_id=1345990899]
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@14" unique_id=1961625396]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"Muted"
 text = "tap a green dot — remove that corner"
 autowrap_mode = 3
 
-[node name="@Control@15" type="Control" parent="LegendFlyout/Panel/Legend" unique_id=1860759446]
+[node name="@Control@15" type="Control" parent="LegendFlyout/Panel/Legend" unique_id=442378161]
 custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 
-[node name="@Label@16" type="Label" parent="LegendFlyout/Panel/Legend" unique_id=847992360]
+[node name="@Label@16" type="Label" parent="LegendFlyout/Panel/Legend" unique_id=1579014188]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"SectionLabel"
 text = "NEITHER — SHAPING"
 autowrap_mode = 3
 
-[node name="@MarginContainer@17" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=274839036]
+[node name="@MarginContainer@17" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=396448520]
 layout_mode = 2
 theme_override_constants/margin_left = 10
 
-[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@17" unique_id=294073962]
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@17" unique_id=577152229]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"Muted"
 text = "drag a green dot — move a corner"
 autowrap_mode = 3
 
-[node name="@MarginContainer@18" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=1476550988]
+[node name="@MarginContainer@18" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=1298651901]
 layout_mode = 2
 theme_override_constants/margin_left = 10
 
-[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@18" unique_id=885812265]
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@18" unique_id=346836949]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"Muted"
 text = "drag the road — slide a straight"
 autowrap_mode = 3
 
-[node name="@MarginContainer@19" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=905583564]
+[node name="@MarginContainer@19" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=952621762]
 layout_mode = 2
 theme_override_constants/margin_left = 10
 
-[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@19" unique_id=2021697388]
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@19" unique_id=1251550302]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"Muted"
 text = "double-tap it — add a bend, then drag that bend in or out"
 autowrap_mode = 3
 
-[node name="@MarginContainer@20" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=1840503594]
+[node name="@MarginContainer@20" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=2036750960]
 layout_mode = 2
 theme_override_constants/margin_left = 10
 
-[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@20" unique_id=680989055]
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@20" unique_id=2042435762]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"Muted"
 text = "numbered badge — corner radius"
 autowrap_mode = 3
 
-[node name="@MarginContainer@21" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=788937660]
+[node name="@MarginContainer@21" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=9623194]
 layout_mode = 2
 theme_override_constants/margin_left = 10
 
-[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@21" unique_id=1771202645]
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@21" unique_id=1520803213]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"Muted"
 text = "badge inside the loop — raise it; raise a corner too to hold the height right through it"
 autowrap_mode = 3
 
-[node name="@MarginContainer@22" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=1813983931]
+[node name="@MarginContainer@22" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=948494553]
 layout_mode = 2
 theme_override_constants/margin_left = 10
 
-[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@22" unique_id=242354105]
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@22" unique_id=813299861]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"Muted"
 text = "drag the flag — move the start"
 autowrap_mode = 3
 
-[node name="@Control@23" type="Control" parent="LegendFlyout/Panel/Legend" unique_id=917070300]
+[node name="@Control@23" type="Control" parent="LegendFlyout/Panel/Legend" unique_id=47803120]
 custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 
-[node name="@Label@24" type="Label" parent="LegendFlyout/Panel/Legend" unique_id=503426683]
+[node name="@Label@24" type="Label" parent="LegendFlyout/Panel/Legend" unique_id=261187094]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"SectionLabel"
 text = "THE VIEW"
 autowrap_mode = 3
 
-[node name="@MarginContainer@25" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=413235969]
+[node name="@MarginContainer@25" type="MarginContainer" parent="LegendFlyout/Panel/Legend" unique_id=1855399315]
 layout_mode = 2
 theme_override_constants/margin_left = 10
 
-[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@25" unique_id=60042320]
+[node name="LegendRow" type="Label" parent="LegendFlyout/Panel/Legend/@MarginContainer@25" unique_id=140326233]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"Muted"
 text = "pinch zooms · two fingers drag the canvas · Fit reframes"
 autowrap_mode = 3
+
+[node name="PasteFlyout" type="PanelContainer" parent="." unique_id=673072375]
+visible = false
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -202.0
+offset_right = 202.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Rows" type="VBoxContainer" parent="PasteFlyout" unique_id=1368829505]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="Label" parent="PasteFlyout/Rows" unique_id=868996030]
+layout_mode = 2
+theme_type_variation = &"Heading"
+text = "Paste a circuit code"
+
+[node name="Hint" type="Label" parent="PasteFlyout/Rows" unique_id=1901917862]
+layout_mode = 2
+theme_type_variation = &"Muted"
+text = "Press ctrl+V (or cmd+V) in the box, then Open."
+autowrap_mode = 3
+
+[node name="CodeEdit" type="LineEdit" parent="PasteFlyout/Rows" unique_id=2129295066]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+placeholder_text = "TD1-..."
+
+[node name="PasteButtons" type="HBoxContainer" parent="PasteFlyout/Rows" unique_id=991441621]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="PasteCancelButton" type="Button" parent="PasteFlyout/Rows/PasteButtons" unique_id=2019966693]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Cancel"
+
+[node name="PasteOpenButton" type="Button" parent="PasteFlyout/Rows/PasteButtons" unique_id=1644008536]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Open"
