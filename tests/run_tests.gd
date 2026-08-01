@@ -110,10 +110,30 @@ func test_time_formatting() -> void:
 	check("format 65.5s", t.format_time(65.5), "1:05.500")
 	check("format 9.25s", t.format_time(9.25), "0:09.250")
 
+## Every preset in the project, not a list of the ones that existed when this was
+## written.
+##
+## It named `grippy` and `drifty` explicitly, so the Prototype's preset arrived
+## with the garage and was checked by nothing — including the handbrake rule,
+## which has silently turned the handbrake into a *grip aid* once already. A
+## garage means presets get added, so the test has to find them.
 func test_tuning_invariants() -> void:
-	for path in ["res://resources/tuning/grippy.tres", "res://resources/tuning/drifty.tres"]:
+	var paths := []
+	var dir := DirAccess.open("res://resources/tuning")
+	if dir != null:
+		for file in dir.get_files():
+			if file.ends_with(".tres"):
+				paths.append("res://resources/tuning/%s" % file)
+	check_true("presets were found to check (%d)" % paths.size(), paths.size() >= 3)
+	# And every car's preset is among them, so a spec pointing somewhere else
+	# cannot slip past.
+	for spec in GameState.cars():
+		check_true("%s's preset is checked" % spec.id,
+			paths.has(spec.tuning.resource_path))
+
+	for path in paths:
 		var tuning: CarTuning = load(path)
-		var name: String = path.get_file()
+		var name: String = String(path).get_file()
 		# The handbrake works by *cutting* rear grip. Setting it above rear grip
 		# silently turns the handbrake into a grip aid; this has happened once.
 		check_true("%s handbrake below rear grip" % name,

@@ -888,12 +888,39 @@ grip the car is *given*, and these say what that *produced*. Par needs the
 outcomes, and deriving them from the tuning would mean reimplementing the physics
 in the estimator.
 
+### The limit checks, and one that did not work
+
+M2's slalom re-run for both cars, at 95% of each car's own top speed rather than
+a shared one, so each is tested where it actually lives:
+
+| Car | Slalom at | 2+ wheels off | Peak roll rate |
+|---|---|---|---|
+| Racer | 156.7 km/h | 0 / 2522 | 0.03 rad/s |
+| Prototype | 176.9 km/h | 0 / 2522 | 0.04 rad/s |
+
+Both flat, over four times the frames M2's 0/600 was declared on. The anti-roll
+bar holds the second car as well as the first.
+
+**The oversteer probe did not work, and saying so is the finding.** Full lock held
+at speed produced a peak slip angle of 3.8 and 4.2 degrees — a car turning, not a
+car sliding. The cause is the speed-based steering falloff: at 177 km/h against a
+215 km/h reference, `speed_factor` clamps to its 0.25 floor, so "full lock" is a
+quarter of the steering the test believed it was applying. **Neither car has been
+provoked at the limit**, and the flat slip numbers are evidence about the probe
+rather than about the cars. Provoking one needs a lower speed, a lift, or the
+handbrake.
+
+That mattered immediately: the Prototype's blurb claimed "less forgiving", which
+nothing had measured. An attempt to *make* it true — rear grip nearer the front,
+softer anti-roll — moved none of the numbers, because the probe could not see it
+either. Worse, it changed the grip the M14 sweep had just been run against, which
+would have left the spec describing a car that no longer existed. Reverted, and
+the blurb now says what was measured: faster everywhere, same balance.
+
 ### Still open, from M14
 
-- The Prototype has had this one sweep and no more. Nothing has been measured
-  about how it behaves at the limit — whether it snaps, whether the anti-roll bar
-  still holds it flat, whether the handbrake still provokes rather than adds grip.
-  M2's slalom and rollover checks were never run for it.
+- **Neither car has been tested at the cornering limit.** See above: the probe
+  needs to provoke a slide rather than assume speed will do it.
 - The two cars are within 12% of the same size, which is why the road-versus-car
   scale question is still deferred rather than answered.
 
