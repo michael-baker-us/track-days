@@ -279,27 +279,96 @@ func test_the_steering_curve_leaves_full_lock_alone() -> void:
 	check_true("half a stick asks for less than half lock", car._curve(0.5) < 0.5)
 	check_true("and asks in the same direction", car._curve(-0.5) < 0.0)
 
-## The grade is baked into each shipped circuit by `_build_lighting`, so a
-## palette change that was not followed by re-running `tools/build_track.gd`
-## would ship three circuits wearing the old look. Same reasoning as the check
-## that the committed theme still matches its source.
-func test_shipped_circuits_carry_the_colour_grade() -> void:
+## Each shipped circuit is baked at **its own hour**, and the whole preset has to
+## survive the bake — not just the grade.
+##
+## The lighting is baked into the scene by `_build_lighting`, so a palette change
+## that was not followed by re-running `tools/build_track.gd` would ship circuits
+## wearing the old look. Same reasoning as the committed theme resource.
+func test_shipped_circuits_carry_their_own_hour() -> void:
+	var used := {}
 	for entry in GameState.TRACKS:
 		var id: String = entry["id"]
+		var preset := SkyPreset.for_track(id)
+		used[SkyPreset.BY_TRACK.get(id, SkyPreset.DEFAULT)] = true
+
 		var circuit: Node3D = load(entry["scene"]).instantiate()
-		var env: Environment = (circuit.get_node("WorldEnvironment") as WorldEnvironment).environment
+		var env: Environment = (
+			circuit.get_node("WorldEnvironment") as WorldEnvironment
+		).environment
+		var grade: Vector3 = preset["grade"]
 		check_true("%s is graded" % id, env.adjustment_enabled)
-		check_near("%s saturation" % id, env.adjustment_saturation,
-			TrackBuilder.GRADE_SATURATION, 0.001)
-		check_near("%s contrast" % id, env.adjustment_contrast,
-			TrackBuilder.GRADE_CONTRAST, 0.001)
-		# Fog exists to land the 4 km ground plane into the sky, which it can only
-		# do while it is the colour the sky is at that edge. They are one horizon
-		# seen twice, so they are read from one constant.
-		check_true("%s fog is the sky's horizon" % id,
-			env.fog_light_color.is_equal_approx(TrackBuilder.SKY_HORIZON))
+		check_near("%s saturation" % id, env.adjustment_saturation, grade.x, 0.001)
+		check_near("%s contrast" % id, env.adjustment_contrast, grade.y, 0.001)
+		check_near("%s brightness" % id, env.adjustment_brightness, grade.z, 0.001)
+
+		# Fog is the sky's own horizon colour or it cannot land the 4 km ground
+		# plane into it. They are one edge seen twice, so they come from one
+		# entry in the preset.
+		check_true("%s fog is its own horizon" % id,
+			env.fog_light_color.is_equal_approx(preset["horizon"]))
+		check_near("%s fog starts where its hour says" % id,
+			env.fog_depth_begin, preset["fog_begin"], 0.5)
+
+		# The sun, which is most of what makes an hour read as one.
+		var sun: DirectionalLight3D = circuit.get_node("Sun")
+		# Compared as a *direction*, not as euler numbers: Godot normalises
+		# `rotation_degrees`, so a preset asking for 205 degrees of yaw comes back
+		# as -155 and a naive comparison fails on a sun pointing exactly where it
+		# was asked to. The direction is also the thing that matters.
+		var angle: Vector3 = preset["sun_angle"]
+		var want := Basis.from_euler(Vector3(
+			deg_to_rad(angle.x), deg_to_rad(angle.y), deg_to_rad(angle.z)
+		))
+		check_true("%s sun points where its hour says" % id,
+			sun.transform.basis.z.normalized().is_equal_approx(
+				want.z.normalized()))
+		check_true("%s sun is coloured for its hour" % id,
+			sun.light_color.is_equal_approx(preset["sun_color"]))
+
+		# And the sky is the shader, not the procedural material it replaced.
+		var sky_mat := env.sky.sky_material
+		check_true("%s uses the sky shader" % id, sky_mat is ShaderMaterial)
+		if sky_mat is ShaderMaterial:
+			# Compared against the **linear** form. A shader uniform is used as
+			# radiance and `set_shader_parameter` converts nothing, unlike the
+			# `ProceduralSkyMaterial` this replaced, which took the same `Color`
+			# and converted it internally. Handing it sRGB rendered the sky at
+			# about twice its intended brightness and washed the horizon white.
+			check_true("%s sky is tinted for its hour, in linear" % id,
+				(sky_mat.get_shader_parameter("top_color") as Color)
+					.is_equal_approx((preset["top"] as Color).srgb_to_linear()))
+			check_true("%s horizon likewise" % id,
+				(sky_mat.get_shader_parameter("horizon_color") as Color)
+					.is_equal_approx((preset["horizon"] as Color).srgb_to_linear()))
 		circuit.free()
 
+	# The point of the whole exercise: the circuits do not all look the same. A
+	# bug collapsing every track to the default would pass every check above.
+	check_true("the circuits are raced at different hours (%d)" % used.size(),
+		used.size() >= 3)
+
+## Every preset has to be complete. They are dictionaries, so a missing key is a
+## crash at bake time rather than a compile error, and the one that gets forgotten
+## is always the one only a later preset needed.
+func test_every_sky_preset_is_complete() -> void:
+	var required := SkyPreset.PRESETS[SkyPreset.DEFAULT].keys()
+	check_true("the default preset has fields", required.size() > 10)
+	for name in SkyPreset.PRESETS:
+		var preset: Dictionary = SkyPreset.PRESETS[name]
+		var missing := []
+		for key in required:
+			if not preset.has(key):
+				missing.append(key)
+		check("%s is complete (missing %s)" % [name, missing], missing.size(), 0)
+
+	# Every circuit names an hour that exists, or it silently races at noon.
+	for id in SkyPreset.BY_TRACK:
+		check_true("%s names a real preset" % id,
+			SkyPreset.PRESETS.has(SkyPreset.BY_TRACK[id]))
+
+## Five poses along a line, enough to exercise interpolation and serialisation
+## without being a real lap.
 func _sample_ghost() -> Ghost:
 	var ghost := Ghost.new()
 	for i in 5:
@@ -308,9 +377,6 @@ func _sample_ghost() -> Ghost:
 		))
 	return ghost
 
-## A ghost is written as bytes, so the write and the read have to agree exactly.
-## A lap that came back subtly wrong would look like a driving mistake rather
-## than a broken file, which is the reason to pin this rather than trust it.
 func test_a_ghost_round_trips_through_bytes() -> void:
 	var original := _sample_ghost()
 	var restored := Ghost.from_bytes(original.to_bytes())
@@ -4557,7 +4623,8 @@ func _physics_process(_delta: float) -> bool:
 		test_the_throttle_setting_survives_a_restart()
 		test_partial_throttle_reaches_the_engine()
 		test_the_steering_curve_leaves_full_lock_alone()
-		test_shipped_circuits_carry_the_colour_grade()
+		test_shipped_circuits_carry_their_own_hour()
+		test_every_sky_preset_is_complete()
 		test_a_ghost_round_trips_through_bytes()
 		test_a_damaged_ghost_is_refused()
 		test_a_ghost_interpolates_and_then_holds()

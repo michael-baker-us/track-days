@@ -660,7 +660,7 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 		_build_road_collision(root_node)
 		_build_checkpoints(root_node)
 		_build_ground(root_node)
-		_build_lighting(root_node)
+		_build_lighting(root_node, track_name)
 		_build_scenery(root_node, track_name)
 
 		# In the pole slot, which is behind the line rather than past it: the
@@ -1624,22 +1624,25 @@ func _build_ground(root_node: Node3D) -> void:
 ## The horizon colour is shared with the fog rather than repeated, because the
 ## two are the same edge seen twice: fog exists to land the ground plane into the
 ## sky, and it can only do that while it is the colour the sky is there.
+##
+## These are the `noon` preset's values, kept as named constants because the
+## suite and the editor both want "the default look" without holding a preset.
+## The real palette now lives in `SkyPreset`, one entry per hour.
+const SKY_SHADER := "res://assets/shaders/sky.gdshader"
 const SKY_TOP := Color(0.11, 0.36, 0.85)
 const SKY_HORIZON := Color(0.62, 0.82, 0.97)
-
-## Applied after tonemapping, so it grades what reached the screen rather than
-## the light in the scene — the sun and the ambient fill stay where they were
-## measured, and the kit stops looking washed out.
 const GRADE_SATURATION := 1.35
 const GRADE_CONTRAST := 1.10
 const GRADE_BRIGHTNESS := 1.02
 
-func _build_lighting(root_node: Node3D) -> void:
+func _build_lighting(root_node: Node3D, track_name: String = "") -> void:
+	var preset := SkyPreset.for_track(track_name)
+
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
-	sun.rotation_degrees = Vector3(-50.0, 35.0, 0.0)
-	sun.light_color = Color(1.0, 0.96, 0.89)
-	sun.light_energy = 1.15
+	sun.rotation_degrees = preset["sun_angle"]
+	sun.light_color = preset["sun_color"]
+	sun.light_energy = preset["sun_energy"]
 	sun.shadow_enabled = true
 	# The default 0.1 leaves the car's own shadow detached from its tyres at this
 	# scale, which reads as the car hovering.
@@ -1652,17 +1655,31 @@ func _build_lighting(root_node: Node3D) -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 
-	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = SKY_TOP
-	sky_mat.sky_horizon_color = SKY_HORIZON
-	sky_mat.ground_bottom_color = Color(0.34, 0.55, 0.38)
-	sky_mat.ground_horizon_color = SKY_HORIZON
-	# A far bigger, harder-edged sun disc than the default. Horizon Chase skies
-	# carry the mood and the sun is a graphic element in them, not a light
-	# source that happens to be visible; 12 degrees with a soft falloff reads as
-	# a bright patch, and this reads as a sun.
-	sky_mat.sun_angle_max = 26.0
-	sky_mat.sun_curve = 0.04
+	# A shader rather than `ProceduralSkyMaterial`: flat bands, an oversized sun
+	# and stylised cloud stripes are the look, and a procedural sky can only give
+	# a smooth gradient and a small disc. See assets/shaders/sky.gdshader.
+	var sky_mat := ShaderMaterial.new()
+	sky_mat.shader = load(SKY_SHADER)
+	# **Converted to linear on the way in.** A shader uniform set through
+	# `set_shader_parameter` arrives exactly as given and is used as linear
+	# radiance, while `ProceduralSkyMaterial` — which this replaced — took the
+	# same `Color` and converted it internally. Handing the old sRGB numbers
+	# straight to a shader therefore rendered the sky at roughly twice its
+	# intended brightness: sRGB 0.62 is linear 0.34, and a horizon authored as a
+	# pale blue came out very nearly white. With fog and the grade on top of it,
+	# the whole distance washed out.
+	#
+	# The presets stay authored in sRGB, because that is how anyone picking a
+	# colour thinks about it, and the conversion happens once here at the
+	# boundary.
+	sky_mat.set_shader_parameter("top_color", (preset["top"] as Color).srgb_to_linear())
+	sky_mat.set_shader_parameter("horizon_color", (preset["horizon"] as Color).srgb_to_linear())
+	sky_mat.set_shader_parameter("ground_color", (preset["ground"] as Color).srgb_to_linear())
+	sky_mat.set_shader_parameter("sun_color", (preset["sun_disc"] as Color).srgb_to_linear())
+	sky_mat.set_shader_parameter("cloud_color", (preset["cloud"] as Color).srgb_to_linear())
+	sky_mat.set_shader_parameter("cloud_amount", preset["cloud_amount"])
+	sky_mat.set_shader_parameter("horizon_falloff", preset["horizon_falloff"])
+	sky_mat.set_shader_parameter("sun_size", preset["sun_size"])
 	env.sky = Sky.new()
 	env.sky.sky_material = sky_mat
 
@@ -1673,8 +1690,8 @@ func _build_lighting(root_node: Node3D) -> void:
 	# from the one down the near side. This is the same cool light with most of
 	# the saturation taken out of it, and it skips the sky irradiance pass.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.66, 0.70, 0.76)
-	env.ambient_light_energy = 0.9
+	env.ambient_light_color = preset["ambient"]
+	env.ambient_light_energy = preset["ambient_energy"]
 	# Sky reflections on roughness-1 materials cost a lot and change nothing.
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
 
@@ -1688,22 +1705,23 @@ func _build_lighting(root_node: Node3D) -> void:
 	# which is the exact failure ACES was chosen to fix.
 	env.tonemap_white = 2.1
 
-	# Saturation, contrast and brightness are the cheapest possible step towards
-	# the Horizon Chase palette: no new asset, no new shader, three properties on
-	# an Environment that is already built in code.
+	var grade: Vector3 = preset["grade"]
 	env.adjustment_enabled = true
-	env.adjustment_saturation = GRADE_SATURATION
-	env.adjustment_contrast = GRADE_CONTRAST
-	env.adjustment_brightness = GRADE_BRIGHTNESS
+	env.adjustment_saturation = grade.x
+	env.adjustment_contrast = grade.y
+	env.adjustment_brightness = grade.z
 
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
-	env.fog_light_color = SKY_HORIZON
+	# The sky's own horizon colour, not a second one that happens to match: fog
+	# exists to land the 4 km ground plane into the sky, and it can only do that
+	# while it *is* the colour the sky is at that edge.
+	env.fog_light_color = preset["horizon"]
 	# Starts beyond anything the chase camera can see, so nothing being driven
 	# through is ever hazed; it only exists to land the far side of the lap and
 	# the edge of the ground plane softly into the sky. Capped below 1 so the
 	# horizon keeps a trace of what is out there instead of going flat white.
-	env.fog_depth_begin = 420.0
+	env.fog_depth_begin = preset["fog_begin"]
 	env.fog_depth_end = 2600.0
 	env.fog_density = 0.72
 

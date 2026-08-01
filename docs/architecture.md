@@ -1038,6 +1038,48 @@ big graphic skies, bright and readable, never grimy. The Kenney kit is already
 untextured flat-shaded geometry, which is the expensive half of that look done,
 and it survives the compatibility renderer the web build is stuck with.
 
+### A time of day per circuit
+
+Four hours, one per shipped circuit: Ardennes at **noon**, Monte Carlo at
+**sunset**, La Sarthe at **dusk**, Suzuka **overcast**. In Horizon Chase every
+race has its own hour and that is most of why the circuits feel like different
+places; three circuits sharing one lighting rig look like three parts of one
+afternoon.
+
+`SkyPreset` keeps them as **one struct each**, not four independent settings,
+because they are not independent. A sunset with a noon fog colour leaves a
+visible seam where the ground plane ends — fog exists to land that edge into the
+sky and can only do it while it *is* the colour the sky is there. A dark sky with
+noon ambient reads as a mistake rather than an evening. They change together or
+not at all.
+
+The sky itself is now a **shader** (`assets/shaders/sky.gdshader`) rather than
+`ProceduralSkyMaterial`: flat colour bands, an oversized sun and stylised cloud
+stripes are the look, and a procedural sky can only give a smooth gradient and a
+small disc. Every term is arithmetic on `EYEDIR` — no loops, no noise textures,
+no derivatives — because the web build runs Compatibility.
+
+> **A shader uniform is linear; a `Color` property is not.** This cost a
+> "everything looks white" report. `ProceduralSkyMaterial` takes a `Color` and
+> converts sRGB to linear internally; `set_shader_parameter` converts nothing and
+> the value is used as radiance. Handing the same numbers to the replacement
+> therefore rendered the sky at roughly **twice** its intended brightness — sRGB
+> 0.62 is linear 0.34 — so a horizon authored as a pale blue came out very nearly
+> white, and with the fog and the grade on top of it the whole distance washed
+> out.
+>
+> The presets stay authored in sRGB, because that is how anyone picking a colour
+> thinks, and `srgb_to_linear()` is applied once at the boundary in
+> `_build_lighting`. The suite compares the baked material against the *linear*
+> form, so the conversion cannot be dropped silently.
+
+> **True night is deliberately absent**, and it is the preset `ideas.md` singles
+> out as most worth having. A night circuit needs the trackside lighting columns
+> to emit light, and they are placed and dark today. Night with no lights is not
+> atmospheric, it is unplayable. La Sarthe gets `dusk` instead — a 24-hour race
+> at the hour you can still see — with its ambient lifted well above the others
+> to do the job the columns will do properly later.
+
 What was missing was saturation, not detail. Kenney's palette is **pastel** —
 mint grass, near-white kerbs, a soft orange car — and saturation is a property of
 the `Environment` rather than of any asset, so the whole first step is three

@@ -473,6 +473,21 @@ columns already being placed trackside. Then horizon silhouettes, denser roadsid
 objects, a lower and closer camera pass, a rim light on the car, a blob shadow
 under it, scenery themes, and weather as a colour treatment.
 
+**Status: sky and hours built.** The shader replaces `ProceduralSkyMaterial`, and
+four presets are attached one per shipped circuit — noon, sunset, dusk, overcast.
+`SkyPreset` keeps each hour as one struct because sun, sky, fog and grade are not
+independent; changing one without the others is nearly always wrong.
+
+**Night is not built, and that is the notable gap.** It needs the trackside
+lighting columns to emit light — they are placed and dark. La Sarthe gets dusk
+instead, with ambient lifted to compensate. Finishing night means giving the
+columns real lights and checking what that costs on the Compatibility renderer.
+
+**Also not done:** horizon silhouettes, denser roadside objects, the camera pass,
+the car rim light, the blob shadow, scenery themes and weather. And **nobody has
+looked at any of it** — the suite asserts each circuit carries its own hour and
+that the presets are complete, which is not the same as it looking good.
+
 **Not doing, and the reversal is deliberate:** clearcoat paint, sky reflections,
 road wear, a fully lit ground plane, SSAO. Those are realism tools and this is not
 a realism target. `ground_grid.gdshader` stays `unshaded`.
