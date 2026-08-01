@@ -780,9 +780,48 @@ fourteen tight corners give up 4.9% while La Sarthe's long straights give up
 1.3%. No single slack constant can absorb that, which is exactly what
 `HUMAN_SLACK` was going to be asked to do.
 
+### The racing line, modelled
+
+The fix M10 asked for. Rather than widen corners with a closed-form arc — which
+assumes a corner alone with unlimited straight either side, and gives a 21 m
+corner an effective radius near 50 m — the line is found by **relaxation**:
+repeatedly pull each point towards the midpoint of its neighbours, clamped to
+6 m either side of the centreline. That converges on the minimum-curvature line
+inside the ribbon, and gets the competition between neighbouring corners for the
+same road for free.
+
+| Circuit | Centreline | Racing line | Estimate before | after | Driven | Error |
+|---|---|---|---|---|---|---|
+| Ardennes | 1473 m | 1447 m | 49.14 s | 47.75 s | 50.48 s | −5.4% |
+| Monte Carlo | 1054 m | 1037 m | 40.04 s | 38.15 s | 38.07 s | +0.2% |
+| La Sarthe | 1768 m | 1738 m | 61.12 s | 59.02 s | 60.33 s | −2.2% |
+
+**The qualitative change matters more than the numbers.** Before, the model was
+slower than the driver on one circuit and faster on two — it was not a bound on
+anything. Now it is faster on all three, by 0.2% to 5.4%, which is what an
+*ideal* lap should be against a conservative driver using 80% of grip.
+
+**The line is only 1.8% shorter, and the lap is 3% quicker.** Most of the gain is
+not distance but curvature: straightening a corner raises the speed through it,
+which is worth more than the metres saved. That is also why the closed-form
+approach would have been so wrong — it models only the radius and ignores what
+the next corner is doing.
+
+**Cost, since it runs on every mouse move.** 4.4 ms on La Sarthe against 2.6 ms
+for the walk alone. Written over flat `PackedFloat32Array`s with the inner loop
+inlined: as arrays of `Vector3` with a two-line helper it was 10.8 ms, nearly all
+of it function-call overhead. Eight passes at a half step land within 0.2% of
+twenty at a quarter and cost a third less.
+
 ### Still open, from M10
 
-- **Model the racing line, do not tune the constant.** The honest fix for the
+- ~~**Model the racing line, do not tune the constant.**~~ **Done, above.**
+- **`HUMAN_SLACK` is still unmeasured**, and still measuring the wrong thing on
+  its own. The model is now a consistent bound, which is the prerequisite for
+  calibrating it, but the spread across three circuits is 0.2% to 5.4% — so a
+  single constant still carries several percent of circuit-dependent error.
+  Narrowing that needs laps driven by people rather than by a pursuit controller.
+- **The old note, kept because the reasoning still holds:** The honest fix for the
   above is a wider effective corner radius — a 90-degree corner of radius R on a
   road of half-width w can be taken on an arc meaningfully larger than R — which
   would both raise corner speeds and shorten the path, the two effects actually

@@ -470,7 +470,7 @@ func test_the_editor_readout_is_affordable_per_mouse_move() -> void:
 	# on purpose: this is a regression guard against the estimate becoming
 	# quadratic, not a benchmark.
 	check_true("measure plus estimate fits in a frame (%.2f ms)" % each_ms,
-		each_ms < 16.0)
+		each_ms < 9.0)
 
 ## A circuit has to survive being turned into a string and back, including every
 ## per-corner choice -- radius, banking and elevation are the interesting half of
@@ -1369,6 +1369,244 @@ func test_the_tunnel_is_built_and_does_not_collide() -> void:
 		check("%s has no tunnel" % id,
 			other.find_children("Tunnel", "MeshInstance3D", true, false).size(), 0)
 		other.free()
+
+## Dragging a bend back onto the straight it came from makes the road straight
+## again, which is the gesture the editor is built around — "drag the road" — and
+## was the one thing it would not do.
+##
+## Pushing a bend *through* to the far side must keep working, because that is
+## why the drag refuses to prune mid-gesture in the first place. Both are driven
+## through `TrackGrid` rather than through `TrackShape`, because the rule that
+## broke this lives in the drag handler and not in the shape maths.
+func test_dragging_a_bend_flat_straightens_the_road() -> void:
+	var editor: Control = staged_editor
+	if editor == null:
+		return
+	var grid: TrackGrid = editor._grid
+
+	var layout := TrackLayout.new()
+	layout.cells = TrackShape.cells_from_corners([
+		Vector2i(0, 0), Vector2i(20, 0), Vector2i(20, 12), Vector2i(0, 12),
+	])
+	layout.start_cell = Vector2i(2, 0)
+	layout.display_name = "Bend Test"
+	grid.layout = layout
+	grid.refresh(layout.compile())
+	var plain := grid._corners.size()
+
+	# Push a bend out of the top straight, the way a double-click does.
+	var popped := TrackShape.insert_bump(grid._corners, 0, Vector2i(10, 0), -4)
+	check("a bend was pushed out", popped.size(), plain + 4)
+	grid._corners = popped
+	layout.cells = TrackShape.cells_from_corners(popped)
+
+	# Now drag its outer edge back onto y = 0, which is the line it left.
+	grid._drag = TrackGrid.Hit.EDGE
+	grid._drag_floor = popped.size()
+	grid._drag_moved = false
+	for i in popped.size():
+		var a: Vector2i = popped[i]
+		var b: Vector2i = popped[(i + 1) % popped.size()]
+		if a.y == -4 and b.y == -4:
+			grid._drag_index = i
+			break
+	# The straighten is armed across the whole band no bend can occupy, not on the
+	# single cell exactly on the line: those cells are ones `move_edge` refuses,
+	# so they used to do nothing but throw the bump to the far side, leaving the
+	# flat position a knife-edge between two flips.
+	for approach in [-1, 0, 1]:
+		grid._corners = popped.duplicate()
+		layout.cells = TrackShape.cells_from_corners(grid._corners)
+		grid._drag = TrackGrid.Hit.EDGE
+		grid._drag_floor = popped.size()
+		grid._drag_moved = false
+		grid._flatten_saved = []
+		for i in popped.size():
+			if popped[i].y == -4 and popped[(i + 1) % popped.size()].y == -4:
+				grid._drag_index = i
+				break
+
+		grid._apply_drag(Vector2i(10, approach))
+		# Straight *now*, not on release: the canvas has to show what letting go
+		# will give, or the player has to know the rule instead of seeing it.
+		check("at y=%d the road is drawn straight" % approach,
+			grid._corners.size(), plain)
+		check("and the cells match what is drawn" % [],
+			grid.layout.cells.size(),
+			TrackShape.cells_from_corners(grid._corners).size())
+		check_true("with the bend kept in case the drag continues",
+			not grid._flatten_saved.is_empty())
+		grid._end_drag()
+		check("letting go at y=%d keeps it straight" % approach,
+			grid._corners.size(), plain)
+		check_true("leaving a valid road", TrackShape.corners_valid(grid._corners))
+
+	# The other half of the gesture, and why the drag refuses to prune while it is
+	# running: a bend must still be pushable through its own straight and out the
+	# far side. Past the band, the flip is exactly as it was.
+	grid._corners = popped.duplicate()
+	layout.cells = TrackShape.cells_from_corners(grid._corners)
+	grid._drag = TrackGrid.Hit.EDGE
+	grid._drag_floor = popped.size()
+	grid._drag_moved = false
+	grid._flatten_saved = []
+	for i in popped.size():
+		if popped[i].y == -4 and popped[(i + 1) % popped.size()].y == -4:
+			grid._drag_index = i
+			break
+	grid._apply_drag(Vector2i(10, 4))
+	check("pushing it through keeps the bend", grid._corners.size(), popped.size())
+	grid._end_drag()
+	check("still there after letting go", grid._corners.size(), popped.size())
+
+	# And the round trip: through the flat band and out the far side in one
+	# gesture. Passing over straight must not cost the bend, or crossing to the
+	# other side would be impossible without a second drag.
+	grid._corners = popped.duplicate()
+	layout.cells = TrackShape.cells_from_corners(grid._corners)
+	grid._drag = TrackGrid.Hit.EDGE
+	grid._drag_floor = popped.size()
+	grid._drag_moved = false
+	grid._flatten_saved = []
+	for i in popped.size():
+		if popped[i].y == -4 and popped[(i + 1) % popped.size()].y == -4:
+			grid._drag_index = i
+			break
+	grid._apply_drag(Vector2i(10, -1))
+	check("passing over flat shows it straight", grid._corners.size(), plain)
+	grid._apply_drag(Vector2i(10, 4))
+	check("carrying on restores the bend on the far side",
+		grid._corners.size(), popped.size())
+	check("and nothing is left held", grid._flatten_saved.size(), 0)
+	grid._end_drag()
+	check("which is what letting go keeps", grid._corners.size(), popped.size())
+
+## A bend arrived at by dragging a **corner** straightens the same way as one
+## pushed out with a double-click. A section becomes a bump by being dragged into
+## one at least as often as by being popped, and the two cannot behave
+## differently — the player did not label which is which.
+##
+## This route used to be refused outright, with "the circuit would cross itself",
+## which was neither true nor the problem: `prune` had found the road no longer
+## turns there, and the drag handler read fewer corners as danger.
+func test_dragging_a_corner_into_line_straightens_it() -> void:
+	var editor: Control = staged_editor
+	if editor == null:
+		return
+	var grid: TrackGrid = editor._grid
+
+	var layout := TrackLayout.new()
+	# A rectangle with a step in its top edge, made of two corners. Nothing was
+	# "popped" here; this is just a shape with a jog in it.
+	var jogged: Array[Vector2i] = [
+		Vector2i(0, 0), Vector2i(8, 0), Vector2i(8, -4), Vector2i(20, -4),
+		Vector2i(20, 12), Vector2i(0, 12),
+	]
+	layout.cells = TrackShape.cells_from_corners(jogged)
+	layout.start_cell = Vector2i(2, 12)
+	layout.display_name = "Jog Test"
+	grid.layout = layout
+	grid.refresh(layout.compile())
+	check("the jogged shape is valid", grid._corners.size(), jogged.size())
+
+	# Drag the corner at (8, -4) down onto y = 0, which puts it in line with the
+	# road either side and leaves no turn there.
+	grid._drag = TrackGrid.Hit.CORNER
+	grid._drag_floor = jogged.size()
+	grid._drag_moved = false
+	grid._flatten_saved = []
+	grid._drag_index = jogged.find(Vector2i(8, -4))
+	check_true("the corner was found", grid._drag_index >= 0)
+
+	grid._apply_drag(Vector2i(8, 0))
+	check_true("the road is drawn straight while dragging",
+		grid._corners.size() < jogged.size())
+	check_true("with the jog kept in case the drag continues",
+		not grid._flatten_saved.is_empty())
+
+	# Carry on past and the jog comes back, so nothing is lost by crossing over.
+	grid._apply_drag(Vector2i(8, 4))
+	check("dragging on restores the jog", grid._corners.size(), jogged.size())
+	check("and nothing is left held", grid._flatten_saved.size(), 0)
+
+	# Back into line, and let go.
+	grid._apply_drag(Vector2i(8, 0))
+	grid._end_drag()
+	check_true("letting go in line keeps it straight",
+		grid._corners.size() < jogged.size())
+	check_true("leaving a valid road", TrackShape.corners_valid(grid._corners))
+
+## A section popped out of a straight has to go back in, from **any** of the four
+## corners it added.
+##
+## It used to work from two of them and refuse from the other two. `straighten_at`
+## only tried the tapped corner with an immediate neighbour, and a bump's outer
+## pair is only adjacent to itself — so tapping either inner corner found no
+## workable pair and refused, with a message about needing four corners that was
+## not the reason. The player is pointing at a shape, not at an index.
+func test_a_popped_section_can_be_flattened_from_any_of_its_corners() -> void:
+	var rect: Array[Vector2i] = [
+		Vector2i(0, 0), Vector2i(20, 0), Vector2i(20, 12), Vector2i(0, 12),
+	]
+	var plain := TrackShape.cells_from_corners(rect)
+	var popped := TrackShape.insert_bump(rect, 0, Vector2i(10, 0), -4)
+	check("a bump adds four corners", popped.size(), rect.size() + 4)
+
+	var tried := 0
+	for i in popped.size():
+		if rect.has(popped[i]):
+			continue  # one of the original corners, not part of the bump
+		tried += 1
+		var out := TrackShape.straighten_at(popped, i)
+		check_true("tapping the bump corner at %s flattens it" % popped[i],
+			not out.is_empty())
+		if out.is_empty():
+			continue
+		check("and leaves the rectangle it started as", out.size(), rect.size())
+		check("with the same road",
+			TrackShape.cells_from_corners(out).size(), plain.size())
+	check("all four of the bump's corners were tried", tried, 4)
+
+## The estimate is driven on the racing line, not the centreline.
+##
+## M10 measured the centreline model against a scripted driver and found it beat
+## the "perfect" lap on two circuits of three — a path error, not a physics one.
+## The line has to be shorter than the centreline, and it has to stay on the road.
+func test_the_estimate_uses_a_racing_line() -> void:
+	var source: GDScript = load("res://tools/build_track.gd")
+	for entry in [["ardennes", source.ARDENNES], ["monte_carlo", source.MONTE_CARLO],
+			["la_sarthe", source.LA_SARTHE]]:
+		var builder := TrackBuilder.new()
+		builder.measure(entry[1])
+		var line := ParTime.racing_line(builder.centreline)
+		check("%s keeps a point per centreline sample" % entry[0],
+			line.size(), builder.centreline.size())
+
+		var centre := _lap_length(builder.centreline)
+		var driven := _lap_length(line)
+		check_true("%s cuts the corners (%.0f m vs %.0f m)"
+			% [entry[0], driven, centre], driven < centre)
+
+		# Never off the road. The line is a lateral offset and the clamp is what
+		# keeps it inside the ribbon; without it the relaxation would happily
+		# shortcut across the grass.
+		var worst := 0.0
+		for i in line.size():
+			worst = maxf(worst, Vector2(line[i].x, line[i].z).distance_to(
+				Vector2(builder.centreline[i].x, builder.centreline[i].z)))
+		check_true("%s stays on the road (%.1f m from centre, limit %.1f)"
+			% [entry[0], worst, ParTime.LINE_HALF_WIDTH],
+			worst <= ParTime.LINE_HALF_WIDTH + 0.01)
+		# Height is carried through untouched: the line moves across the road,
+		# never up or down it.
+		check_near("%s keeps its elevation" % entry[0],
+			line[10].y, builder.centreline[10].y, 0.0001)
+
+func _lap_length(line: Array[Vector3]) -> float:
+	var total := 0.0
+	for i in line.size():
+		total += line[i].distance_to(line[(i + 1) % line.size()])
+	return total
 
 ## Every entry the title screen offers must actually load and be a usable
 ## circuit. A broken entry here is a dead button on the menu.
@@ -4112,6 +4350,8 @@ func _physics_process(_delta: float) -> bool:
 		test_the_ghost_car_is_not_a_physics_body()
 		test_par_time_reproduces_measured_corner_speeds()
 		test_par_time_is_plausible_on_the_shipped_circuits()
+		test_the_estimate_uses_a_racing_line()
+		test_a_popped_section_can_be_flattened_from_any_of_its_corners()
 		test_par_time_refuses_a_degenerate_circuit()
 		test_the_editor_readout_is_affordable_per_mouse_move()
 		test_a_circuit_round_trips_through_a_share_code()
@@ -4208,6 +4448,8 @@ func _physics_process(_delta: float) -> bool:
 		test_title_menu_fits_however_many_tracks()
 		test_a_pasted_code_opens_through_the_field()
 		test_a_refused_crossing_can_still_be_raised_on_the_canvas()
+		test_dragging_a_bend_flat_straightens_the_road()
+		test_dragging_a_corner_into_line_straightens_it()
 		test_the_panel_keeps_its_buttons_whatever_the_readout_says()
 		test_the_editor_says_how_to_fix_a_crossing()
 		test_editor_panel_is_wired_and_fits()

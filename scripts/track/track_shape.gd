@@ -357,13 +357,32 @@ static func insert_bump(
 	return _accept(out, allow_crossings)
 
 ## Straightens the jog a corner belongs to. A single corner cannot be removed
-## from a rectilinear ring on its own — they come in pairs — so this tries the
-## corner with each of its neighbours and takes whichever leaves a valid loop.
+## from a rectilinear ring on its own — they come in pairs — so this tries pairs
+## around the tapped corner and takes the first that leaves a valid loop.
+##
+## ## Why it tries four pairs and not two
+##
+## It used to try only the tapped corner with each immediate neighbour, which
+## flattens an ordinary jog but **fails on a section popped out of a straight**.
+## That inserts *four* corners: two where the road leaves the straight and two at
+## the far side. Removing the outer pair leaves three collinear points that
+## `prune` drops, taking the whole bump with it — but the outer pair is only
+## adjacent to itself, so tapping either of the two *inner* corners found no
+## workable pair and refused.
+##
+## Two of the four dots worked and two did not, with an error message about
+## needing four corners that was not the reason. Reaching one step further out
+## covers the bump from whichever of its corners is tapped, which is the whole
+## point: the player is pointing at a shape, not at an index.
 static func straighten_at(
 	corners: Array[Vector2i], index: int, allow_crossings: bool = false
 ) -> Array[Vector2i]:
 	var n := corners.size()
-	for pair_start in [index, (index - 1 + n) % n]:
+	# Nearest pairs first, so an ordinary jog still goes exactly as it did and
+	# only a tap that would otherwise have been refused reaches further.
+	for pair_start in [
+		index, (index - 1 + n) % n, (index + 1) % n, (index - 2 + n) % n,
+	]:
 		var out: Array[Vector2i] = []
 		for i in n:
 			if i == pair_start or i == (pair_start + 1) % n:

@@ -313,6 +313,57 @@ on the way in and comes back on the way out with nothing lit or unlit specially.
 > A real tunnel therefore needs a hole in both the ground mesh and its collider,
 > a signed elevation level, and geometry — a milestone, not a feature.
 
+### Straightening a bend is a drag, not a mode
+
+Pushing a bend out of a straight is a double-click; putting it back used to be
+Erase plus a tap — a mode switch to undo a drag, in an editor whose premise is
+that you drag the road. **Dragging a straight back level with the road either
+side of it now straightens it.**
+
+**However the bend got there.** A section becomes a bump by being dragged into
+one at least as often as by being pushed out with a double-click, and the player
+did not label which is which — so both routes straighten the same way. There are
+two ways a drag can arrive at straight, and both are handled:
+
+- an **edge** pulled level with the road either side of it, and
+- **any** drag whose result simply comes back with fewer corners, which is
+  `prune` finding the road no longer turns there. That is how a **corner**
+  dragged back into line reads, and it used to be refused outright with "the
+  circuit would cross itself" — neither true nor the problem.
+
+Three things make that work, and it took three attempts to get there — each one
+correct in code and wrong in the hand:
+
+- **Flat is measured against the corners either side**, not against how far the
+  drag has travelled. `_step_past_flat` reads the direction of travel, which
+  answers "which way is the player going" rather than "have they arrived". The
+  first attempt used it and so stepped past every time.
+- **It applies across a band, not on a single cell.** A bend shallower than
+  `MIN_EDGE` cannot be represented, so the cells either side of the line are ones
+  `move_edge` refuses — and `_step_past_flat` then throws the bend to the far
+  side. That left the straighten position a knife-edge with a flip on either side
+  of it, so dragging a bump back **flapped between the two sides and never went
+  flat**. Those cells were dead space; making the whole band mean "straighten"
+  turns a knife-edge into a target.
+- **It is applied live, not on release.** Holding the bend in place and
+  straightening only when the button came up meant the canvas disagreed with the
+  outcome: the player had to *know* the rule rather than see it. The road is now
+  drawn straight the moment the drag enters the band, and the bend is kept aside
+  in `_flatten_saved` so dragging back out puts it straight back. Passing through
+  on the way to the far side therefore costs nothing, which is what
+  `_drag_floor` was protecting in the first place — the protection just moved
+  from "refuse to prune" to "remember what was pruned".
+
+The last one is the general lesson: **what is drawn during a drag has to be what
+letting go will give you.** A gesture that commits something other than what it
+is showing cannot be learned by using it.
+
+`straighten_at` still exists for the Erase tap, and it now tries pairs one step
+further out. A popped section adds **four** corners and its outer pair is only
+adjacent to itself, so tapping either inner corner previously found no workable
+pair and refused — two of the four dots worked and two did not, with an error
+message about needing four corners that was not the reason.
+
 ### Drawing a crossing, and the trap in it
 
 The **Cross** toggle in the editor's tool row sets `TrackLayout.allow_crossings`

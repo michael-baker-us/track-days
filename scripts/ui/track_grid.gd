@@ -128,6 +128,17 @@ var _drag_index := -1
 var _drag_refused := false
 ## Corner count when the drag began; the drag may not go below it.
 var _drag_floor := 0
+## The bend, put aside while the road is being shown straight.
+##
+## Straightening is applied **live**, so the canvas shows what letting go will
+## give you — holding the bend in place and only straightening on release meant
+## the drawing disagreed with the outcome, and the player had to know the rule
+## rather than see it. Dragging back out of the flat band puts this straight
+## back, so nothing is lost by passing through.
+##
+## Empty whenever the road being shown is the real one.
+var _flatten_saved: Array[Vector2i] = []
+var _flatten_saved_index := -1
 ## Whether the drag has actually changed anything yet. A press that grabs a
 ## handle and lets go without moving is not an edit, and recording one leaves an
 ## undo entry that undoes nothing — which matters now that a two-finger gesture
@@ -599,11 +610,69 @@ func _apply_drag(cell: Vector2i) -> void:
 			layout_touched.emit()
 		return
 
-	var moved: Array[Vector2i] = (
-		TrackShape.move_corner(_corners, _drag_index, cell, layout.allow_crossings)
-		if _drag == Hit.CORNER
-		else TrackShape.move_edge(_corners, _drag_index, cell, layout.allow_crossings)
+	# The shape as it really is. While the road is being shown straight, `_corners`
+	# is the straightened version and this is the bend it is standing in for.
+	var base: Array[Vector2i] = (
+		_flatten_saved if not _flatten_saved.is_empty() else _corners
 	)
+	var base_index: int = (
+		_flatten_saved_index if not _flatten_saved.is_empty() else _drag_index
+	)
+
+	# Dragged into line: show the road straight, and keep the bend in case the
+	# drag carries on past.
+	#
+	# Two ways to arrive at that, and both have to work, because a section becomes
+	# a bump by being dragged into one just as often as by being pushed out.
+	#
+	# 1. An edge pulled level with the road either side. This needs a *band*
+	#    rather than the single cell on the line: a bend shallower than
+	#    `MIN_EDGE` cannot be represented, so the cells either side of the line
+	#    are ones `move_edge` refuses, and `_step_past_flat` then throws the bend
+	#    to the far side — leaving the straighten a knife-edge between two flips.
+	# 2. Any drag whose own result simply comes back with fewer corners, which is
+	#    `prune` having found the road no longer turns there. That is how a
+	#    *corner* dragged back into line reads, and it used to be refused outright
+	#    with "the circuit would cross itself" — which was not true and named the
+	#    wrong problem.
+	var straightened: Array[Vector2i] = []
+	if _drag == Hit.EDGE:
+		var flat := _straighten_cell(base, base_index, cell)
+		if flat != Vector2i.MAX:
+			var pruned := TrackShape.move_edge(
+				base, base_index, flat, layout.allow_crossings
+			)
+			if not pruned.is_empty() and pruned.size() < base.size():
+				straightened = pruned
+
+	var moved: Array[Vector2i] = (
+		TrackShape.move_corner(base, base_index, cell, layout.allow_crossings)
+		if _drag == Hit.CORNER
+		else TrackShape.move_edge(base, base_index, cell, layout.allow_crossings)
+	)
+	if straightened.is_empty() and not moved.is_empty() and moved.size() < base.size():
+		straightened = moved
+
+	if not straightened.is_empty():
+		if _flatten_saved.is_empty():
+			_flatten_saved = base.duplicate()
+			_flatten_saved_index = base_index
+			status.emit("Straight — let go to keep it.")
+		# Shown straight, right now. Nothing is committed until the button comes
+		# up, and dragging back out puts the bend back.
+		layout.cells = TrackShape.cells_from_corners(straightened)
+		_corners = straightened
+		_drag_moved = true
+		layout_touched.emit()
+		return
+
+	# Not straight any more: put the bend back and carry on as an ordinary drag.
+	if not _flatten_saved.is_empty():
+		_corners = _flatten_saved
+		_drag_index = _flatten_saved_index
+		layout.cells = TrackShape.cells_from_corners(_corners)
+		_flatten_saved = []
+		_flatten_saved_index = -1
 
 	# Dragging a bend from one side of its straight to the other has to pass
 	# through the flat position, where the bend momentarily has no depth and gets
@@ -668,6 +737,36 @@ func _insert_bend(index: int, cell: Vector2i) -> void:
 			return
 	status.emit("No room for a bend here — try a longer straight.")
 
+## Where this drag would flatten to, or `Vector2i.MAX` if it is not close enough
+## to the road either side to count as straightening.
+##
+## The band is `MIN_EDGE` either way, which is exactly the range no bend can
+## occupy: one cell deep is refused by `corners_valid`, so those cells were dead
+## space that did nothing but bounce the bump across to the far side. Making the
+## whole dead band mean "straighten" costs nothing and turns a knife-edge into
+## something you can actually hit.
+##
+## Measured against the corners either side, not against how far the drag has
+## travelled. `_step_past_flat` reads the direction of travel, which answers
+## "which way is the player going" rather than "have they arrived".
+func _straighten_cell(
+	corners: Array[Vector2i], index: int, cell: Vector2i
+) -> Vector2i:
+	var n := corners.size()
+	if n < 4 or index < 0:
+		return Vector2i.MAX
+	var a := corners[index]
+	var b := corners[(index + 1) % n]
+	var prev := corners[(index - 1 + n) % n]
+	var next := corners[(index + 2) % n]
+	if a.y == b.y:
+		if prev.y != next.y or absi(cell.y - prev.y) >= TrackShape.MIN_EDGE:
+			return Vector2i.MAX
+		return Vector2i(cell.x, prev.y)
+	if prev.x != next.x or absi(cell.x - prev.x) >= TrackShape.MIN_EDGE:
+		return Vector2i.MAX
+	return Vector2i(prev.x, cell.y)
+
 ## The target nudged one cell further along the direction of travel, so a bend
 ## being dragged across its own straight lands on the far side instead of on the
 ## line. Returns `cell` unchanged when there is no direction to infer.
@@ -701,6 +800,12 @@ func _straighten(index: int) -> void:
 	layout_edited.emit()
 
 func _end_drag() -> void:
+	# Nothing to apply here: if the road is being shown straight it already *is*
+	# straight, in `layout.cells` and in `_corners` both. Letting go simply stops
+	# the bend being available to put back.
+	if not _flatten_saved.is_empty():
+		status.emit("Straightened — drag the road out again to put a bend back.")
+
 	# `_drag_moved`, not merely "a drag was in progress": grabbing a handle and
 	# letting go without moving is not an edit, and recording one leaves an undo
 	# entry that undoes nothing. A pinch beginning on a handle does exactly that.
@@ -710,6 +815,8 @@ func _end_drag() -> void:
 	_drag_refused = false
 	_drag_floor = 0
 	_drag_moved = false
+	_flatten_saved = []
+	_flatten_saved_index = -1
 	var painted := _painted_any
 	_stroke = 0
 	_has_last_painted = false

@@ -91,14 +91,129 @@ const SWEEPS := 2
 ## so nothing user-facing rests on it.
 const HUMAN_SLACK := 1.08
 
+## How far the car's centre may sit either side of the centreline, in metres.
+##
+## The road is 14 m wide and the car about 1.2 m, so 6 m keeps it on the tarmac
+## with a little to spare. The scripted driver measured in M10 strayed up to
+## 7.3 m — the very edge — so this is slightly the conservative side of what is
+## actually achievable, which is the right side to be on for a target time.
+const LINE_HALF_WIDTH := 6.0
+
+## Relaxation passes over the lap, and how far each moves a point.
+##
+## Enough to converge and few enough to stay affordable: the editor runs this on
+## every mouse move. Eight passes at a half step land within 0.2% of twenty at a
+## quarter step and cost 4.4 ms on the longest circuit rather than 6.4 — the line
+## barely moves after the first few passes, because most of it is already
+## straight.
+const LINE_PASSES := 8
+const LINE_RATE := 0.5
+
+## The line a car actually drives, as a lateral offset from the centreline.
+##
+## ## Why this exists
+##
+## M10 measured the model against a scripted driver and found it **beat the
+## "perfect" lap on two circuits out of three**. Not a physics error — the
+## constants are measured and the cornering half is checked independently — but a
+## *path* error: this integrates along the centreline, and a car drives the
+## racing line, which came out 6-8% shorter on every circuit.
+##
+## The error is circuit-dependent, so no single slack constant can absorb it: it
+## was 4.9% on tight Monte Carlo and 1.3% on open La Sarthe. Modelling the line
+## is the only honest fix.
+##
+## ## How
+##
+## Repeatedly pull each point towards the midpoint of its neighbours, clamped to
+## the width of the road. That converges on the **minimum-curvature** line inside
+## the ribbon, which is very close to what a driver takes and needs no per-corner
+## geometry: a corner opens out because straightening it is what reduces
+## curvature, and a chicane is straightened for the same reason.
+##
+## Deliberately *not* the closed-form widest arc through a single corner. That
+## formula assumes a corner alone with unlimited straight either side, and gives
+## a 21 m corner an effective radius near 50 m — true in isolation and nonsense
+## on a circuit where the next corner arrives first. Relaxation gets the
+## interaction between neighbouring corners for free, because they compete for
+## the same road.
+static func racing_line(line: Array[Vector3]) -> Array[Vector3]:
+	var n := line.size()
+	if n < 8:
+		return line
+
+	# Flat `PackedFloat32Array`s rather than arrays of vectors, and the inner loop
+	# written out rather than calling a helper. This runs on every mouse move in
+	# the editor: as arrays of `Vector3` with a two-line helper it cost 10.8 ms on
+	# the longest circuit, most of it in function-call overhead, against a 16.7 ms
+	# frame. The arithmetic is identical.
+	var bx := PackedFloat32Array()
+	var by := PackedFloat32Array()
+	var sx := PackedFloat32Array()
+	var sy := PackedFloat32Array()
+	var offset := PackedFloat32Array()
+	bx.resize(n)
+	by.resize(n)
+	sx.resize(n)
+	sy.resize(n)
+	offset.resize(n)
+
+	# Lateral direction at each point, flat: curvature and the road's width are
+	# both horizontal, and a climb should not narrow the line.
+	for i in n:
+		bx[i] = line[i].x
+		by[i] = line[i].z
+		var ahead := line[(i + 1) % n]
+		var behind := line[(i + n - 1) % n]
+		var tx := ahead.x - behind.x
+		var ty := ahead.z - behind.z
+		var length := sqrt(tx * tx + ty * ty)
+		if length < 0.0001:
+			tx = 1.0
+			ty = 0.0
+			length = 1.0
+		sx[i] = -ty / length
+		sy[i] = tx / length
+
+	for _pass in LINE_PASSES:
+		for i in n:
+			var j := (i + 1) % n
+			var k := (i + n - 1) % n
+			var hx := bx[i] + sx[i] * offset[i]
+			var hy := by[i] + sy[i] * offset[i]
+			var mx := (
+				(bx[k] + sx[k] * offset[k]) + (bx[j] + sx[j] * offset[j])
+			) * 0.5
+			var my := (
+				(by[k] + sy[k] * offset[k]) + (by[j] + sy[j] * offset[j])
+			) * 0.5
+			# Only the component across the road is available to move: the point
+			# has to stay at its own station along the lap, or the samples would
+			# bunch up and the distances stop meaning anything.
+			var move := (mx - hx) * sx[i] + (my - hy) * sy[i]
+			offset[i] = clampf(
+				offset[i] + move * LINE_RATE, -LINE_HALF_WIDTH, LINE_HALF_WIDTH
+			)
+
+	var out: Array[Vector3] = []
+	out.resize(n)
+	for i in n:
+		out[i] = Vector3(
+			bx[i] + sx[i] * offset[i], line[i].y, by[i] + sy[i] * offset[i]
+		)
+	return out
+
 ## Seconds for a perfect lap of `centreline`, or 0.0 if there is not enough of a
 ## circuit to say.
 ##
+## Driven on the **racing line** rather than the centreline: the builder's
+## centreline is where the road is, not where a car goes.
+##
 ## `centreline` is the builder's, which `measure()` fills without instancing a
-## single tile — so this costs the editor nothing beyond the walk it was already
-## doing on every mouse move.
+## single tile — so this costs the editor only the relaxation on top of the walk
+## it was already doing on every mouse move.
 static func ideal_lap(centreline: Array[Vector3]) -> float:
-	var walk := resample(centreline)
+	var walk := resample(racing_line(centreline))
 	var points: Array[Vector3] = walk[0]
 	var limit: PackedFloat32Array = walk[1]
 	if points.size() < 8:
