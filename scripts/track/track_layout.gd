@@ -150,6 +150,15 @@ var cells: Array[Vector2i] = []
 var start_cell := Vector2i.ZERO
 ## Painted loops have no inherent direction; this picks which way round to race.
 var reversed := false
+
+## Whether this circuit is allowed to cross over itself.
+##
+## Off by default and not yet settable from the editor: crossings are being
+## brought in a layer at a time (`docs/roadmap.md`, M13), and a circuit the
+## editor accepted before the builder could build it would be worse than one it
+## refuses. The flag is what lets the compiler be finished and tested ahead of
+## the two layers around it.
+var allow_crossings := false
 ## Bend cell -> chosen corner size. Absent means "largest that fits".
 var corner_sizes := {}
 ## Bend cell -> chosen bank level, 0 for a flat corner. Absent means "whatever
@@ -190,6 +199,11 @@ func compile() -> Compiled:
 		var n := TrackShape.neighbour_count(occupied, c)
 		if n == 2:
 			continue
+		# Four neighbours is a crossing, where the road runs straight over
+		# itself. Three is a T junction — a branch — and stays an error however
+		# the heights work out, because there is no lap through it.
+		if allow_crossings and n == 4:
+			continue
 		out.problem_cells.append(c)
 		if n < 2:
 			loose += 1
@@ -213,7 +227,7 @@ func compile() -> Compiled:
 	# TrackShape.walk is the single definition of a valid painted loop; the
 	# handle edits in the editor are refused against exactly this test, so the
 	# two can never disagree about what counts as a circuit.
-	var cycle := TrackShape.walk(cells)
+	var cycle := TrackShape.walk(cells, allow_crossings)
 	if cycle.is_empty() or doubled:
 		out.errors.append("That is more than one separate loop — join them or erase one.")
 		return out
@@ -239,6 +253,10 @@ func compile() -> Compiled:
 	# corner has to be at ground level for the loop's height to close.
 	_resolve_elevation(out)
 
+	_check_crossings_clear(occupied, out)
+	if not out.errors.is_empty():
+		return out
+
 	out.segments = _emit(out)
 	out.cycle = _order_from(cycle, out)
 	out.to_grid = _grid_transform(out)
@@ -247,6 +265,64 @@ func compile() -> Compiled:
 
 
 
+
+## Two levels, because that is what the art costs.
+##
+## `roadStraightBridge` carries 0.5 tile units of structure below its deck, which
+## is exactly one level. One level of separation puts the upper road's supports
+## in the lower road; two puts the deck 7 m up with 3.5 m of clear air beneath,
+## which is what Suzuka is built on. So this is a measurement off the tiles, not
+## a taste in gradients.
+const CROSSING_CLEARANCE_LEVELS := 2
+
+## Refuses a crossing where the two passes would meet.
+##
+## This is the whole safety argument for allowing crossings at all: the shape is
+## drawable (`TrackShape.walk` says so) but only *buildable* if one leg is high
+## enough above the other, and only the compiler knows how high anything is.
+##
+## Reported rather than silently reduced, unlike elevation requests that do not
+## fit. A climb that gets shortened is still a circuit; two roads occupying the
+## same space is not, and quietly flattening it would leave the player looking at
+## a crossing they did not ask for and cannot see the problem with.
+func _check_crossings_clear(occupied: Dictionary, out: Compiled) -> void:
+	if not allow_crossings:
+		return
+	for cell in cells:
+		if TrackShape.neighbour_count(occupied, cell) != 4:
+			continue
+		var levels := _levels_over(cell, out)
+		if levels.size() != 2:
+			# A crossing the runs do not account for twice means the walk and the
+			# run builder disagree, which is a bug rather than a bad circuit.
+			out.errors.append(
+				"A crossing at %d,%d could not be worked out." % [cell.x, cell.y]
+			)
+			out.problem_cells.append(cell)
+			continue
+		var gap: int = absi(int(levels[0]) - int(levels[1]))
+		if gap >= CROSSING_CLEARANCE_LEVELS:
+			continue
+		out.problem_cells.append(cell)
+		out.errors.append(
+			("The road crosses itself at %d,%d with %s between the two. "
+			+ "Raise one side by %d more to bridge over the other.")
+			% [
+				cell.x, cell.y,
+				"nothing" if gap == 0 else "only one level",
+				CROSSING_CLEARANCE_LEVELS - gap,
+			]
+		)
+
+## The level of each run that passes through `cell`. Two entries for a crossing.
+func _levels_over(cell: Vector2i, out: Compiled) -> Array:
+	var levels := []
+	for run in out.runs:
+		for c in run.cells:
+			if c == cell:
+				levels.append(run.level)
+				break
+	return levels
 
 func _build_corners_and_runs(
 	cycle: Array[Vector2i], bends: Array[int], out: Compiled
@@ -641,6 +717,7 @@ func to_dict() -> Dictionary:
 		"cells": flat_cells,
 		"start": [start_cell.x, start_cell.y],
 		"reversed": reversed,
+		"crossings": allow_crossings,
 		"corner_sizes": sizes,
 		"corner_banks": banks,
 		"elevation": levels,
@@ -651,6 +728,7 @@ static func from_dict(data: Dictionary) -> TrackLayout:
 	layout.id = String(data.get("id", ""))
 	layout.display_name = String(data.get("name", "Untitled"))
 	layout.reversed = bool(data.get("reversed", false))
+	layout.allow_crossings = bool(data.get("crossings", false))
 
 	for pair in data.get("cells", []):
 		if pair is Array and pair.size() == 2:

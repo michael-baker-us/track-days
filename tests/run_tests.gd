@@ -763,6 +763,153 @@ func _figure_of_eight() -> Array[Vector2i]:
 			out.append(c)
 	return out
 
+## A painted figure of eight: two square rings sharing one cell. Big enough that
+## the runs have room for the start line and for a two-level climb.
+func _eight_layout(size: int) -> TrackLayout:
+	var layout := TrackLayout.new()
+	var cells: Array[Vector2i] = _ring(size, size)
+	for c in _ring(size, size, Vector2i(size - 1, size - 1)):
+		if not cells.has(c):
+			cells.append(c)
+	layout.cells = cells
+	layout.start_cell = cells[0]
+	layout.display_name = "Crossover"
+	layout.allow_crossings = true
+	return layout
+
+## Raises whichever run passes through `cell` and is not the start run, as high
+## as it is allowed to go. Returns the level it managed.
+func _raise_over(layout: TrackLayout, cell: Vector2i, want: int) -> int:
+	var compiled := layout.compile()
+	for run in compiled.runs:
+		if run.is_start or not run.cells.has(cell):
+			continue
+		layout.elevation[run.key] = want
+		break
+	var after := layout.compile()
+	for run in after.runs:
+		if run.cells.has(cell) and not run.is_start:
+			return run.level
+	return 0
+
+## The compiler refuses a crossing where the two roads would meet, and says so in
+## a sentence rather than by producing a circuit with two roads in one place.
+##
+## This is the whole safety argument for allowing crossings: the shape is
+## drawable, and only *buildable* if one leg clears the other. `TrackShape` knows
+## the first; only the compiler knows heights, so only the compiler can know the
+## second.
+func test_a_crossing_needs_headroom_to_compile() -> void:
+	var flat := _eight_layout(14)
+	var crossing: Vector2i = TrackShape.crossings_in(flat.cells)[0]
+
+	var level := flat.compile()
+	check("a flat crossing is refused", level.ok, false)
+	check_true("and the cell is pointed at",
+		level.problem_cells.has(crossing))
+	var said_headroom := false
+	for e in level.errors:
+		if e.contains("crosses itself"):
+			said_headroom = true
+	check_true("with a sentence about the crossing (%s)"
+		% ", ".join(level.errors), said_headroom)
+
+	# Raised properly, it compiles. Two levels because the bridge tile carries
+	# one level of structure below its deck -- one level of separation would put
+	# the upper road's supports in the lower road.
+	var raised := _eight_layout(14)
+	var got := _raise_over(raised, crossing, TrackLayout.CROSSING_CLEARANCE_LEVELS)
+	check("the leg went up two levels", got,
+		TrackLayout.CROSSING_CLEARANCE_LEVELS)
+	var ok := raised.compile()
+	check_true("and then it compiles (%s)" % ", ".join(ok.errors), ok.ok)
+	check_true("with a lap to drive", ok.segments.size() > 0)
+
+## A painted crossing has to build, not just compile -- and the builder needs no
+## special case for it. Suzuka reaches the builder as a hand-authored segment
+## list; this is the same geometry arriving from painted cells, which is the
+## route a player's circuit takes.
+##
+## The raised leg becomes `roadStraightBridge` because `_emit_run` already emits
+## that for a held section above ground. Nothing was added to the builder for
+## crossings; it simply walks the segments and the road passes over itself.
+func test_a_painted_crossing_builds_with_real_clearance() -> void:
+	var layout := _eight_layout(14)
+	var crossing: Vector2i = TrackShape.crossings_in(layout.cells)[0]
+	_raise_over(layout, crossing, TrackLayout.CROSSING_CLEARANCE_LEVELS)
+	var compiled := layout.compile()
+	check_true("it compiles (%s)" % ", ".join(compiled.errors), compiled.ok)
+	if not compiled.ok:
+		return
+
+	var builder := TrackBuilder.new()
+	var result := builder.measure(compiled.segments)
+	check_true("and closes", result.closed)
+	check("as a circuit that crosses itself", result.simple, false)
+
+	# The same measurement Suzuka gets: two parts of the lap far apart along the
+	# road, on top of each other in plan, with real height between them.
+	var line := builder.centreline
+	var n := line.size()
+	var apart := n / 6
+	var best_flat := INF
+	var rise := 0.0
+	for i in n:
+		for j in range(i + apart, n - apart):
+			var flat := Vector2(line[i].x, line[i].z).distance_to(
+				Vector2(line[j].x, line[j].z)
+			)
+			if flat < best_flat:
+				best_flat = flat
+				rise = absf(line[i].y - line[j].y)
+	check_true("the lap meets itself in plan (%.1f m)" % best_flat,
+		best_flat < 2.0)
+	check_true("with two levels of air between (%.1f m)" % rise, rise > 6.0)
+
+	# And the raised leg is carried on the bridge tile, which is what holds a
+	# deck up rather than a plain straight hanging in space.
+	var bridges := 0
+	for seg in compiled.segments:
+		if seg[0] == "S" and String(seg[1]) == "roadStraightBridge":
+			bridges += 1
+	check_true("carried on bridge tiles", bridges > 0)
+
+## One level is not enough, and the refusal has to say so specifically rather
+## than repeating the flat message.
+func test_one_level_of_crossing_clearance_is_refused() -> void:
+	var layout := _eight_layout(14)
+	var crossing: Vector2i = TrackShape.crossings_in(layout.cells)[0]
+	var got := _raise_over(layout, crossing, 1)
+	check("the leg went up one level", got, 1)
+	var result := layout.compile()
+	check("one level is still refused", result.ok, false)
+	var said_one := false
+	for e in result.errors:
+		if e.contains("only one level"):
+			said_one = true
+	check_true("and says one level is not enough (%s)"
+		% ", ".join(result.errors), said_one)
+
+## The compiler is only crossing-aware when the layout asks. Without the flag a
+## four-neighbour cell is still a junction, which is what every circuit saved so
+## far will keep getting.
+func test_the_compiler_refuses_crossings_by_default() -> void:
+	var layout := _eight_layout(14)
+	layout.allow_crossings = false
+	var result := layout.compile()
+	check("refused without the flag", result.ok, false)
+	var said_junction := false
+	for e in result.errors:
+		if e.contains("junction"):
+			said_junction = true
+	check_true("as a junction (%s)" % ", ".join(result.errors), said_junction)
+
+	# And the flag survives being saved, or a shared or reloaded circuit would
+	# come back as an invalid one.
+	var raised := _eight_layout(14)
+	var round_tripped := TrackLayout.from_dict(raised.to_dict())
+	check("the flag round-trips", round_tripped.allow_crossings, true)
+
 ## The relaxation is opt-in, and with it off nothing whatsoever changes. This is
 ## the guard that matters most in M13: `TrackShape.walk` refusing bad shapes is
 ## what makes the editor safe, and the editor has not been switched over yet.
@@ -3728,6 +3875,10 @@ func _physics_process(_delta: float) -> bool:
 		test_a_crossing_is_walked_straight_through()
 		test_allowing_crossings_still_refuses_everything_else()
 		test_ordinary_circuits_walk_identically_either_way()
+		test_a_crossing_needs_headroom_to_compile()
+		test_a_painted_crossing_builds_with_real_clearance()
+		test_one_level_of_crossing_clearance_is_refused()
+		test_the_compiler_refuses_crossings_by_default()
 		test_corner_sizing()
 		test_elevation()
 		test_layout_round_trip()

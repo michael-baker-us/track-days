@@ -303,17 +303,44 @@ every painted circuit must satisfy.
 A scripted driver laps it in ~33 s between −0.04 m and 7.80 m, so it is drivable
 rather than only geometrically valid.
 
+### Step 2 done — the compiler, and the gate that makes it safe
+
+`TrackLayout.allow_crossings` (off by default, persisted, round-trips through
+JSON and share codes) makes the compiler crossing-aware: four-neighbour cells
+stop being junctions, and the walk is asked to allow them.
+
+**The gate is two levels of separation, and that is a measurement rather than a
+taste.** `roadStraightBridge` carries 0.5 tile units of structure below its deck —
+exactly one level. One level of separation would put the upper road's supports
+in the lower road; two puts the deck 7 m up with 3.5 m of clear air beneath,
+which is what Suzuka is built on.
+
+A crossing that does not clear is **refused with a sentence**, not silently
+flattened. Elevation requests that do not fit are reduced rather than refused —
+a shortened climb is still a circuit — but two roads in the same place is not a
+circuit at all, and quietly levelling it would leave the player looking at a
+problem they cannot see.
+
+### Step 3 done — and it needed no builder changes at all
+
+A painted crossing builds with real clearance, and `TrackBuilder` was not
+touched. It simply walks the segments and the road passes over itself, exactly as
+Suzuka does; `_emit_run` already emits `roadStraightBridge` for a held section
+above ground, so the raised leg is carried on a bridge without anything asking
+for one. Pinned by a test measuring the built centreline: two parts of the lap a
+sixth of a lap apart, meeting in plan, with 7 m between them.
+
+Suzuka is what made this cheap. Shipping a crossover circuit as an authored
+segment list proved the builder handled overlapping geometry *before* any of the
+painted path existed, which turned step 3 from the risky one into a test.
+
 ### Remaining
 
-2. **`corners_valid` and `TrackLayout.compile`** — the junction check currently
-   reports four-neighbour cells as errors, and `corners_valid` re-walks
-   `cells_from_corners`, which emits a crossing cell twice. Plus the gate that
-   makes this safe: *the two passes must resolve to different levels*, which only
-   the compiler can know.
-3. **`TrackBuilder`** — emit the raised leg as a bridge, and check the collision
-   ribbon behaves where it passes over itself.
-4. **The editor** — `edge_at` assumes a cell lies on at most one straight, and
-   the canvas has to draw a crossing as a crossing.
+4. **The editor.** `TrackShape._accept` and `corners_valid` still refuse
+   crossings, so no handle edit can produce one — `corners_valid` re-walks
+   `cells_from_corners`, which emits a crossing cell twice. `edge_at` assumes a
+   cell lies on at most one straight. The canvas has to draw a crossing as a
+   crossing. And the player needs a way to turn `allow_crossings` on.
 
 **Explicitly not doing:** diagonals. `roadStraightSkew` exists and is a trap — the
 rectilinear model is why closure is arithmetic rather than trial and error.
