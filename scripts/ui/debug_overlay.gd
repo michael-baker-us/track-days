@@ -22,8 +22,15 @@ func _process(_delta: float) -> void:
 			return
 
 	var speed_kmh := _car.linear_velocity.length() * 3.6
+	# Pedal travel is read back through the car's own `_pedal` rather than from
+	# Input directly, so the readout cannot disagree with what is actually driving
+	# the car -- including about which input mode is in force.
 	var lines := PackedStringArray([
 		"speed: %.1f km/h" % speed_kmh,
+		"throttle: %.2f / brake: %.2f (%s)" % [
+			_car._pedal(&"accelerate"), _car._pedal(&"brake"),
+			"analogue" if GameState.analogue_input() else "binary",
+		],
 		"engine_force: %.0f" % _car.engine_force,
 		"brake: %.0f" % _car.brake,
 		"steering: %.2f rad" % _car.steering,

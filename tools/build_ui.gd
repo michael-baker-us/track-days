@@ -173,6 +173,15 @@ func _pause_menu() -> Control:
 	resume.custom_minimum_size = Vector2(0.0, 44.0)
 	rows.add_child(resume)
 
+	# The analogue/binary choice sits here rather than on the title screen because
+	# it is a driving setting, and this is the only menu reachable while driving:
+	# flipping it and feeling the difference is one press apart. The label is
+	# rewritten by pause_menu.gd from the stored setting, so what is baked here is
+	# only a width.
+	var throttle := _label_button("ThrottleButton", "Throttle: Analogue")
+	throttle.custom_minimum_size = Vector2(0.0, 44.0)
+	rows.add_child(throttle)
+
 	# Not styled as the danger action: leaving a race destroys nothing, and
 	# painting it red would say it does. It is second because the safe one should
 	# be what a pad has focus on when the menu opens.

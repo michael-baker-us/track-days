@@ -46,6 +46,12 @@ extends Resource
 @export var max_steer_angle: float = 0.6
 @export var steer_speed: float = 4.0
 @export var steer_falloff_reference_kmh: float = 200.0
+## Exponent on stick travel: 1.0 is linear, higher gives finer control near
+## centre. Only reaches analogue sticks - the curve fixes -1, 0 and 1, and a
+## keyboard or touch pad asks for nothing else - so raising it cannot change any
+## figure in the tuning journal, all of which were measured at full lock.
+## 1.5 is a starting point to drive against, not a measurement.
+@export_range(1.0, 3.0, 0.1) var steer_response_curve: float = 1.5
 
 @export_group("Suspension")
 ## Godot's default stiffness (5.0) is tuned for a far lighter body than 1200 kg

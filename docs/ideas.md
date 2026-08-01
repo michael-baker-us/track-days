@@ -4,6 +4,13 @@ A working document, not a plan. Things worth building next, what each one would
 cost, and — more usefully — which of them break something the codebase currently
 guarantees. Nothing here is committed to.
 
+> **`docs/roadmap.md` is where things get committed to.** It takes the order at
+> the end of this file, groups it into milestones M8 onwards (continuing the
+> numbering `docs/plan.md` and the tuning journal already use), and answers
+> several of the open questions below. This file keeps the reasoning for why they
+> were hard; the roadmap records what was chosen. Where the two disagree, the
+> roadmap is the decision and this is the argument.
+
 Two references, and they are not the same one despite both saying "Horizon".
 Worth separating up front, because everything below leans on one or the other:
 
@@ -452,7 +459,151 @@ noise. There is currently **no audio at all**, which remains the single biggest
 gap in the project. Engine pitch from wheel RPM and tyre squeal from the skid
 values every wheel already reports, plus music that matches the palette.
 
-## 6. Things that will have to give
+## 6. Surfaces: dirt, snow, and tracks with depth
+
+Two separable features that get talked about as one: **what the surface is** —
+grip, colour, sound — and **what the tyres do to it**. The first is
+straightforward and mostly already plumbed. The second is the ambitious one, and
+this codebase happens to have an unusually good angle on it.
+
+### There is no dirt or snow art, and that turns out not to matter
+
+Checked: the kit has no dirt, snow or gravel *road* pieces. The `*Sand` variants
+(`roadCornerLargeSand`, `roadCornerSmallSand` and friends) carry a single `sand`
+material and no `road` surface at all — they are **run-off aprons** that sit
+outside a corner, not a dirt road.
+
+That is fine, because the drivable surface is already re-materialised at load
+time. `TrackBuilder.surface_road` walks the tiles and replaces every surface
+Kenney names `road` with the tarmac shader. **Dirt and snow are shader variants
+swapped through that same hook** — no new geometry, no new tiles, and the tarmac
+shader is the template to copy. The mechanism was built for something else and
+lands exactly where this needs it.
+
+The sand aprons are then a free bonus: gravel traps on the outside of fast
+corners, placed by the scenery system, which already knows how to put things at a
+lateral offset from the centreline and keep them off other legs of the circuit.
+
+### Where a surface type lives
+
+The layout already carries **elevation per segment** and **banking per corner**.
+Surface is the natural third property of the same kind, cycled in the editor the
+way banking is cycled flat → 1.5° → 2.5° → 4°.
+
+Two steps, and the first is much cheaper than it looks:
+
+- **Per circuit.** A winter Ardennes, a dirt La Sarthe. One field on the layout,
+  no editor work, no per-segment format change. This alone gets snow and dirt into
+  the game and is the sane first move.
+- **Per segment.** Where rally stages come from — tarmac onto gravel and back, a
+  snowy section in the shade. More interesting, and it fits the existing editor
+  idiom exactly, but it needs the transitions to look deliberate rather than like
+  a seam.
+
+### Grip, and what it breaks
+
+`CarTuning` already carries `friction_front` and `friction_rear`. Surface-varying
+grip means the car has to know what it is standing on. `_surface_up` already
+raycasts down every physics frame, so the type could ride on the hit — but the
+cheaper and more robust lookup is **by arc**: nearest centreline index → segment →
+surface. No splitting the collision shape, and it works off data the builder
+already has.
+
+Then be honest about the consequences, because they are real:
+
+- **Grass currently grips like tarmac, and that is load-bearing.** It is why
+  cutting a corner is only discouraged by the ordered gates, and it is what makes
+  the "just drive up the pit lane" approach in section 1 cheap. Introduce
+  genuinely low-grip surfaces and both of those change.
+- **Every number in the tuning journal is a tarmac number.** Each surface needs
+  its own sweep — top speed, braking distance, corner speeds — or it will be a
+  guess wearing measured clothes.
+- **Lap records get another dimension.** A snow lap and a dry lap are not
+  comparable, which joins the per-car question already open in section 1. Better
+  to settle both at once than to bolt a second key on later.
+
+### Tyre tracks with depth, in three steps
+
+Each one is useful on its own and each is a prerequisite for the next.
+
+**Step 1 — trail geometry.** Emit a quad strip on the ground behind each wheel
+while `is_in_contact()` is true, shaded dark or light to read as a rut. No render
+targets, no special renderer features, works everywhere including the web build,
+and persists for as long as you keep the geometry — cap the length and recycle.
+This is the cheapest thing that genuinely looks like tracks.
+
+**Step 2 — a track-space deformation texture.** The good idea, and it is good
+*because of what this project already is*.
+
+The road is a **ribbon**, so it has a natural two-coordinate parameterisation:
+distance along the lap, and offset across the road. Unwrap the entire circuit
+into one texture on those axes. A 4096 x 128 target covers a 1500 m lap at
+roughly 0.37 m along by 0.11 m across — fine for ruts. The world-space equivalent
+is hopeless: a 500 m square at that resolution is a texture nobody can allocate.
+The ribbon makes the problem small.
+
+Then splat each wheel's contact point into that texture every frame and let it
+**accumulate across laps**, so lap three shows the lines you cut on laps one and
+two. That persistence is the part that actually feels good.
+
+> **This is the same coordinate the racing-line rubber idea in section 5 needs.**
+> Both want the ribbon to carry its lateral position per vertex, in `UV2` or
+> vertex colour. Do it once, deliberately, and two features fall out of it. It is
+> the single most reusable small change on this list.
+
+**Step 3 — real depth.** Sample that texture in the vertex shader and push
+vertices down; take the normal from its gradient in the fragment shader so the
+ruts catch light properly.
+
+This needs vertex density the Kenney tiles do not have — but generating a dense
+visual ribbon is squarely inside what the builder already does. It generates the
+collision ribbon from scratch, and `_reshape_tiles` already rewrites tile meshes
+vertex by vertex for banking and elevation. Vertex texture fetch is guaranteed in
+GLES3, so this survives the compatibility renderer the web build is stuck with.
+
+### What depth can and cannot do to the physics
+
+Worth deciding early and writing down. The collision surface is a single
+`ConcavePolygonShape3D` built once at load. Rebuilding it per frame to match the
+ruts is not realistic and not worth it.
+
+So **the depth is visual**, and the physics reads the same texture as a *modifier*
+rather than as geometry: fresh snow drags and pushes the car around, an existing
+rut gives grip and a mild steering pull, a churned line is slower than clean
+tarmac. That is what most games in this space actually do, and it delivers the
+whole mechanic — cutting your own line and then following it — without touching
+the collision shape at all.
+
+### Snow and dirt in the Horizon Chase palette
+
+Following section 5, these want to be **bold and graphic, not photoreal**:
+
+- **Snow** as flat bright white with a strong blue-shadowed rut, not grey slush.
+  Snow banks along the road edge, placed the way the barrier already is.
+- **Dirt** as a saturated ochre with darker churned lines, and a lot of it kicked
+  into the air.
+- **Particles** from the wheels, tinted per surface, driven by the
+  `get_skidinfo()` values every wheel already reports and the debug overlay
+  already reads.
+- **Pair each surface with a weather and time-of-day preset** from section 5. A
+  snow circuit wants the snow sky and the cold grade; they are the same kind of
+  data and should be chosen together.
+
+### Constraints to check before designing around them
+
+- **Decals are the obvious tool and are probably unavailable.** Godot 4's `Decal`
+  node is a Forward+/Mobile feature and the web build runs Compatibility. Verify
+  against 4.7 before relying on it — if it holds, steps 1 and 2 above are the
+  routes that work on every target, which is a good reason to prefer them anyway.
+- **Single-threaded web.** A small per-frame splat into a `SubViewport` is fine;
+  anything that wants a worker thread is not.
+- **The deformation texture is session state** and is not saved. Unless you want
+  it to be — persisting the ruts alongside a best-lap ghost would be a genuinely
+  nice touch, and it is the same file.
+
+---
+
+## 7. Things that will have to give
 
 Honest list of what a "full game" would force a decision on.
 
@@ -508,6 +659,13 @@ that has not been made yet.
 11. **A custom sky shader and time-of-day presets.** The point at which it
    stops looking like a Kenney demo and starts looking like Horizon Chase. Then
    horizon silhouettes, scenery themes and weather.
+12. **Lateral coordinate on the ribbon.** Small, and it is the prerequisite for
+   both racing-line rubber and the deformation texture. Worth doing on its own,
+   before either.
+13. **Surfaces per circuit** — a snow variant and a dirt variant, as shader swaps
+   through the hook `surface_road` already provides, plus their own grip sweeps.
+14. **Tyre tracks**, steps 1 to 3: trail geometry, then the track-space
+   deformation texture accumulating across laps, then real vertex displacement.
 
 ## Open questions
 
@@ -530,6 +688,15 @@ that has not been made yet.
 - Does analogue throttle invalidate the existing lap records? Strictly it makes
   faster times possible, so probably yes — better decided before medals exist
   than after.
+- Is a surface chosen per circuit or per segment? Per circuit is far cheaper and
+  gets snow and dirt into the game; per segment is what makes rally stages
+  possible and is where the editor idiom already points.
+- If grass and gravel stop gripping like tarmac, what stops corner cutting — the
+  ordered gates alone, as now, or do the barriers finally need collision?
+- Are lap times comparable across surfaces? Almost certainly not, which makes the
+  record-key question from section 1 really "per car *and* per surface".
+- Should tyre tracks persist between sessions, saved next to the ghost, or reset
+  each time the circuit loads?
 - If a share code is a string, what stops someone editing it into a circuit the
   editor would never have accepted? `TrackLayout.compile` calls `walk` too, so an
   invalid one cannot build — but it should fail politely, not silently.

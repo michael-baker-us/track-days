@@ -625,6 +625,67 @@ choice rather than in the layouts.
 > would have let a banked circuit that had silently reverted to level pass on the
 > strength of its ramps.
 
+## M8 — analogue throttle
+
+**The triggers were being thrown away.** `car_controller` read steering with
+`Input.get_axis`, which is analogue-aware, but throttle, brake and handbrake all
+went through `Input.is_action_pressed`. Every device in the game therefore had
+exactly two throttle positions, and half-throttle out of a hairpin was impossible
+on any of them. Throttle and brake now scale `engine_force` and `brake` by
+`Input.get_action_strength`, behind a player setting (analogue or binary) since
+the brief pulls both ways — see `docs/architecture.md`.
+
+**Measured, on the 2 km plane, at four trigger positions.** `_diag_throttle.gd`
+held a fixed strength from a standing start for 120 s, teleporting the car back
+up the plane whenever it neared the edge so velocity was never interrupted — the
+slow runs need far longer than the plane is long to converge:
+
+| Throttle | 0–60 km/h | 0–100 km/h | Top speed | % of full |
+|---|---|---|---|---|
+| 0.25 | 10.65 s | never | 67.4 km/h | 41% |
+| 0.50 | 3.87 s | 9.73 s | 107.1 km/h | 65% |
+| 0.75 | 2.65 s | 4.67 s | 138.3 km/h | 84% |
+| 1.00 | 2.13 s | 3.37 s | 164.9 km/h | 100% |
+
+**Full throttle reproduces M1's figures exactly** — 3.37 s to 100 km/h against
+the 3.4 s recorded then, and 164.9 km/h against 165. That is the result that
+matters most: the change adds positions between 0 and 1 without moving either
+end, so nothing already in this journal was invalidated.
+
+**Top speed falls off faster than the drag model alone predicts.** Drag is
+quadratic, so top speed should go as the square root of engine force: 0.25
+throttle ought to give 50% of top speed and gives 41%; 0.5 ought to give 71% and
+gives 65%. The gap is a speed-independent loss — rolling resistance in the
+raycast wheel model — sitting on top of aerodynamic drag. Useful rather than
+alarming: it means the bottom of the trigger travel is **less** compressed than
+a pure square root would make it, so quarter throttle is a genuinely distinct
+thing to ask for rather than most of half throttle.
+
+**The steering curve is not measured and is not claimed to be.**
+`steer_response_curve` defaults to 1.5, which is a starting point to drive
+against. It is an odd power, so it fixes -1, 0 and 1, and a keyboard and a touch
+pad only ever ask for those three — which is exactly why it could be added
+without re-measuring anything here, and equally why nothing here can evaluate it.
+
+### Still open, from M8
+
+- **Everything above is arithmetic, not feel.** These runs hold a fixed strength;
+  they cannot say whether the pedal is *nice*, which needs a physical pad. The
+  three questions waiting on one: is 1.5 the right steering exponent, should
+  analogue or binary be the default, and does the InputMap deadzone (0.2, shared
+  with steering) produce a step at the bottom of the trigger worth smoothing out.
+  Godot zeroes below the deadzone without rescaling what is left, so the pedal
+  currently engages at 20% rather than from nothing.
+- **Corner-exit figures are still binary-throttle figures.** Nothing in M2 was
+  invalidated, because full throttle is unchanged — but no corner has yet been
+  driven at partial throttle, which is the whole point of the change. The
+  cornering half of this milestone is measured, not assumed, and is not done.
+- **Braking was not swept.** It takes the same treatment as throttle and the same
+  argument applies, but M1 established that stopping is traction-limited rather
+  than brake-torque-limited, so scaling `brake_force` by trigger travel may do
+  much less than scaling `engine_force` did. Worth measuring before assuming it
+  works.
+
 ### Still open
 
 - The hills are still the hardest part of the circuit to drive: 0.84 s airborne

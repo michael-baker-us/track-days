@@ -38,9 +38,12 @@ func _apply_tuning_to_wheels() -> void:
 		wheel.wheel_friction_slip = tuning.friction_rear
 
 func _physics_process(delta: float) -> void:
-	var steer_input := Input.get_axis("steer_left", "steer_right")
-	var accelerate_pressed := Input.is_action_pressed("accelerate")
-	var brake_pressed := Input.is_action_pressed("brake")
+	var steer_input := _curve(Input.get_axis("steer_left", "steer_right"))
+	var throttle := _pedal(&"accelerate")
+	var braking := _pedal(&"brake")
+	# The handbrake stays binary whatever the setting: it is bound to a face
+	# button, so there is no analogue source to read. Pretending otherwise would
+	# be a strength of 1.0 dressed up as a measurement.
 	var handbrake_pressed := Input.is_action_pressed("handbrake")
 
 	var speed_kmh := linear_velocity.length() * 3.6
@@ -57,15 +60,15 @@ func _physics_process(delta: float) -> void:
 	if handbrake_pressed:
 		engine_force = 0.0
 		brake = tuning.handbrake_force
-	elif accelerate_pressed:
-		engine_force = tuning.engine_force
+	elif throttle > 0.0:
+		engine_force = tuning.engine_force * throttle
 		brake = 0.0
-	elif brake_pressed:
+	elif braking > 0.0:
 		if forward_speed > 0.5:
 			engine_force = 0.0
-			brake = tuning.brake_force
+			brake = tuning.brake_force * braking
 		else:
-			engine_force = -tuning.reverse_force
+			engine_force = -tuning.reverse_force * braking
 			brake = 0.0
 	else:
 		engine_force = 0.0
@@ -82,6 +85,39 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("reset_car"):
 		_reset()
+
+## How far a pedal is down, 0 to 1.
+##
+## In analogue mode this is how far a gamepad trigger is pulled, so partial
+## throttle out of a hairpin becomes possible for the first time — the triggers
+## were previously read through `is_action_pressed` and their travel thrown away
+## entirely. A keyboard key and a touch pad both report full strength when held,
+## so neither is affected by the setting, and every figure in the tuning journal
+## was measured at full lock through one of those two.
+##
+## Deadzone comes from the InputMap rather than a constant here, so steering and
+## the pedals cut in at the same place. Godot zeroes below the deadzone without
+## rescaling what is left, which means the pedal engages with a small step rather
+## than from nothing. Whether that step wants smoothing out is a feel question
+## and belongs in the journal, measured, rather than guessed at here.
+func _pedal(action: StringName) -> float:
+	if not GameState.analogue_input():
+		return 1.0 if Input.is_action_pressed(action) else 0.0
+	return Input.get_action_strength(action)
+
+## Shapes stick travel so small movements near centre stay small, while full lock
+## is still full lock.
+##
+## The stick maps linearly today and is then smoothed by `steer_speed`, and the
+## two fight each other: the lerp is what gives a keyboard its ramp from nothing
+## to full lock, and it blunts an analogue input that already has a position.
+##
+## Note what this deliberately cannot touch. The curve is an odd power, so it
+## fixes -1, 0 and 1 — and a keyboard or a touch pad only ever asks for those
+## three. Sticks are the only input it reaches, which is the point, and it is
+## also why adding it invalidates nothing already measured.
+func _curve(x: float) -> float:
+	return signf(x) * pow(absf(x), tuning.steer_response_curve)
 
 func _apply_drag() -> void:
 	apply_central_force(-linear_velocity * linear_velocity.length() * tuning.drag_coefficient)

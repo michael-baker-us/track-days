@@ -37,6 +37,7 @@ const TITLE_SCENE := "res://scenes/title.tscn"
 
 @onready var _resume_button: Button = $Panel/Rows/ResumeButton
 @onready var _quit_button: Button = $Panel/Rows/QuitButton
+@onready var _throttle_button: Button = $Panel/Rows/ThrottleButton
 ## A sibling, not a child: it has to be on screen while this menu is not.
 @onready var _open_button: Button = get_parent().get_node_or_null("PauseButton")
 
@@ -44,9 +45,23 @@ func _ready() -> void:
 	visible = false
 	_resume_button.pressed.connect(_resume)
 	_quit_button.pressed.connect(_leave)
+	_throttle_button.pressed.connect(_toggle_throttle)
+	_refresh_throttle()
 	if _open_button != null:
 		_open_button.pressed.connect(_toggle)
 	set_button_visible_for_device()
+
+## Analogue reads how far the trigger is pulled; binary treats any press as full.
+## Both labels stay inside the built-in font, which the web export has no
+## fallback for.
+func _toggle_throttle() -> void:
+	GameState.set_analogue_input(not GameState.analogue_input())
+	_refresh_throttle()
+
+func _refresh_throttle() -> void:
+	_throttle_button.text = (
+		"Throttle: Analogue" if GameState.analogue_input() else "Throttle: Binary"
+	)
 
 ## Shown only where there is a touchscreen, on the same rule as the driving pads:
 ## a keyboard has Escape and a pad has Start, and neither needs the screen space.

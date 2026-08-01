@@ -7,6 +7,10 @@ extends RefCounted
 
 const RECORDS_PATH := "user://records.cfg"
 
+## Bumped when the shape of the file changes, so a save written by an older build
+## can be recognised and rewritten exactly once. See `_migrate`.
+const RECORDS_VERSION := 2
+
 ## Overridable so the test suite can write records somewhere disposable instead
 ## of polluting the player's real best laps.
 static var records_path: String = RECORDS_PATH
@@ -85,30 +89,138 @@ static func selected() -> Dictionary:
 	var tracks := all_tracks()
 	return tracks[clampi(selected_index, 0, tracks.size() - 1)]
 
-## One place that knows how a record is keyed, shared by the tracker that
-## writes them and the title screen that displays them.
-static func record_key(track_id: String) -> String:
-	return "best_%s" % track_id
+## A lap time is only comparable to another set in the same car on the same
+## surface, so a record is keyed on all three. Both extra dimensions are fixed
+## today — there is one car and every circuit is tarmac — but the key carries
+## them from the start, because the alternative is migrating three save formats
+## (records, sector splits, ghosts) once a garage exists rather than one now.
+##
+## The track is the *section* and the car and surface are the key, for two
+## reasons. Deleting a circuit has to take every time set on it, whatever car
+## they were set in, and `erase_section` is exactly that sweep. And ids are drawn
+## from `[a-z0-9_]` (`TrackStore.new_id`), so a flat `best_<track>_<car>` could
+## not be taken apart again: `best_ardennes_kart` is either the kart on Ardennes
+## or the default car on a circuit called "ardennes kart".
+const DEFAULT_CAR := "default"
+const DEFAULT_SURFACE := "tarmac"
 
-static func best_lap_for(track_id: String) -> float:
-	var cfg := ConfigFile.new()
-	if cfg.load(records_path) != OK:
-		return 0.0
-	return cfg.get_value("records", record_key(track_id), 0.0)
+## What the next lap will be recorded against. Placeholders until the garage and
+## the surface work make them real choices (`docs/roadmap.md`, M14 and M17); they
+## exist now so every caller is already keying correctly.
+static var selected_car: String = DEFAULT_CAR
+static var selected_surface: String = DEFAULT_SURFACE
 
-static func save_best_lap(track_id: String, seconds: float) -> void:
-	var cfg := ConfigFile.new()
-	cfg.load(records_path)
-	cfg.set_value("records", record_key(track_id), seconds)
+static func record_section(track_id: String) -> String:
+	return "record:%s" % track_id
+
+## Empty arguments mean "whatever is selected now", which is what a race wants;
+## the title screen passes nothing and gets the times it is about to offer.
+##
+## `|` separates because it cannot appear in an id, so the two halves stay
+## recoverable however the ids are named.
+static func record_key(car_id: String = "", surface_id: String = "") -> String:
+	return "%s|%s" % [
+		car_id if not car_id.is_empty() else selected_car,
+		surface_id if not surface_id.is_empty() else selected_surface,
+	]
+
+static func best_lap_for(
+	track_id: String, car_id: String = "", surface_id: String = ""
+) -> float:
+	var cfg := _open()
+	return cfg.get_value(
+		record_section(track_id), record_key(car_id, surface_id), 0.0
+	)
+
+static func save_best_lap(
+	track_id: String, seconds: float, car_id: String = "", surface_id: String = ""
+) -> void:
+	var cfg := _open()
+	cfg.set_value(record_section(track_id), record_key(car_id, surface_id), seconds)
 	cfg.save(records_path)
 
+## Every time set on the circuit, not just the current car's — a deleted circuit
+## must not leave a record behind for the next one to inherit.
 static func clear_best_lap(track_id: String) -> void:
+	var cfg := _open()
+	var section := record_section(track_id)
+	if not cfg.has_section(section):
+		return
+	cfg.erase_section(section)
+	cfg.save(records_path)
+
+## Whether throttle and brake read how far the trigger is pulled, or treat any
+## press as full.
+##
+## A setting rather than a decision because the brief pulls both ways: the look
+## is Horizon Chase, which is arcade and binary, while the mode is Forza's time
+## attack, where lifting a fraction out of a hairpin is the skill being tested.
+##
+## Records are deliberately *not* keyed on it. Analogue is a strict superset —
+## a full press is 1.0, so anything driveable in binary is driveable in analogue
+## — which means a binary record stays an honest target. The reverse does not
+## hold, and a binary-mode player may meet a time they cannot match. That is a
+## real cost of offering the choice and it is accepted, not overlooked.
+const SETTINGS_SECTION := "settings"
+const ANALOGUE_INPUT_KEY := "analogue_input"
+
+## Cached: `car_controller` asks every physics frame, and the answer lives in a
+## file. -1 means "not read yet" rather than false, so the stored default of
+## *true* is not quietly overridden by an uninitialised variable.
+static var _analogue_input: int = -1
+
+static func analogue_input() -> bool:
+	if _analogue_input < 0:
+		var cfg := _open()
+		var on: bool = cfg.get_value(SETTINGS_SECTION, ANALOGUE_INPUT_KEY, true)
+		_analogue_input = 1 if on else 0
+	return _analogue_input == 1
+
+static func set_analogue_input(on: bool) -> void:
+	_analogue_input = 1 if on else 0
+	var cfg := _open()
+	cfg.set_value(SETTINGS_SECTION, ANALOGUE_INPUT_KEY, on)
+	cfg.save(records_path)
+
+## Drops the cached setting so the next read comes off disk again. For the test
+## suite, which repoints `records_path` after this class may already have been
+## touched — without it a cached answer would outlive the file it came from.
+static func forget_cached_settings() -> void:
+	_analogue_input = -1
+
+## Loads the save, bringing it up to date first. Every read and write goes
+## through here so there is exactly one place that can encounter an old file.
+static func _open() -> ConfigFile:
 	var cfg := ConfigFile.new()
 	if cfg.load(records_path) != OK:
+		# No file yet, so it is born current and never looks migratable.
+		cfg.set_value("meta", "version", RECORDS_VERSION)
+		return cfg
+	_migrate(cfg)
+	return cfg
+
+## Version 1 kept every time in one `[records]` section under a flat
+## `best_<track>` key, one per circuit. Those are all default-car tarmac laps by
+## definition — there was nothing else to drive — so they move across without
+## having to be interpreted, and the ambiguity that makes the flat key unusable
+## in general does not arise, because at version 1 no composite key exists to
+## confuse one with.
+##
+## Saved on the spot rather than left for the next write, so a player who only
+## ever reads their records still converts once instead of on every launch.
+static func _migrate(cfg: ConfigFile) -> void:
+	if int(cfg.get_value("meta", "version", 1)) >= RECORDS_VERSION:
 		return
-	if not cfg.has_section_key("records", record_key(track_id)):
-		return
-	cfg.erase_section_key("records", record_key(track_id))
+	if cfg.has_section("records"):
+		for key in cfg.get_section_keys("records"):
+			var track_id := String(key).trim_prefix("best_")
+			cfg.set_value(
+				record_section(track_id),
+				record_key(DEFAULT_CAR, DEFAULT_SURFACE),
+				cfg.get_value("records", key, 0.0)
+			)
+		cfg.erase_section("records")
+	cfg.set_value("meta", "version", RECORDS_VERSION)
 	cfg.save(records_path)
 
 ## Removing a circuit removes its record with it, which is why deletion lives

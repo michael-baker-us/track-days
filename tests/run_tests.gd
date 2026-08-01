@@ -134,6 +134,149 @@ func test_car_wired_to_tuning() -> void:
 				wheel.suspension_stiffness, car.tuning.suspension_stiffness, 0.01)
 			break
 
+## Records written by an older build have to survive the move to a composite key.
+##
+## Version 1 kept one flat `best_<track>` per circuit in a `[records]` section.
+## Those times are the only thing the game saves, so dropping them here would be
+## dropping everything a player has to show for playing it.
+func test_old_records_migrate_to_the_composite_key() -> void:
+	var path := "user://test_migration.cfg"
+	var old := ConfigFile.new()
+	old.set_value("records", "best_ardennes", 91.5)
+	old.set_value("records", "best_user_my_track", 42.25)
+	old.save(path)
+
+	var real_path := GameState.records_path
+	GameState.records_path = path
+	check_near("old record survives", GameState.best_lap_for("ardennes"), 91.5, 0.001)
+	check_near("and a custom circuit's too",
+		GameState.best_lap_for("user_my_track"), 42.25, 0.001)
+
+	# Rewritten on disk, not merely read through. A migration that only ever
+	# happened in memory would run on every launch, and would leave the old
+	# section behind to shadow whatever the new one later said.
+	var after := ConfigFile.new()
+	after.load(path)
+	check("old section gone", after.has_section("records"), false)
+	check("version stamped", int(after.get_value("meta", "version", 1)),
+		GameState.RECORDS_VERSION)
+	check_true("moved to the new key", after.has_section_key(
+		GameState.record_section("ardennes"),
+		GameState.record_key(GameState.DEFAULT_CAR, GameState.DEFAULT_SURFACE)))
+
+	GameState.records_path = real_path
+	GameState.forget_cached_settings()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+## Two cars on one circuit are two records, and deleting the circuit takes both.
+func test_records_are_kept_per_car_and_surface() -> void:
+	var track := "test_keying"
+	GameState.save_best_lap(track, 60.0, "hatchback", "tarmac")
+	GameState.save_best_lap(track, 48.0, "kart", "tarmac")
+	check_near("one car's time", GameState.best_lap_for(track, "hatchback", "tarmac"),
+		60.0, 0.001)
+	check_near("the other's, separately",
+		GameState.best_lap_for(track, "kart", "tarmac"), 48.0, 0.001)
+	check_near("a surface never driven has no time",
+		GameState.best_lap_for(track, "kart", "snow"), 0.0, 0.001)
+
+	# Why the track is a section rather than part of one flat key: ids are drawn
+	# from [a-z0-9_], so `best_test_keying_kart` reads equally well as the kart on
+	# "test keying" and as the default car on "test keying kart". This is that
+	# collision, and it must not be one.
+	GameState.save_best_lap("test_keying_kart", 12.0, "default", "tarmac")
+	check_near("a circuit named after a car keeps its own record",
+		GameState.best_lap_for("test_keying_kart", "default", "tarmac"), 12.0, 0.001)
+	check_near("and did not stand on the kart's time",
+		GameState.best_lap_for(track, "kart", "tarmac"), 48.0, 0.001)
+
+	# Ids are handed straight back out once a file is gone, so a time left behind
+	# is inherited by the next circuit named the same thing.
+	GameState.clear_best_lap(track)
+	check_near("every car's time goes with the circuit",
+		GameState.best_lap_for(track, "hatchback", "tarmac"), 0.0, 0.001)
+	check_near("including the second car's",
+		GameState.best_lap_for(track, "kart", "tarmac"), 0.0, 0.001)
+	check_near("and the circuit next to it is untouched",
+		GameState.best_lap_for("test_keying_kart", "default", "tarmac"), 12.0, 0.001)
+
+## The stored default is analogue, so only the *false* case proves anything came
+## back off disk rather than out of an uninitialised variable. That is the one
+## worth asserting.
+func test_the_throttle_setting_survives_a_restart() -> void:
+	GameState.set_analogue_input(false)
+	# What a relaunch does: drop the cache, so the answer has to be read again.
+	GameState.forget_cached_settings()
+	check("binary persisted", GameState.analogue_input(), false)
+	GameState.set_analogue_input(true)
+	GameState.forget_cached_settings()
+	check("analogue persisted", GameState.analogue_input(), true)
+
+## How far the trigger is pulled has to reach engine force -- the travel was
+## previously read through `is_action_pressed` and thrown away.
+##
+## Driven with `Input.action_press`, which sets the action's strength there and
+## then, and stepped by calling `_physics_process` directly. Both so the
+## assertion sits one call after the press, and so nothing is left held for the
+## scripted lap sequence later in this suite to drive into.
+func test_partial_throttle_reaches_the_engine() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	var full: float = car.tuning.engine_force
+	var step_delta := 1.0 / 120.0
+
+	GameState.set_analogue_input(true)
+	Input.action_press("accelerate", 0.5)
+	car._physics_process(step_delta)
+	check_near("half a trigger is half the force", car.engine_force, full * 0.5,
+		full * 0.02)
+
+	# The whole point of offering the setting: the same half-pull commits to
+	# everything the engine has.
+	GameState.set_analogue_input(false)
+	car._physics_process(step_delta)
+	check_near("binary does not care how far", car.engine_force, full, 0.01)
+
+	Input.action_release("accelerate")
+	GameState.set_analogue_input(true)
+	# Back to a standing start, or the car drives itself away from the grid while
+	# the rest of the suite is measuring where it sits.
+	car._physics_process(step_delta)
+	check_near("nothing left held", car.engine_force, 0.0, 0.01)
+
+## The steering curve is an odd power, so it fixes -1, 0 and 1 -- and a keyboard
+## or a touch pad only ever asks for those three. That is what lets it be added
+## without invalidating a tuning journal measured entirely at full lock, so it is
+## worth asserting rather than reasoning about.
+func test_the_steering_curve_leaves_full_lock_alone() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	check_true("the curve is doing something", car.tuning.steer_response_curve > 1.0)
+	check_near("full right is still full right", car._curve(1.0), 1.0, 0.0001)
+	check_near("full left is still full left", car._curve(-1.0), -1.0, 0.0001)
+	check_near("centre is still centre", car._curve(0.0), 0.0, 0.0001)
+	check_true("half a stick asks for less than half lock", car._curve(0.5) < 0.5)
+	check_true("and asks in the same direction", car._curve(-0.5) < 0.0)
+
+## The grade is baked into each shipped circuit by `_build_lighting`, so a
+## palette change that was not followed by re-running `tools/build_track.gd`
+## would ship three circuits wearing the old look. Same reasoning as the check
+## that the committed theme still matches its source.
+func test_shipped_circuits_carry_the_colour_grade() -> void:
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var env: Environment = (circuit.get_node("WorldEnvironment") as WorldEnvironment).environment
+		check_true("%s is graded" % id, env.adjustment_enabled)
+		check_near("%s saturation" % id, env.adjustment_saturation,
+			TrackBuilder.GRADE_SATURATION, 0.001)
+		check_near("%s contrast" % id, env.adjustment_contrast,
+			TrackBuilder.GRADE_CONTRAST, 0.001)
+		# Fog exists to land the 4 km ground plane into the sky, which it can only
+		# do while it is the colour the sky is at that edge. They are one horizon
+		# seen twice, so they are read from one constant.
+		check_true("%s fog is the sky's horizon" % id,
+			env.fog_light_color.is_equal_approx(TrackBuilder.SKY_HORIZON))
+		circuit.free()
+
 ## Every entry the title screen offers must actually load and be a usable
 ## circuit. A broken entry here is a dead button on the menu.
 func test_all_tracks_usable() -> void:
@@ -2791,6 +2934,12 @@ func _physics_process(_delta: float) -> bool:
 		test_time_formatting()
 		test_tuning_invariants()
 		test_car_wired_to_tuning()
+		test_old_records_migrate_to_the_composite_key()
+		test_records_are_kept_per_car_and_surface()
+		test_the_throttle_setting_survives_a_restart()
+		test_partial_throttle_reaches_the_engine()
+		test_the_steering_curve_leaves_full_lock_alone()
+		test_shipped_circuits_carry_the_colour_grade()
 		test_all_tracks_usable()
 		test_no_duplicated_instances()
 		test_spawn_is_behind_the_line()

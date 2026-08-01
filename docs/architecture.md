@@ -218,6 +218,40 @@ on its own schedule and deletes `;` comments. Both are asserted by the suite
 instead: `test_joypad_bindings_take_any_device` walks the whole `InputMap`, so an
 action added later cannot quietly reintroduce a concrete device index.
 
+### Analogue pedals, and why they are a setting
+
+Throttle and brake read `Input.get_action_strength`, so a gamepad trigger's
+travel reaches `engine_force` and `brake`. It previously went through
+`is_action_pressed` and was **discarded entirely** — every device in the game had
+exactly two throttle positions.
+
+It is a **player setting** (`GameState.analogue_input`, on the pause menu)
+because the brief genuinely pulls both ways: the look is Horizon Chase, which is
+arcade and binary, while the mode is Forza's time attack, where lifting a
+fraction out of a hairpin is the skill being measured. Rather than guess which
+half wins, both are offered.
+
+Three things follow, and each is a decision rather than an oversight:
+
+- **The handbrake stays binary in both modes.** It is bound to a face button, so
+  there is no analogue source to read. Routing it through `get_action_strength`
+  would return 1.0 dressed up as a measurement.
+- **Keyboard and touch are unaffected by the setting.** Both report full strength
+  when held, so they take the same path either way. That is what makes the change
+  safe: every figure in the tuning journal was measured through one of those two,
+  at full lock, and none of them moved.
+- **Records are not keyed on the setting**, although they are keyed on car and
+  surface. Analogue is a strict superset of binary — a full press is 1.0, so
+  anything driveable in binary is driveable in analogue — which means a
+  binary-mode record stays an honest target. The converse does not hold, and a
+  binary-mode player may meet a time they cannot match. That is a real cost of
+  offering the choice, accepted rather than missed.
+
+The steering curve added alongside it (`CarTuning.steer_response_curve`) is an
+**odd power**, so it fixes -1, 0 and 1. A keyboard and a touch pad ask for
+nothing but those three, so the curve reaches sticks only. That is both its
+purpose and the reason it invalidated no existing measurement.
+
 ### Leaving a race
 
 `ui_cancel` used to change scene the instant it was pressed. That is fine on a
@@ -752,6 +786,44 @@ guide card already answers "now what".
 > readout — the live verdict, wanted on every single edit — under the fold. The
 > current rule is the opposite: feedback is fixed, reference scrolls.
 
+## The look
+
+The target is **Horizon Chase**: vivid flat-shaded colour blocking, no textures,
+big graphic skies, bright and readable, never grimy. The Kenney kit is already
+untextured flat-shaded geometry, which is the expensive half of that look done,
+and it survives the compatibility renderer the web build is stuck with.
+
+What was missing was saturation, not detail. Kenney's palette is **pastel** —
+mint grass, near-white kerbs, a soft orange car — and saturation is a property of
+the `Environment` rather than of any asset, so the whole first step is three
+properties on an object `_build_lighting` already constructs in code:
+`adjustment_saturation`, `adjustment_contrast`, `adjustment_brightness`. No new
+art, no new shader.
+
+Two things about it are load-bearing:
+
+- **`tonemap_white` had to rise with the contrast.** ACES was chosen because the
+  kerbs and grid markings clipped to featureless white under linear tonemapping.
+  Pushing contrast lifts the top of the range and reintroduces exactly that, so
+  the white point moved from 1.8 to 2.1 in the same change. Raising one without
+  the other undoes the reason the tonemapper was picked.
+- **The fog colour and the sky's horizon colour are one constant**
+  (`TrackBuilder.SKY_HORIZON`), not two that happen to match. Fog here is
+  structural rather than weather: the ground is a 4 km plane and fog exists to
+  land its edge into the sky, which it can only do while it *is* the colour the
+  sky is at that edge. Letting them drift apart puts a visible seam at the
+  horizon.
+
+The grade is **baked into each shipped circuit** by `_build_lighting`, so
+changing the palette does nothing until `tools/build_track.gd` is re-run — the
+same trap as the theme resource, and asserted the same way, by comparing the
+committed scenes against the constants.
+
+These are constants rather than a resource on purpose. A per-circuit
+time-of-day preset is the right home for them and is scheduled (`docs/roadmap.md`,
+M16); building that structure now, with one circuit's worth of values and nothing
+to vary, would be fitting a socket before there is a bulb.
+
 ## Lap timing
 
 16 `Area3D` gates along the centreline, index 0 on the start line. They never
@@ -813,6 +885,37 @@ what make a lap time mean anything.
 Lap time accumulates in `_physics_process`, so times track the simulation rather
 than the render framerate — headless runs therefore produce the same times as
 the game.
+
+### How a record is keyed, and why the track is a section
+
+A time is only comparable to another set **in the same car on the same surface**,
+so a record is keyed on all three. Both extra dimensions are fixed today — there
+is one car and every circuit is tarmac — and they are in the key anyway, because
+sector splits and ghosts are next and would otherwise have to be migrated
+alongside the records once a garage exists. One migration now beats three later,
+across data a player by then minds losing.
+
+The **track is the `ConfigFile` section** and the car and surface are the key
+(`record:<track>` / `<car>|<surface>`). Two reasons, and the first is the one
+that forced it:
+
+- Ids are drawn from `[a-z0-9_]` (`TrackStore.new_id`), so a flat
+  `best_<track>_<car>` cannot be taken apart again. `best_ardennes_kart` reads
+  equally well as the kart on Ardennes and as the default car on a circuit called
+  "ardennes kart". A separator outside the id alphabet is needed, and a section
+  boundary is the cleanest one available.
+- Deleting a circuit has to take **every** time set on it, whatever car they were
+  set in, and `erase_section` is exactly that sweep. Ids are handed straight back
+  out once a file is gone, so a record left behind is inherited by the next
+  circuit named the same thing — the same hazard `GameState.delete_track` already
+  exists to close.
+
+The old flat format (`[records] best_<track>`) is version 1 and migrates once, on
+load, stamped with `[meta] version`. That migration is only unambiguous *because*
+version 1 predates any composite key: every key it can encounter is a
+default-car tarmac lap, since there was nothing else to drive. `_open` is the
+single door onto the file, so there is exactly one place that can meet an old
+one.
 
 ## Testing
 

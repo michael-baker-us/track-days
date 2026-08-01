@@ -1539,6 +1539,34 @@ func _build_ground(root_node: Node3D) -> void:
 ## and the circuit sits in the middle of it, so without fog the plane ends at a
 ## hard line against the sky and the far side of the lap is as crisp as the
 ## corner being driven. Fading both into the sky colour puts a horizon there.
+
+## The look, as far as one hard-coded preset can carry it.
+##
+## The target is Horizon Chase: vivid flat-shaded colour blocking, big graphic
+## skies, bright and readable, never grimy. Kenney's palette is pastel — mint
+## grass, near-white kerbs, a soft orange car — so the gap between the kit and
+## the target is almost entirely saturation, and saturation is a property of the
+## `Environment` rather than of any asset. Nothing here needs new art.
+##
+## These are constants rather than a resource on purpose. A per-circuit
+## time-of-day preset is the right home for them and is scheduled (see
+## `docs/roadmap.md`, M16); putting the structure in now, with one circuit's worth
+## of values and nothing to vary, would be building the fitting before there is
+## anything to fit.
+##
+## The horizon colour is shared with the fog rather than repeated, because the
+## two are the same edge seen twice: fog exists to land the ground plane into the
+## sky, and it can only do that while it is the colour the sky is there.
+const SKY_TOP := Color(0.11, 0.36, 0.85)
+const SKY_HORIZON := Color(0.62, 0.82, 0.97)
+
+## Applied after tonemapping, so it grades what reached the screen rather than
+## the light in the scene — the sun and the ambient fill stay where they were
+## measured, and the kit stops looking washed out.
+const GRADE_SATURATION := 1.35
+const GRADE_CONTRAST := 1.10
+const GRADE_BRIGHTNESS := 1.02
+
 func _build_lighting(root_node: Node3D) -> void:
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
@@ -1558,12 +1586,16 @@ func _build_lighting(root_node: Node3D) -> void:
 	env.background_mode = Environment.BG_SKY
 
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.26, 0.47, 0.80)
-	sky_mat.sky_horizon_color = Color(0.71, 0.81, 0.90)
-	sky_mat.ground_bottom_color = Color(0.40, 0.54, 0.42)
-	sky_mat.ground_horizon_color = Color(0.71, 0.81, 0.90)
-	sky_mat.sun_angle_max = 12.0
-	sky_mat.sun_curve = 0.08
+	sky_mat.sky_top_color = SKY_TOP
+	sky_mat.sky_horizon_color = SKY_HORIZON
+	sky_mat.ground_bottom_color = Color(0.34, 0.55, 0.38)
+	sky_mat.ground_horizon_color = SKY_HORIZON
+	# A far bigger, harder-edged sun disc than the default. Horizon Chase skies
+	# carry the mood and the sun is a graphic element in them, not a light
+	# source that happens to be visible; 12 degrees with a soft falloff reads as
+	# a bright patch, and this reads as a sun.
+	sky_mat.sun_angle_max = 26.0
+	sky_mat.sun_curve = 0.04
 	env.sky = Sky.new()
 	env.sky.sky_material = sky_mat
 
@@ -1583,11 +1615,23 @@ func _build_lighting(root_node: Node3D) -> void:
 	# featureless white under linear tonemapping, which is most of why the
 	# start/finish area used to lose its detail.
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_white = 1.8
+	# Raised alongside the contrast below. Pushing contrast lifts the top of the
+	# range, and the kerbs and grid markings are already the brightest things in
+	# the frame — at the old 1.8 they went back to clipping to featureless white,
+	# which is the exact failure ACES was chosen to fix.
+	env.tonemap_white = 2.1
+
+	# Saturation, contrast and brightness are the cheapest possible step towards
+	# the Horizon Chase palette: no new asset, no new shader, three properties on
+	# an Environment that is already built in code.
+	env.adjustment_enabled = true
+	env.adjustment_saturation = GRADE_SATURATION
+	env.adjustment_contrast = GRADE_CONTRAST
+	env.adjustment_brightness = GRADE_BRIGHTNESS
 
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
-	env.fog_light_color = Color(0.71, 0.81, 0.90)
+	env.fog_light_color = SKY_HORIZON
 	# Starts beyond anything the chase camera can see, so nothing being driven
 	# through is ever hazed; it only exists to land the far side of the lap and
 	# the edge of the ground plane softly into the sky. Capped below 1 so the
