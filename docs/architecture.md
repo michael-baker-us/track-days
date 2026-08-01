@@ -909,6 +909,20 @@ guide card already answers "now what".
 > readout — the live verdict, wanted on every single edit — under the fold. The
 > current rule is the opposite: feedback is fixed, reference scrolls.
 
+**The cards need a ceiling, not just a floor.** `custom_minimum_size` sets the
+floor; the guide and readout wrap, and what goes in them comes from the compiler
+— a list of errors, a nudge, a crossing that needs bridging. With no cap they
+grew, and pushed Save, Test drive and Back under the bottom of the column. There
+was no way to save the circuit being described.
+
+`max_lines_visible` on every wrapping label makes that **structural** rather than
+a matter of keeping the wording short: however long the text gets, nothing below
+it can move. Trimmed with an ellipsis so a clipped message looks clipped rather
+than finished. The suite now drives the layout with the worst content the editor
+can produce — a refused crossing, which carries an error per problem cell — and
+asserts the buttons are still on screen, because the default circuit it used to
+test with is exactly the case that never overflowed.
+
 The budget is enforced by the suite, and it bites. Adding the longest straight
 and the lap estimate as two new readout lines overran the portrait column by
 18 units, and nothing but `test_more_panel_holds_the_rest` noticed. Both facts

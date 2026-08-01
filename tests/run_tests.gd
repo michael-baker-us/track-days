@@ -1015,6 +1015,61 @@ func test_the_start_straight_offers_no_headroom() -> void:
 			over += 1
 	check_true("and the other leg can rise far enough to bridge", over > 0)
 
+## The panel's controls must survive whatever the compiler has to say.
+##
+## The guide and readout cards wrap, and with a floor on their height but no
+## ceiling they simply grew: a circuit with a list of errors on it pushed Save,
+## Test drive and Back under the bottom of a column that is 720 units tall on
+## every window, so there was no way to save the thing being described. The cards
+## are capped with `max_lines_visible` now, which makes that structural rather
+## than a matter of keeping the wording short.
+##
+## Driven with the worst content the editor can produce — a refused crossing,
+## which carries an error per problem cell — rather than the default circuit the
+## other layout test uses, because the default is exactly the case that never
+## overflowed.
+func test_the_panel_keeps_its_buttons_whatever_the_readout_says() -> void:
+	var editor: Control = staged_editor
+	if editor == null:
+		return
+	var side: Control = editor.get_node_or_null("Split/Side")
+	if side == null:
+		return
+
+	var worst := _eight_layout(14)
+	editor._layout = worst
+	editor._grid.layout = worst
+	editor._recompile()
+	# Also load the status line up, which is the other label that takes a
+	# sentence from the code rather than a fixed string.
+	editor._flash(
+		"The start straight stays on the ground so the lap's height closes. "
+		+ "Raise the other side instead."
+	)
+	editor._update_panel()
+	check("the worst case is actually a refused circuit", editor._compiled.ok, false)
+
+	var rows: Control = side.get_node("Rows")
+	check_true("the panel still fits its column (%.0f in %.0f)"
+		% [rows.get_combined_minimum_size().y, side.size.y],
+		rows.get_combined_minimum_size().y <= side.size.y)
+
+	# And the buttons that matter are still on screen, which is the thing the
+	# player actually lost.
+	for path in [
+		"Split/Side/Rows/Actions/UndoRow/SaveButton",
+		"Split/Side/Rows/Actions/TestButton",
+		"Split/Side/Rows/Actions/ExitRow/BackButton",
+	]:
+		var button: Control = editor.get_node_or_null(path)
+		check_true("%s exists" % path.get_file(), button != null)
+		if button == null:
+			continue
+		var bottom := button.get_global_rect().end.y
+		check_true("%s is on screen (bottom %.0f of %.0f)"
+			% [button.name, bottom, side.get_global_rect().end.y],
+			bottom <= side.get_global_rect().end.y + 1.0)
+
 ## The fix for a crossing has to be reachable *while the circuit is refused*,
 ## because being refused is the only state it is ever offered from.
 ##
@@ -1075,8 +1130,8 @@ func test_the_editor_says_how_to_fix_a_crossing() -> void:
 
 	check("a flat crossing does not compile", editor._compiled.ok, false)
 	var guide: String = editor._guide.text
-	check_true("the guide names the fix (%s)" % guide,
-		guide.contains("bridge over") and guide.contains("dot"))
+	check_true("the guide names the control to press (%s)" % guide,
+		guide.contains("dot") and guide.contains("bridge"))
 	check_true("and warns which straight will not rise",
 		guide.contains("start line"))
 
@@ -4113,6 +4168,7 @@ func _physics_process(_delta: float) -> bool:
 		test_title_menu_fits_however_many_tracks()
 		test_a_pasted_code_opens_through_the_field()
 		test_a_refused_crossing_can_still_be_raised_on_the_canvas()
+		test_the_panel_keeps_its_buttons_whatever_the_readout_says()
 		test_the_editor_says_how_to_fix_a_crossing()
 		test_editor_panel_is_wired_and_fits()
 		return false

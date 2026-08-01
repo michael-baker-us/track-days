@@ -558,11 +558,13 @@ func _guidance() -> String:
 		# player is left with a correct diagnosis and nowhere to click.
 		for e in _compiled.errors:
 			if e.contains("crosses itself"):
+				# Kept to three lines. This card has a fixed height budget and
+				# anything longer is trimmed with an ellipsis, which would hide
+				# the half of the instruction that says which straight to use.
 				return (
-					"The road crosses itself, so one side has to bridge over the "
-					+ "other. Click the faint dot in the middle of the straight "
-					+ "that should go over — twice, up to +2. The straight with "
-					+ "the start line on it cannot be raised, so use the other one."
+					"Click the dot inside the loop on the straight that should go "
+					+ "over — twice, to +2 — to bridge it. Not the one with the "
+					+ "start line: that stays down."
 				)
 		return "Fix the circuit first — see below."
 	if not _grid.has_handles():

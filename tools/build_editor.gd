@@ -119,12 +119,12 @@ func _initialize() -> void:
 	# What to do next. Deliberately the most prominent thing after the heading -
 	# it is the only answer to "the editor is open, now what". In its own framed
 	# card so it reads as advice rather than as another line of status.
-	rows.add_child(_card("GuideCard", "DO THIS NEXT", _wrapped("Guide", 56.0)))
+	rows.add_child(_card("GuideCard", "DO THIS NEXT", _wrapped("Guide", 56.0, 3)))
 
 	# The live verdict: what the circuit *is*, updated on every edit.
-	rows.add_child(_card("ReadoutCard", "THIS CIRCUIT", _wrapped("Readout", 84.0)))
+	rows.add_child(_card("ReadoutCard", "THIS CIRCUIT", _wrapped("Readout", 84.0, 5)))
 
-	var status := _wrapped("Status", 30.0)
+	var status := _wrapped("Status", 30.0, 2)
 	status.theme_type_variation = UiTheme.V_FINE
 	rows.add_child(status)
 
@@ -146,7 +146,7 @@ func _initialize() -> void:
 
 	rows.add_child(_actions())
 
-	var keys := _wrapped("Keys", 28.0)
+	var keys := _wrapped("Keys", 28.0, 2)
 	keys.theme_type_variation = UiTheme.V_FINE
 	keys.text = (
 		"wheel or pinch zooms \u00b7 middle-drag, two-finger drag or cmd-drag pans"
@@ -425,12 +425,26 @@ func _label(node_name: String, text: String) -> Label:
 	l.text = text
 	return l
 
-func _wrapped(node_name: String, min_height: float) -> Label:
+## A wrapping body label with a floor **and a ceiling** on its height.
+##
+## `custom_minimum_size` alone only sets the floor. These labels take whatever
+## the compiler has to say — a list of errors, a nudge, a crossing that needs
+## bridging — and with autowrap and no cap they simply grow, pushing the action
+## buttons under the bottom of a column that is 720 units tall on every window.
+## That is how Save went off screen.
+##
+## `max_lines_visible` makes the ceiling structural rather than a matter of
+## keeping the wording short: however long the text gets, the panel cannot move
+## anything below it. Trimmed with an ellipsis so a clipped message looks
+## clipped rather than finished.
+func _wrapped(node_name: String, min_height: float, max_lines: int) -> Label:
 	var l := _label(node_name, "")
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.custom_minimum_size = Vector2(0.0, min_height)
+	l.max_lines_visible = max_lines
+	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	return l
 
 func _button(node_name: String, text: String) -> Button:
