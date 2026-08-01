@@ -221,11 +221,39 @@ func _track_button(index: int) -> Button:
 		_meta(button, "STATUS", "unfinished", UiTheme.DANGER)
 	else:
 		var best: float = GameState.best_lap_for(info["id"])
+		var par := GameState.par_for(info)
 		if best > 0.0:
-			_meta(button, "BEST LAP", _format(best), UiTheme.ACCENT)
+			# The medal is the caption rather than a separate line: the column is
+			# a caption over a value, and "which medal" is what that time *is*.
+			var medal := GameState.medal_for(best, par)
+			var caption := (
+				"BEST LAP" if medal == GameState.Medal.NONE
+				else "%s LAP" % GameState.medal_name(medal)
+			)
+			_meta(button, caption, _format(best), _medal_colour(medal))
+		elif par > 0.0:
+			# Never driven: show what gold is worth instead of a dash, so a
+			# circuit says what it is asking for before it is attempted.
+			_meta(button, "GOLD AT", _format(par * GameState.MEDAL_GOLD),
+				UiTheme.MUTED)
 		else:
 			_meta(button, "BEST LAP", "—", UiTheme.MUTED)
 	return button
+
+## Medal colours, from the theme rather than invented here, so they mean the same
+## thing as everywhere else: accent is the good result the screen is built around,
+## text is ordinary, muted is the least of the three. There is no brown in the
+## palette and adding one for bronze alone would be a colour with a single user.
+func _medal_colour(medal: GameState.Medal) -> Color:
+	match medal:
+		GameState.Medal.GOLD:
+			return UiTheme.ACCENT
+		GameState.Medal.SILVER:
+			return UiTheme.TEXT
+		GameState.Medal.BRONZE:
+			return UiTheme.MUTED
+		_:
+			return UiTheme.ACCENT
 
 ## The circuit's description, along the bottom of the card, stopping short of the
 ## lap time column so a long blurb truncates instead of colliding with it.

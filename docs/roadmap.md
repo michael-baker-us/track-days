@@ -393,12 +393,9 @@ The scale question has to be answered here: the road is 14 m wide and the car is
 
 ## M15 — Medals
 
-> **Blocked, by a measurement rather than by an opinion.** M10 found the par
-> model is 6–8% pessimistic because it walks the centreline and a car drives the
-> racing line, and that the gap varies with how tight the circuit is. Medals rest
-> directly on par, so calibrating `HUMAN_SLACK` first would bake a path error
-> into a constant that is supposed to mean "how much slower people are". Model
-> the racing line first.
+> **Unblocked, and built.** The racing line is modelled (tuning journal, M10),
+> so par is no longer 6–8% pessimistic and is now a consistent bound rather than
+> something the reference driver beat on two circuits out of three.
 
 Gold / silver / bronze per circuit per car, with par times **derived** from
 `measure()` rather than authored — so player-drawn circuits get medals for free,
@@ -411,6 +408,31 @@ par x 1.06, bronze at par x 1.15, all to be measured.
 **Medals unlock variety, never capability.** No performance upgrades — they make
 old lap times incomparable, which is the one thing a time attack game cannot
 afford.
+
+**Status: built.** Gold at par x 1.06, silver x 1.15, bronze x 1.30, where par is
+`ParTime.ideal_lap` — a perfect lap on the racing line.
+
+**A medal is derived, never stored.** It is the best lap read against par, so
+there is no new save format, no migration, and no way for a stored medal to
+disagree with the time that earned it. Changing a threshold re-evaluates every
+medal in the game on the spot.
+
+Shipped circuits carry their par as a constant in `GameState.TRACKS`, because the
+layouts live in `tools/` and the game does not depend on `tools/` at runtime —
+the same arrangement as the generated theme, and guarded the same way: the suite
+recomputes each one from its layout and fails if it has drifted. **Player-drawn
+circuits compute their own**, which is the point of deriving par rather than
+authoring it: a circuit has a gold time the moment it is drawn.
+
+Shown as the caption on the title screen's lap column ("GOLD LAP"), coloured from
+the theme, and announced on the HUD banner alongside the time that earned it. A
+circuit never driven shows what gold is worth instead of a dash.
+
+**The weakness, stated:** gold is set at roughly the pace of M10's scripted
+driver, which is the only reference for what a perfect lap is worth in practice.
+That reference is itself 0.2% to 5.4% off par depending on the circuit, so gold
+is harder on some than others. Narrowing it needs laps driven by people — the
+same gap that leaves `ParTime.HUMAN_SLACK` unmeasured.
 
 ---
 

@@ -122,6 +122,16 @@ func _show_delta() -> void:
 	_delta_colour = colour
 	_delta.add_theme_color_override("font_color", colour)
 
+## The banner after a lap, and the one place a medal is announced.
+##
+## A medal is worth saying only when the lap earned one, and only alongside the
+## time that earned it — it is a reading of that time, not a separate award.
 func _on_lap_completed(_lap_number: int, time: float, is_best: bool) -> void:
-	_banner.text = ("NEW BEST  %s" if is_best else "LAP  %s") % _tracker.format_time(time)
+	var medal := GameState.medal_for(time, GameState.par_for(GameState.selected()))
+	var name := GameState.medal_name(medal)
+	_banner.text = "%s  %s%s" % [
+		"NEW BEST" if is_best else "LAP",
+		_tracker.format_time(time),
+		"" if name.is_empty() else "   %s" % name,
+	]
 	_banner_timer = 3.0

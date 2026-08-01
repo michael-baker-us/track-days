@@ -1608,6 +1608,95 @@ func _lap_length(line: Array[Vector3]) -> float:
 		total += line[i].distance_to(line[(i + 1) % line.size()])
 	return total
 
+## The par times written into `GameState.TRACKS` have to match what `ParTime`
+## produces now.
+##
+## They are constants because the game does not depend on `tools/` at runtime and
+## the shipped layouts live there — the same arrangement the generated theme has,
+## and the same hazard: change the handling constants or the racing-line model and
+## every shipped par silently becomes a different number from the one the medals
+## are handed out against.
+func test_shipped_par_times_match_the_model() -> void:
+	var source: GDScript = load("res://tools/build_track.gd")
+	var layouts := {
+		"ardennes": source.ARDENNES, "monte_carlo": source.MONTE_CARLO,
+		"la_sarthe": source.LA_SARTHE, "suzuka": source.SUZUKA,
+	}
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		check_true("%s records a par" % id, GameState.par_for(entry) > 0.0)
+		if not layouts.has(id):
+			continue
+		var builder := TrackBuilder.new()
+		builder.measure(layouts[id])
+		check_near("%s par is still what the model says" % id,
+			GameState.par_for(entry), ParTime.ideal_lap(builder.centreline), 0.05)
+
+## Medals are read off the lap time and the par, never stored. That is what makes
+## it impossible for a saved medal to disagree with the time that earned it, and
+## it means changing a threshold re-evaluates every medal in the game.
+func test_medals_are_derived_from_the_lap_time() -> void:
+	var par := 100.0
+	check("dead on par is gold",
+		GameState.medal_for(100.0, par), GameState.Medal.GOLD)
+	check("and so is anything inside the gold margin",
+		GameState.medal_for(par * GameState.MEDAL_GOLD, par),
+		GameState.Medal.GOLD)
+	check("just past it is silver",
+		GameState.medal_for(par * GameState.MEDAL_GOLD + 0.01, par),
+		GameState.Medal.SILVER)
+	check("then bronze",
+		GameState.medal_for(par * GameState.MEDAL_SILVER + 0.01, par),
+		GameState.Medal.BRONZE)
+	check("and then nothing",
+		GameState.medal_for(par * GameState.MEDAL_BRONZE + 0.01, par),
+		GameState.Medal.NONE)
+
+	# The two ways there is nothing to judge.
+	check("no lap, no medal", GameState.medal_for(0.0, par), GameState.Medal.NONE)
+	check("no par, no medal", GameState.medal_for(50.0, 0.0), GameState.Medal.NONE)
+
+	# The thresholds have to stay in order, or a faster lap could win a lesser
+	# medal — the sort of thing a stray edit does silently.
+	check_true("the thresholds are ordered",
+		GameState.MEDAL_GOLD < GameState.MEDAL_SILVER
+		and GameState.MEDAL_SILVER < GameState.MEDAL_BRONZE)
+
+	# Medal names stay inside the built-in font, like everything else drawn.
+	for medal in [GameState.Medal.GOLD, GameState.Medal.SILVER,
+			GameState.Medal.BRONZE]:
+		check_true("%s has a name" % medal,
+			not GameState.medal_name(medal).is_empty())
+	check("and no medal has no name",
+		GameState.medal_name(GameState.Medal.NONE), "")
+
+## A player's own circuit gets medals too, from its own geometry — which is the
+## whole reason par is derived rather than authored. A circuit nobody has ever
+## seen has a gold time the moment it is drawn.
+func test_custom_circuits_get_a_par_of_their_own() -> void:
+	var layout := sample_layout()
+	layout.display_name = "Par Test"
+	layout.id = ""
+	TrackStore.save(layout)
+	staged_track_ids.append(layout.id)
+
+	var found := {}
+	for info in GameState.all_tracks():
+		if info["id"] == layout.id:
+			found = info
+	check_true("the circuit is listed", not found.is_empty())
+	if found.is_empty():
+		return
+	var par := GameState.par_for(found)
+	check_true("with a par of its own (%.1f s)" % par, par > 5.0)
+
+	# And it agrees with computing it directly, so the menu is not showing a
+	# different target from the one a lap will be judged against.
+	var builder := TrackBuilder.new()
+	builder.measure(layout.compile().segments)
+	check_near("that matches the model",
+		par, ParTime.ideal_lap(builder.centreline), 0.05)
+
 ## Every entry the title screen offers must actually load and be a usable
 ## circuit. A broken entry here is a dead button on the menu.
 func test_all_tracks_usable() -> void:
@@ -4351,6 +4440,9 @@ func _physics_process(_delta: float) -> bool:
 		test_par_time_reproduces_measured_corner_speeds()
 		test_par_time_is_plausible_on_the_shipped_circuits()
 		test_the_estimate_uses_a_racing_line()
+		test_shipped_par_times_match_the_model()
+		test_medals_are_derived_from_the_lap_time()
+		test_custom_circuits_get_a_par_of_their_own()
 		test_a_popped_section_can_be_flattened_from_any_of_its_corners()
 		test_par_time_refuses_a_degenerate_circuit()
 		test_the_editor_readout_is_affordable_per_mouse_move()

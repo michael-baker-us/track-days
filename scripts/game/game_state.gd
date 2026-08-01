@@ -25,29 +25,88 @@ static var records_path: String = RECORDS_PATH
 const TRACKS := [
 	{
 		"id": "ardennes",
+		"par": 47.75,
 		"name": "Ardennes",
 		"blurb": "A hairpin, a long climb, fast sweepers",
 		"scene": "res://scenes/track/track_ardennes.tscn",
 	},
 	{
 		"id": "monte_carlo",
+		"par": 38.15,
 		"name": "Monte Carlo",
 		"blurb": "Fourteen tight corners, not one banked",
 		"scene": "res://scenes/track/track_monte_carlo.tscn",
 	},
 	{
 		"id": "la_sarthe",
+		"par": 59.02,
 		"name": "La Sarthe",
 		"blurb": "Huge straights, chicanes, one big sweeper",
 		"scene": "res://scenes/track/track_la_sarthe.tscn",
 	},
 	{
 		"id": "suzuka",
+		"par": 34.43,
 		"name": "Suzuka",
 		"blurb": "A figure of eight - the lap bridges over itself",
 		"scene": "res://scenes/track/track_suzuka.tscn",
 	},
 ]
+
+## Medals, as multiples of the par time.
+##
+## A medal is **derived**, never stored: it is the best lap measured against par,
+## so there is no new save format, no migration, and no way for a stored medal to
+## disagree with the time that earned it. Change these numbers and every medal in
+## the game re-evaluates on the spot.
+##
+## Par is `ParTime.ideal_lap` — a perfect lap on the racing line. The one
+## reference for what that is worth in practice is the scripted driver from M10,
+## which lapped 0.2% to 5.4% off it using 80% of the car's grip. **Gold is set at
+## roughly that pace.**
+##
+## Honest about the weakness: the spread of that reference is itself several
+## percent and circuit-dependent, so gold is harder on some circuits than others.
+## Fixing that needs laps driven by people, not by a pursuit controller, and it is
+## the same gap that leaves `ParTime.HUMAN_SLACK` unmeasured.
+const MEDAL_GOLD := 1.06
+const MEDAL_SILVER := 1.15
+const MEDAL_BRONZE := 1.30
+
+enum Medal { NONE, BRONZE, SILVER, GOLD }
+
+## Which medal a lap time earns against a par. `NONE` when there is no time yet,
+## or no par to measure it against.
+static func medal_for(seconds: float, par: float) -> Medal:
+	if seconds <= 0.0 or par <= 0.0:
+		return Medal.NONE
+	if seconds <= par * MEDAL_GOLD:
+		return Medal.GOLD
+	if seconds <= par * MEDAL_SILVER:
+		return Medal.SILVER
+	if seconds <= par * MEDAL_BRONZE:
+		return Medal.BRONZE
+	return Medal.NONE
+
+static func medal_name(medal: Medal) -> String:
+	match medal:
+		Medal.GOLD:
+			return "GOLD"
+		Medal.SILVER:
+			return "SILVER"
+		Medal.BRONZE:
+			return "BRONZE"
+		_:
+			return ""
+
+## Seconds a perfect lap of this circuit would take, or 0.0 if unknown.
+##
+## Shipped circuits carry the number in `TRACKS` rather than working it out: the
+## layouts live in `tools/`, and the game does not depend on `tools/` at runtime.
+## The suite recomputes them from the layouts and fails if they have drifted,
+## which is the same arrangement the generated theme resource has.
+static func par_for(info: Dictionary) -> float:
+	return float(info.get("par", 0.0))
 
 static var selected_index: int = 0
 
@@ -70,10 +129,12 @@ static func all_tracks() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	out.assign(TRACKS)
 	for layout in TrackStore.list_layouts():
+		var facts := _facts(layout)
 		out.append({
 			"id": layout.id,
 			"name": layout.display_name,
-			"blurb": describe(layout),
+			"blurb": String(facts["blurb"]),
+			"par": float(facts["par"]),
 			"layout": layout,
 			"custom": true,
 		})
@@ -82,14 +143,24 @@ static func all_tracks() -> Array[Dictionary]:
 ## A one-line summary of a custom circuit for the menu, from the same compile
 ## the editor uses — so the list cannot claim a length the track does not have.
 static func describe(layout: TrackLayout) -> String:
+	return String(_facts(layout)["blurb"])
+
+## The blurb and the par time together, from **one** walk of the circuit.
+##
+## Both want the same `measure()`, and the menu asks for both for every custom
+## track it lists. Computed separately that is two builder walks and two racing
+## lines per row, on a screen that is built in one go — so they are computed
+## together and the menu pays once.
+static func _facts(layout: TrackLayout) -> Dictionary:
 	var compiled := layout.compile()
 	if not compiled.ok:
-		return "unfinished — press Edit to finish it"
-	var result := TrackBuilder.new().measure(compiled.segments)
+		return {"blurb": "unfinished — press Edit to finish it", "par": 0.0}
+	var builder := TrackBuilder.new()
+	var result := builder.measure(compiled.segments)
 	var text := "%.0f m, %d corners" % [result.length, compiled.corners.size()]
 	if result.peak > 0.5:
 		text += ", climbs %.1f m" % result.peak
-	return text
+	return {"blurb": text, "par": ParTime.ideal_lap(builder.centreline)}
 
 static func selected() -> Dictionary:
 	var tracks := all_tracks()
