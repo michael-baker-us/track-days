@@ -1,3 +1,4 @@
+class_name LapTracker
 extends Node
 
 ## Times laps, and enforces that checkpoints are crossed in order.

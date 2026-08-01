@@ -686,6 +686,77 @@ without re-measuring anything here, and equally why nothing here can evaluate it
   much less than scaling `engine_force` did. Worth measuring before assuming it
   works.
 
+## M10 — how long a lap ought to take
+
+The editor needed an estimated lap time, and the medals (M15) need a par. Both
+have to be the same function or the editor would advertise a target the medals
+disagreed with, so it lives in `scripts/game/par_time.gd`.
+
+**Not a fitted constant.** `docs/ideas.md` proposed
+`length / effective_average_speed(corners, peak)` calibrated against the shipped
+circuits. That has to be re-fitted whenever the handling changes and cannot tell
+one long straight from the same metres in short bursts. Instead it runs the
+standard quasi-static simulation over the centreline the builder already
+produces: cap speed by cornering grip at every point, then sweep forwards under
+acceleration and backwards under braking until the profile is reachable.
+
+**Every constant is a measurement from this journal.** 3.65 g lateral, 1.62 g
+braking, 164.9 km/h top speed, 0–100 in 3.37 s. Acceleration is modelled as
+`A * (1 - (v/v_max)^2)`, the shape drag actually produces; integrating that to
+100 km/h in 3.37 s fixes `A` at 9.56 m/s² with nothing left free. It predicts
+0–60 in 1.83 s against a measured 2.13, so it is optimistic low down where the
+real car is traction-limited off the line.
+
+**The cornering half checks out against M3b.** That milestone measured 98 km/h
+on a 21 m radius and 127 km/h on 35 m. The model gives 98.7 and 127.4.
+
+| Circuit | Length | Ideal lap | Average |
+|---|---|---|---|
+| Ardennes | 1473 m | 0:49.1 | 108 km/h |
+| Monte Carlo | 1054 m | 0:40.0 | 95 km/h |
+| La Sarthe | 1768 m | 1:01.1 | 104 km/h |
+
+Monte Carlo is the shortest circuit and the slowest per metre, which is what
+"fourteen tight corners" should produce — the model is reading difficulty rather
+than just length.
+
+**Corner radii are 7 / 21 / 35 m, not 21 / 35.** Worth writing down because the
+M3c table lists only two and it is easy to read them as the whole set. From
+`PIECES`, radius is `(size - 0.5)` tile units, so the three Kenney corners are
+0.5, 1.5 and 2.5 cells. The M3c figures are the middle and largest. **The
+smallest is a genuine 7 m, 57 km/h hairpin**, and all three shipped circuits
+contain one — which is why they all report the same slowest corner. This was
+briefly mistaken for a bug in the curvature code.
+
+**One real bug, in how curvature was sampled.** The centreline is a polyline —
+eight chords around a corner arc — so its vertices lie on the real geometry but
+the segments between them cut inside it. Measuring curvature *after* resampling
+to a fixed step therefore measures the polygon: a sample near a chord junction
+reads the join as a kink, one mid-chord reads a corner as straight, and finer
+resampling makes it worse. Fixed by computing the speed cap at the source
+vertices and interpolating it onto the step alongside the position. Worth about
+half a second a lap on Monte Carlo and a tenth on Ardennes.
+
+**Cost, since it runs on every mouse move.** 2.64 ms for measure-plus-estimate on
+La Sarthe, of which 1.63 ms is the walk the editor was doing anyway. Against a
+16.7 ms frame.
+
+### Still open, from M10
+
+- **No driven lap has ever been recorded on these circuits**, so `HUMAN_SLACK` —
+  how much slower a good human is than a perfect simulation — is a stated
+  placeholder at 1.08 and nothing more. It is the only unmeasured number in the
+  model, and it is exactly the one the medals will rest on. This is why the
+  editor shows the *ideal* lap rather than the par: showing a number derived from
+  a placeholder would launder it into something that looks authored. M15 cannot
+  be closed honestly until real laps exist.
+- The acceleration model is optimistic below about 60 km/h. It matters most on
+  circuits with many slow corners, which is exactly where a par time is hardest
+  to get right.
+- Braking is treated as constant-g from any speed. Real braking from 165 km/h has
+  aerodynamic drag helping at the start, so the model is slightly pessimistic
+  into the fastest corners.
+
 ### Still open
 
 - The hills are still the hardest part of the circuit to drive: 0.84 s airborne

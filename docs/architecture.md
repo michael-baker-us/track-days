@@ -786,6 +786,51 @@ guide card already answers "now what".
 > readout — the live verdict, wanted on every single edit — under the fold. The
 > current rule is the opposite: feedback is fixed, reference scrolls.
 
+The budget is enforced by the suite, and it bites. Adding the longest straight
+and the lap estimate as two new readout lines overran the portrait column by
+18 units, and nothing but `test_more_panel_holds_the_rest` noticed. Both facts
+were folded into lines that already existed instead, and the pathology nudge
+**replaces** the least important line rather than adding one — so the readout has
+the same height whether or not it is warning about something. A panel that
+changed height when it had something to say would reflow the column underneath it
+at exactly the moment the player was reading it.
+
+### The estimated lap time
+
+`ParTime` is deliberately shared between the editor readout and the medals that
+will derive from it (`docs/roadmap.md`, M15): an editor advertising a target the
+medals disagreed with would be worse than no readout at all.
+
+It runs the standard quasi-static lap simulation over the centreline `measure()`
+already fills — cap speed by cornering grip everywhere, then sweep forwards under
+acceleration and backwards under braking — rather than the fitted
+`length / average_speed` constant `ideas.md` sketched. A fitted constant needs
+re-fitting whenever the handling changes and cannot tell one long straight from
+the same metres in short bursts.
+
+Every constant in it is measured (see the tuning journal, M10), and the cornering
+half is checked against figures measured in M3b: 98.7 km/h predicted on a 21 m
+radius against 98 measured, 127.4 against 127.
+
+Three things about it are load-bearing:
+
+- **Curvature is measured at the source vertices, not after resampling.** The
+  centreline is a polyline whose vertices sit on the real geometry and whose
+  segments cut inside it, so sampling it finely reads its own chord junctions as
+  kinks. This is the one genuine bug the model had.
+- **Curvature is measured flat; distance is measured in 3D.** A crest is
+  curvature too, and counting it would brake for a gentle brow. The car is
+  limited by grip through bends, not by the shape of the hill.
+- **The editor shows the *ideal* lap, not the par.** `HUMAN_SLACK` — how much
+  slower a person is than a perfect simulation — is the only unmeasured number in
+  the model, and printing something derived from it would launder a placeholder
+  into a figure that looks authored. For the same reason the readout prints whole
+  seconds: milliseconds on an estimate claim an accuracy it does not have.
+
+It costs about 1 ms on top of the walk the editor was already doing, on the
+longest shipped circuit, against a 16.7 ms frame. The suite asserts that, because
+the editor recompiles on every mouse move and dragging is how it is used.
+
 ## The look
 
 The target is **Horizon Chase**: vivid flat-shaded colour blocking, no textures,

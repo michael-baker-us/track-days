@@ -395,6 +395,83 @@ func test_the_ghost_car_is_not_a_physics_body() -> void:
 	check_true("but does carry meshes",
 		ghost_car.find_children("*", "MeshInstance3D", true, false).size() > 0)
 
+## The cornering half of the par model, against the figures the tuning journal
+## measured. Those two radii are the middle and largest Kenney corners, and they
+## are the only independent check this model has -- everything else in it is a
+## straight-line number.
+func test_par_time_reproduces_measured_corner_speeds() -> void:
+	for pair in [[21.0, 98.0], [35.0, 127.0]]:
+		var radius: float = pair[0]
+		var kmh: float = sqrt(ParTime.LATERAL_G * ParTime.G * radius) * 3.6
+		check_near("a %.0f m corner goes at the measured speed" % radius,
+			kmh, float(pair[1]), 1.0)
+
+## The estimate has to be the right shape even without a driven lap to check it
+## against: longer circuits take longer, nothing exceeds the car's measured top
+## speed, and a tight circuit averages less than an open one.
+func test_par_time_is_plausible_on_the_shipped_circuits() -> void:
+	var source: GDScript = load("res://tools/build_track.gd")
+	var times := {}
+	var lengths := {}
+	for entry in [["ardennes", source.ARDENNES], ["monte_carlo", source.MONTE_CARLO],
+			["la_sarthe", source.LA_SARTHE]]:
+		var builder := TrackBuilder.new()
+		var result := builder.measure(entry[1])
+		var ideal := ParTime.ideal_lap(builder.centreline)
+		times[entry[0]] = ideal
+		lengths[entry[0]] = result.length
+		check_true("%s has an estimate at all" % entry[0], ideal > 0.0)
+		# A lap cannot average more than the car's measured top speed, and a
+		# circuit made of corners cannot average anywhere near it.
+		var average_kmh: float = result.length / maxf(ideal, 0.001) * 3.6
+		check_true("%s averages below top speed (%.1f)" % [entry[0], average_kmh],
+			average_kmh < ParTime.TOP_SPEED * 3.6)
+		check_true("%s averages something sane (%.1f)" % [entry[0], average_kmh],
+			average_kmh > 40.0)
+
+	check_true("the longest circuit takes the longest",
+		times["la_sarthe"] > times["ardennes"]
+		and times["ardennes"] > times["monte_carlo"])
+	# Monte Carlo is "fourteen tight corners, not one banked" and Ardennes is
+	# "fast sweepers" -- so the shorter circuit must also be the slower one per
+	# metre, or the model is measuring length and calling it difficulty.
+	check_true("and the tight circuit is slower per metre",
+		lengths["monte_carlo"] / times["monte_carlo"]
+		< lengths["ardennes"] / times["ardennes"])
+
+## Nothing to walk, nothing to say. The editor calls this on a circuit that is
+## mid-edit and may be anything at all.
+func test_par_time_refuses_a_degenerate_circuit() -> void:
+	var empty: Array[Vector3] = []
+	check_near("no centreline", ParTime.ideal_lap(empty), 0.0, 0.0001)
+	var two: Array[Vector3] = [Vector3.ZERO, Vector3(1.0, 0.0, 0.0)]
+	check_near("not enough of one", ParTime.ideal_lap(two), 0.0, 0.0001)
+	# All one point: every chord degenerate, so there is no turn to measure
+	# anywhere. Must come back with nothing rather than dividing by zero.
+	var stack: Array[Vector3] = []
+	for _i in 20:
+		stack.append(Vector3.ZERO)
+	check_near("a circuit with no extent", ParTime.ideal_lap(stack), 0.0, 0.0001)
+
+## The editor recompiles on every mouse move, and the readout now runs the lap
+## estimate on top of that walk. Both together have to fit inside a frame or
+## dragging a corner would stutter -- which is the one thing the editor cannot
+## afford, since dragging is how it is used.
+func test_the_editor_readout_is_affordable_per_mouse_move() -> void:
+	var source: GDScript = load("res://tools/build_track.gd")
+	var runs := 20
+	var started := Time.get_ticks_usec()
+	for _i in runs:
+		var builder := TrackBuilder.new()
+		builder.measure(source.LA_SARTHE)
+		ParTime.ideal_lap(builder.centreline)
+	var each_ms := float(Time.get_ticks_usec() - started) / float(runs) / 1000.0
+	# Against a 16.7 ms frame at 60 Hz, on the longest shipped circuit. Generous
+	# on purpose: this is a regression guard against the estimate becoming
+	# quadratic, not a benchmark.
+	check_true("measure plus estimate fits in a frame (%.2f ms)" % each_ms,
+		each_ms < 16.0)
+
 ## Every entry the title screen offers must actually load and be a usable
 ## circuit. A broken entry here is a dead button on the menu.
 func test_all_tracks_usable() -> void:
@@ -3063,6 +3140,10 @@ func _physics_process(_delta: float) -> bool:
 		test_a_ghost_interpolates_and_then_holds()
 		test_ghosts_go_with_a_deleted_circuit()
 		test_the_ghost_car_is_not_a_physics_body()
+		test_par_time_reproduces_measured_corner_speeds()
+		test_par_time_is_plausible_on_the_shipped_circuits()
+		test_par_time_refuses_a_degenerate_circuit()
+		test_the_editor_readout_is_affordable_per_mouse_move()
 		test_all_tracks_usable()
 		test_no_duplicated_instances()
 		test_spawn_is_behind_the_line()

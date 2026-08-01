@@ -577,7 +577,11 @@ func _summary() -> String:
 		)
 		return "\n".join(lines)
 
-	var result := TrackBuilder.new().measure(_compiled.segments)
+	# The same builder walk the measurement already needed, kept so the
+	# centreline it fills can be handed to the lap estimate. `measure` instances
+	# no tiles, which is what makes it affordable on every mouse move.
+	var builder := TrackBuilder.new()
+	var result := builder.measure(_compiled.segments)
 	var widths := {1: 0, 2: 0, 3: 0}
 	var lefts := 0
 	for corner in _compiled.corners:
@@ -585,13 +589,31 @@ func _summary() -> String:
 		if corner.turn == "left":
 			lefts += 1
 
+	var straight := _longest_straight()
+	# The estimate is the *ideal* lap rather than the par a medal will want.
+	# `ParTime.HUMAN_SLACK` is the one constant in that model which has not been
+	# measured, and showing a number derived from it here would launder a
+	# placeholder into something that looks authored.
+	var ideal := ParTime.ideal_lap(builder.centreline)
+
+	# The readout has a fixed height budget — feedback is pinned and reference
+	# scrolls, see docs/architecture.md — so the two facts added here are folded
+	# into the lines already present rather than given lines of their own, and the
+	# nudge below *replaces* the least important line rather than adding to it.
 	var lines := [
-		"%.0f m lap" % result.length,
+		"%.0f m lap, about %s on a perfect run" % [result.length, _rough(ideal)],
 		"%d corners — %d tight, %d medium, %d sweeping" % [
 			_compiled.corners.size(), widths[1], widths[2], widths[3]
 		],
-		"%d left / %d right" % [lefts, _compiled.corners.size() - lefts],
 	]
+
+	var warning := _pathology(result, straight)
+	if warning.is_empty():
+		lines.append("%d left / %d right · longest straight %.0f m" % [
+			lefts, _compiled.corners.size() - lefts, straight
+		])
+	else:
+		lines.append(warning)
 	if result.peak > 0.5:
 		var raised_corners := 0
 		for corner in _compiled.corners:
@@ -609,6 +631,52 @@ func _summary() -> String:
 		# apart, which is worth surfacing rather than hiding.
 		lines.append("BUG: builder says this does not close (%s)" % result.summary())
 	return "\n".join(lines)
+
+## An estimated lap as minutes and whole seconds, deliberately without the
+## milliseconds `LapTracker.format_time` gives a real one. The model drives every
+## corner exactly at the limit and has one constant in it that is still a
+## placeholder; printing thousandths of a second off that would claim an accuracy
+## it does not have.
+func _rough(seconds: float) -> String:
+	if seconds <= 0.0:
+		return "--"
+	var minutes := int(seconds / 60.0)
+	return "%d:%02d" % [minutes, int(seconds) - minutes * 60]
+
+## Metres of the longest straight, from the compiler's own count of the cells a
+## run has left once the corners at each end have taken theirs. Read off `free`
+## rather than measured off the centreline so it cannot disagree with the number
+## the corner-sizing rules are enforcing.
+func _longest_straight() -> float:
+	var most := 0
+	for run in _compiled.runs:
+		most = maxi(most, run.free)
+	return float(most) * TrackBuilder.SCALE
+
+## A nudge when a circuit is legal but not much fun to drive. Advice, never a
+## refusal — the shape rules already decide what can be built, and a design tool
+## that argued with what it had just accepted would be worse than a quiet one.
+##
+## Both thresholds are read off things already measured rather than picked:
+##
+## - Sixteen gates are spread evenly round the lap, and each is 4 m deep against
+##   a 2.56 m car. Under about 30 m apart they stop reading as sectors and start
+##   reading as a queue.
+## - The car needs roughly 250 m to reach its measured 165 km/h from a corner.
+##   Nothing near that anywhere on the lap means it never gets out of the
+##   mid-range, which is what a circuit of nothing but hairpins feels like.
+func _pathology(result: TrackBuilder.BuildResult, straight: float) -> String:
+	if result.gate_spacing > 0.0 and result.gate_spacing < 30.0:
+		return (
+			"Very short lap — the 16 timing gates end up %.0f m apart, so sector "
+			+ "times will be nearly meaningless. Worth lengthening."
+		) % result.gate_spacing
+	if straight < 60.0 and _compiled.corners.size() >= 8:
+		return (
+			"No real straight anywhere — top speed needs about 250 m of clear "
+			+ "road. Fine if you want it technical, but nothing will stretch its legs."
+		)
+	return ""
 
 # --- files ---
 

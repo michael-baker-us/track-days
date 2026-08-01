@@ -153,6 +153,17 @@ duplicating a shipped circuit as a starting point, mirror and rotate, rename.
 dropping frames, and the estimated time is within a sensible margin of a real lap
 on all three shipped circuits.
 
+**Status: readout built, second half of the "done when" not met.** The live
+estimate is in and costs ~1 ms on top of the walk the editor already did. But
+**no real lap has ever been driven on these circuits**, so "within a sensible
+margin of a real lap" has not been tested — only that the model reproduces the
+corner speeds M3b measured, that longer circuits take longer, and that the tight
+circuit is slower per metre. Closing this properly needs driven laps, which is
+the same thing M15 needs, and neither should be called done until they exist.
+
+Editor comfort — undo/redo, duplicating a shipped circuit, mirror and rotate — is
+**not started**.
+
 ---
 
 ## M11 — Reach
