@@ -842,6 +842,61 @@ twenty at a quarter and cost a third less.
   aerodynamic drag helping at the start, so the model is slightly pessimistic
   into the fastest corners.
 
+## M14 — a second car, measured
+
+A garage needs cars that feel different, so the second one had to be measured
+rather than assumed. Same rig as M1 and M2: the flat plane, real `car_controller`
+driven through `Input.action_press`, teleported back up the plane so the run is
+not cut short by the edge.
+
+| Car | 0–60 | 0–100 | Top | 100–0 | Lateral |
+|---|---|---|---|---|---|
+| Racer | 2.14 s | 3.38 s | 164.9 km/h | 1.85 s / 24.3 m | 3.52 g |
+| Prototype | 2.05 s | 3.07 s | 186.2 km/h | 1.81 s / 23.9 m | 3.90 g |
+
+**The Racer reproduces M1 and M2 exactly** — 0–100 in 3.38 s against 3.37, top
+speed 164.9 against 164.9 — which is what says the rig is measuring the same
+thing the old one did. The lateral figure reads 3.52 against M3b's 3.65 because
+the *method* differs: this takes the peak of `v * yaw_rate` in a steady-state
+skidpad, M3b measured it another way. Both are internally consistent, so the
+Prototype's grip is carried across as a **ratio** of the two rather than used
+raw: 3.90/3.52 applied to 3.65 gives 4.04.
+
+The Prototype is 13% faster at the top end, 9% quicker to 100 and 11% grippier.
+That is a different car rather than a reskin, which is the whole point of a
+garage.
+
+### The consequence: par is per car
+
+`ParTime` hard-coded the Racer's grip and top speed, because for as long as there
+was one car they were *the* grip and top speed. A second, quicker car makes a par
+computed from them simply wrong for it — and medals were always specified per car,
+so a shared par would hand the Prototype an easy gold on every circuit.
+
+So the measured outcomes moved onto `CarSpec` and `ParTime` takes one. Par is now
+per circuit *and* per car:
+
+| Circuit | Racer | Prototype |
+|---|---|---|
+| Ardennes | 47.75 s | 45.25 s |
+| Monte Carlo | 38.15 s | 36.35 s |
+| La Sarthe | 59.01 s | 56.09 s |
+| Suzuka | 34.43 s | 32.78 s |
+
+Note what is on the spec and what is not: `tuning` says how much engine force and
+grip the car is *given*, and these say what that *produced*. Par needs the
+outcomes, and deriving them from the tuning would mean reimplementing the physics
+in the estimator.
+
+### Still open, from M14
+
+- The Prototype has had this one sweep and no more. Nothing has been measured
+  about how it behaves at the limit — whether it snaps, whether the anti-roll bar
+  still holds it flat, whether the handbrake still provokes rather than adds grip.
+  M2's slalom and rollover checks were never run for it.
+- The two cars are within 12% of the same size, which is why the road-versus-car
+  scale question is still deferred rather than answered.
+
 ### Still open
 
 - The hills are still the hardest part of the circuit to drive: 0.84 s airborne

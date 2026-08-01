@@ -25,28 +25,28 @@ static var records_path: String = RECORDS_PATH
 const TRACKS := [
 	{
 		"id": "ardennes",
-		"par": 47.75,
+		"par": {"race": 47.75, "race_future": 45.25},
 		"name": "Ardennes",
 		"blurb": "A hairpin, a long climb, fast sweepers",
 		"scene": "res://scenes/track/track_ardennes.tscn",
 	},
 	{
 		"id": "monte_carlo",
-		"par": 38.15,
+		"par": {"race": 38.15, "race_future": 36.35},
 		"name": "Monte Carlo",
 		"blurb": "Fourteen tight corners, not one banked",
 		"scene": "res://scenes/track/track_monte_carlo.tscn",
 	},
 	{
 		"id": "la_sarthe",
-		"par": 59.02,
+		"par": {"race": 59.01, "race_future": 56.09},
 		"name": "La Sarthe",
 		"blurb": "Huge straights, chicanes, one big sweeper",
 		"scene": "res://scenes/track/track_la_sarthe.tscn",
 	},
 	{
 		"id": "suzuka",
-		"par": 34.43,
+		"par": {"race": 34.43, "race_future": 32.78},
 		"name": "Suzuka",
 		"blurb": "A figure of eight - the lap bridges over itself",
 		"scene": "res://scenes/track/track_suzuka.tscn",
@@ -99,14 +99,30 @@ static func medal_name(medal: Medal) -> String:
 		_:
 			return ""
 
-## Seconds a perfect lap of this circuit would take, or 0.0 if unknown.
+## Seconds a perfect lap of this circuit would take **in the car being driven**,
+## or 0.0 if unknown.
 ##
-## Shipped circuits carry the number in `TRACKS` rather than working it out: the
-## layouts live in `tools/`, and the game does not depend on `tools/` at runtime.
-## The suite recomputes them from the layouts and fails if they have drifted,
-## which is the same arrangement the generated theme resource has.
-static func par_for(info: Dictionary) -> float:
-	return float(info.get("par", 0.0))
+## Par is per car as well as per circuit, because the cars are not equally quick:
+## the Prototype is 13% faster at the top end and 11% grippier than the Racer, so
+## a par computed for one hands the other an easy gold. Medals were always
+## specified per car; this is what makes that true rather than nominal.
+##
+## Shipped circuits carry the numbers in `TRACKS`, keyed by car id, rather than
+## working them out: the layouts live in `tools/`, and the game does not depend on
+## `tools/` at runtime. The suite recomputes every one and fails if it has
+## drifted, which is the same arrangement the generated theme resource has.
+static func par_for(info: Dictionary, car_id: String = "") -> float:
+	var want: String = car_id if not car_id.is_empty() else selected_car
+	var par = info.get("par", null)
+	if par is float or par is int:
+		return float(par)          # a custom circuit, already computed for this car
+	if par is Dictionary:
+		if par.has(want):
+			return float(par[want])
+		# A save from before the garage, or a car with no baked par: fall back to
+		# the first car rather than reporting no target at all.
+		return float(par.get(car_spec(want).id, par.values()[0] if par.size() > 0 else 0.0))
+	return 0.0
 
 static var selected_index: int = 0
 
@@ -160,7 +176,10 @@ static func _facts(layout: TrackLayout) -> Dictionary:
 	var text := "%.0f m, %d corners" % [result.length, compiled.corners.size()]
 	if result.peak > 0.5:
 		text += ", climbs %.1f m" % result.peak
-	return {"blurb": text, "par": ParTime.ideal_lap(builder.centreline)}
+	return {
+		"blurb": text,
+		"par": ParTime.ideal_lap(builder.centreline, selected_car_spec()),
+	}
 
 static func selected() -> Dictionary:
 	var tracks := all_tracks()

@@ -1622,15 +1622,26 @@ func test_shipped_par_times_match_the_model() -> void:
 		"ardennes": source.ARDENNES, "monte_carlo": source.MONTE_CARLO,
 		"la_sarthe": source.LA_SARTHE, "suzuka": source.SUZUKA,
 	}
+	# Every circuit, for every car: par is per car because the cars are not
+	# equally quick, and a par computed for one hands the other an easy gold.
 	for entry in GameState.TRACKS:
 		var id: String = entry["id"]
-		check_true("%s records a par" % id, GameState.par_for(entry) > 0.0)
 		if not layouts.has(id):
 			continue
 		var builder := TrackBuilder.new()
 		builder.measure(layouts[id])
-		check_near("%s par is still what the model says" % id,
-			GameState.par_for(entry), ParTime.ideal_lap(builder.centreline), 0.05)
+		for spec in GameState.cars():
+			var recorded := GameState.par_for(entry, spec.id)
+			check_true("%s records a par for %s" % [id, spec.id], recorded > 0.0)
+			check_near("%s par for %s is still what the model says" % [id, spec.id],
+				recorded, ParTime.ideal_lap(builder.centreline, spec), 0.05)
+
+	# And the quicker car has the quicker par everywhere, or the medals are
+	# measuring the circuit rather than the drive.
+	for entry in GameState.TRACKS:
+		check_true("%s is quicker in the Prototype" % entry["id"],
+			GameState.par_for(entry, "race_future")
+			< GameState.par_for(entry, "race"))
 
 ## Medals are read off the lap time and the par, never stored. That is what makes
 ## it impossible for a saved medal to disagree with the time that earned it, and

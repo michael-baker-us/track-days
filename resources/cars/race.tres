@@ -12,3 +12,7 @@ source = "res://assets/kenney/car_kit/race.glb"
 blurb = "The measured baseline - planted, predictable"
 tuning = ExtResource("2_tune")
 mass = 1200.0
+top_speed_kmh = 164.9
+lateral_g = 3.65
+braking_g = 1.62
+launch_accel = 9.56

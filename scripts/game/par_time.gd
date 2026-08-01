@@ -54,7 +54,14 @@ extends RefCounted
 
 const G := 9.81
 
-## Measured. See the class comment for where each came from.
+## The default car's measured figures, kept as constants because plenty of things
+## want "how fast is the car, roughly" without holding a spec — and because every
+## number in this file having a name is what makes the model readable.
+##
+## **The car is a parameter now.** These were the only figures for as long as
+## there was one car; a second one that is 13% faster at the top end and 11%
+## grippier makes a par computed from these simply wrong for it, and medals are
+## per car. Every entry point takes a `CarSpec` and falls back to these.
 const LATERAL_G := 3.65
 const BRAKING_G := 1.62
 const TOP_SPEED := 45.8      ## m/s, 164.9 km/h
@@ -212,8 +219,12 @@ static func racing_line(line: Array[Vector3]) -> Array[Vector3]:
 ## `centreline` is the builder's, which `measure()` fills without instancing a
 ## single tile — so this costs the editor only the relaxation on top of the walk
 ## it was already doing on every mouse move.
-static func ideal_lap(centreline: Array[Vector3]) -> float:
-	var walk := resample(racing_line(centreline))
+static func ideal_lap(centreline: Array[Vector3], spec: CarSpec = null) -> float:
+	var top := spec.top_speed_kmh / 3.6 if spec != null else TOP_SPEED
+	var lateral := spec.lateral_g if spec != null else LATERAL_G
+	var braking := spec.braking_g if spec != null else BRAKING_G
+	var launch := spec.launch_accel if spec != null else LAUNCH_ACCEL
+	var walk := resample(racing_line(centreline), lateral, top)
 	var points: Array[Vector3] = walk[0]
 	var limit: PackedFloat32Array = walk[1]
 	if points.size() < 8:
@@ -227,10 +238,10 @@ static func ideal_lap(centreline: Array[Vector3]) -> float:
 		# the car arrive too fast and slow down inside it.
 		for i in n:
 			var j := (i + 1) % n
-			speed[j] = minf(speed[j], _after_accelerating(speed[i]))
+			speed[j] = minf(speed[j], _after_accelerating(speed[i], launch, top))
 		for i in range(n - 1, -1, -1):
 			var j := (i + n - 1) % n
-			speed[j] = minf(speed[j], _before_braking(speed[i]))
+			speed[j] = minf(speed[j], _before_braking(speed[i], braking))
 
 	var total := 0.0
 	for i in n:
@@ -243,8 +254,8 @@ static func ideal_lap(centreline: Array[Vector3]) -> float:
 ## What the same lap is worth as a target for a person rather than for the
 ## simulation. Separate from `ideal_lap` so the unmeasured constant is applied
 ## in exactly one visible place.
-static func par_lap(centreline: Array[Vector3]) -> float:
-	return ideal_lap(centreline) * HUMAN_SLACK
+static func par_lap(centreline: Array[Vector3], spec: CarSpec = null) -> float:
+	return ideal_lap(centreline, spec) * HUMAN_SLACK
 
 ## Fastest the car can hold the bend at `i`, from the radius of the circle
 ## through its neighbours.
@@ -261,17 +272,19 @@ static func par_lap(centreline: Array[Vector3]) -> float:
 ## which is nearly true here and would not be on a circuit whose start sits in a
 ## bend. Defensive rather than a fix for an observed wrong number, and it also
 ## covers coincident vertices anywhere else a piece happens to produce them.
-static func _corner_speed(points: Array[Vector3], i: int) -> float:
+static func _corner_speed(
+	points: Array[Vector3], i: int, lateral: float = LATERAL_G
+) -> float:
 	var a := _neighbour(points, i, -1)
 	var c := _neighbour(points, i, 1)
 	if a < 0 or c < 0:
-		return TOP_SPEED
+		return INF
 	var radius := _circumradius(
 		_flat(points[a]), _flat(points[i]), _flat(points[c])
 	)
 	if radius <= 0.0:
-		return TOP_SPEED
-	return sqrt(LATERAL_G * G * radius)
+		return INF
+	return sqrt(lateral * G * radius)
 
 ## Shortest chord worth measuring a turn across. Below this the three points are
 ## effectively one and the circle through them means nothing.
@@ -310,13 +323,15 @@ static func _circumradius(a: Vector2, b: Vector2, c: Vector2) -> float:
 ## Acceleration falls off as the square of speed, so it is evaluated at the
 ## start of the step rather than held constant across the lap. At STEP = 5 m the
 ## difference within one step is small enough to ignore.
-static func _after_accelerating(v: float) -> float:
-	var accel: float = LAUNCH_ACCEL * maxf(0.0, 1.0 - pow(v / TOP_SPEED, 2.0))
+static func _after_accelerating(
+	v: float, launch: float = LAUNCH_ACCEL, top: float = TOP_SPEED
+) -> float:
+	var accel: float = launch * maxf(0.0, 1.0 - pow(v / top, 2.0))
 	return sqrt(v * v + 2.0 * accel * STEP)
 
 ## Speed one step *earlier* that still allows `v` to be reached under braking.
-static func _before_braking(v: float) -> float:
-	return sqrt(v * v + 2.0 * BRAKING_G * G * STEP)
+static func _before_braking(v: float, braking: float = BRAKING_G) -> float:
+	return sqrt(v * v + 2.0 * braking * G * STEP)
 
 ## The centreline at a constant step, walked as the closed loop it is, plus the
 ## cornering speed limit at each of those steps. Returns `[points, limits]`.
@@ -341,7 +356,10 @@ static func _before_braking(v: float) -> float:
 ## exact, and interpolated onto the fixed step along with the position. Worth
 ## about half a second a lap on Monte Carlo, which has the most corners to get
 ## wrong, and a tenth on Ardennes.
-static func resample(centreline: Array[Vector3]) -> Array:
+static func resample(
+	centreline: Array[Vector3], lateral: float = LATERAL_G,
+	top: float = TOP_SPEED
+) -> Array:
 	var points: Array[Vector3] = []
 	var limits := PackedFloat32Array()
 	var n := centreline.size()
@@ -351,7 +369,7 @@ static func resample(centreline: Array[Vector3]) -> Array:
 	var caps := PackedFloat32Array()
 	caps.resize(n)
 	for i in n:
-		caps[i] = minf(TOP_SPEED, _corner_speed(centreline, i))
+		caps[i] = minf(top, _corner_speed(centreline, i, lateral))
 
 	var carried := 0.0
 	for i in n:

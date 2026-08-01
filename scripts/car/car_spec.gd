@@ -43,6 +43,25 @@ extends Resource
 ## Godot's default of 1.0 kg is unusable and was the first thing M1 had to fix.
 @export var mass: float = 1200.0
 
+## What this car actually does, measured on the flat plane by the same rig M1 and
+## M2 used. See `docs/tuning-journal.md`, M14.
+##
+## These are **outcomes, not settings**: `tuning` says how much engine force and
+## grip the car is given, and these say what that produced. `ParTime` needs the
+## outcomes — a par time is about how fast the car goes, not about the numbers
+## that make it go — and deriving them from the tuning would mean reimplementing
+## the physics.
+##
+## They are per car because par is per car. A faster car on the same circuit has
+## a faster perfect lap, and medals judged against one car's par would hand the
+## other an easy gold.
+@export var top_speed_kmh: float = 164.9
+@export var lateral_g: float = 3.65
+@export var braking_g: float = 1.62
+## Acceleration at a standstill, fitted to the measured 0-100 time through
+## `A * (1 - (v/v_max)^2)`. See `ParTime`.
+@export var launch_accel: float = 9.56
+
 ## Where the built scene goes, and where the game loads it from.
 func scene_path() -> String:
 	return "res://scenes/car/%s.tscn" % id
