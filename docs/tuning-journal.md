@@ -741,15 +741,61 @@ half a second a lap on Monte Carlo and a tenth on Ardennes.
 La Sarthe, of which 1.63 ms is the walk the editor was doing anyway. Against a
 16.7 ms frame.
 
+### Checking it against a driven lap
+
+The estimate needed a real lap to be worth anything, and none had ever been
+driven. So a throwaway `_diag_drive.gd` drove one: pure pursuit for steering, a
+look-ahead speed target for the pedals, pressing the same actions a pad does
+through `Input.action_press` — so the whole of `car_controller` and the real
+physics are in the loop and the lap time is produced by the car rather than by a
+model of it. It used 80% of measured grip, because a pursuit controller with
+steering lag cannot sit on the limit without eventually losing the back end.
+
+Four laps each, best of the three after a warm-up lap:
+
+| Circuit | Driver | Estimate | Driver vs estimate | Centreline | Driven | Max stray |
+|---|---|---|---|---|---|---|
+| Ardennes | 50.48 s | 49.14 s | **+2.7%** | 1473 m | 1380 m (−6.3%) | 7.3 m |
+| Monte Carlo | 38.07 s | 40.04 s | **−4.9%** | 1054 m | 973 m (−7.7%) | 7.3 m |
+| La Sarthe | 60.33 s | 61.12 s | **−1.3%** | 1768 m | 1650 m (−6.6%) | 7.3 m |
+
+**The model is good to about ±5%, which is the answer M10 wanted.** Lap times
+were repeatable to within half a second across four laps, so the spread is the
+model's, not noise.
+
+**But the driver beat the "perfect" lap on two circuits, and that is the real
+finding.** Not because the physics constants are wrong — they are measured and
+the cornering half is checked independently — but because of the **path**. The
+model integrates along the centreline. A car drives the racing line, which came
+out **6–8% shorter** on every circuit.
+
+The 7.3 m maximum stray is exactly half the 14 m road width, on all three. The
+driver is not cutting off the circuit or exploiting grass gripping like tarmac;
+it is using the full width of the road, outside to apex to outside, as anyone
+would. This is an ordinary racing line, not an exploit.
+
+Which means **the error is circuit-dependent, not a constant offset**: the
+tighter the circuit, the more the racing line has to gain, so Monte Carlo's
+fourteen tight corners give up 4.9% while La Sarthe's long straights give up
+1.3%. No single slack constant can absorb that, which is exactly what
+`HUMAN_SLACK` was going to be asked to do.
+
 ### Still open, from M10
 
-- **No driven lap has ever been recorded on these circuits**, so `HUMAN_SLACK` —
-  how much slower a good human is than a perfect simulation — is a stated
-  placeholder at 1.08 and nothing more. It is the only unmeasured number in the
-  model, and it is exactly the one the medals will rest on. This is why the
-  editor shows the *ideal* lap rather than the par: showing a number derived from
-  a placeholder would launder it into something that looks authored. M15 cannot
-  be closed honestly until real laps exist.
+- **Model the racing line, do not tune the constant.** The honest fix for the
+  above is a wider effective corner radius — a 90-degree corner of radius R on a
+  road of half-width w can be taken on an arc meaningfully larger than R — which
+  would both raise corner speeds and shorten the path, the two effects actually
+  observed. Adding a fudge factor to `HUMAN_SLACK` instead would hide a
+  systematic error inside a number that is supposed to mean something else.
+- **`HUMAN_SLACK` is still unmeasured**, and now known to be measuring the wrong
+  thing on its own. Medals (M15) rest on it, so M15 should not be started until
+  the path question above is settled. Nothing user-facing uses it today; the
+  editor shows `ideal_lap`.
+- **The scripted driver is not a human.** It is a competent, conservative
+  reference at 80% grip, useful for validating the model and useless for knowing
+  what a person on a pad will do. A gold medal set at the driver's pace is a
+  guess about people, however well measured it is about cars.
 - The acceleration model is optimistic below about 60 km/h. It matters most on
   circuits with many slow corners, which is exactly where a par time is hardest
   to get right.

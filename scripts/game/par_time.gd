@@ -72,13 +72,23 @@ const STEP := 5.0
 ## it. Two laps of each sweep converges; a third changes nothing.
 const SWEEPS := 2
 
-## How much slower a good human lap is than a perfect one.
+## How much slower a real lap is than this model's perfect one.
 ##
-## **This is the one number here that is not measured**, and it is the only one
-## a real lap time would settle. The simulation drives every corner at exactly
-## the limit and every straight flat out, which nobody does. Until M15 calibrates
-## it against driven laps it is a stated placeholder, not a finding — which is
-## why the editor shows the ideal lap rather than this.
+## **Still not measured, and M10 found out why it is harder than it looks.** A
+## scripted driver was run round all three shipped circuits (tuning journal, M10)
+## and came out at 1.027, 0.951 and 0.987 times the estimate — that is, it *beat*
+## the "perfect" lap on two of them.
+##
+## The cause is not the physics, which is checked, but the **path**. This model
+## integrates along the centreline; a car drives the racing line, which on the
+## measured runs was 6-8% shorter, using the full 14 m road width without ever
+## leaving it. The tighter the circuit the more there is to gain, so the error is
+## circuit-dependent rather than a constant offset, and no single number here can
+## absorb it.
+##
+## So this stays a placeholder, and the honest fix is to model the racing line
+## rather than to tune this. Until then the editor shows `ideal_lap`, never this,
+## so nothing user-facing rests on it.
 const HUMAN_SLACK := 1.08
 
 ## Seconds for a perfect lap of `centreline`, or 0.0 if there is not enough of a

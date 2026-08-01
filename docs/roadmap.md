@@ -153,16 +153,22 @@ duplicating a shipped circuit as a starting point, mirror and rotate, rename.
 dropping frames, and the estimated time is within a sensible margin of a real lap
 on all three shipped circuits.
 
-**Status: readout built, second half of the "done when" not met.** The live
-estimate is in and costs ~1 ms on top of the walk the editor already did. But
-**no real lap has ever been driven on these circuits**, so "within a sensible
-margin of a real lap" has not been tested — only that the model reproduces the
-corner speeds M3b measured, that longer circuits take longer, and that the tight
-circuit is slower per metre. Closing this properly needs driven laps, which is
-the same thing M15 needs, and neither should be called done until they exist.
+**Status: the readout is done and the estimate is validated.** The live readout
+costs ~1 ms on top of the walk the editor already did. A scripted driver was then
+run round all three circuits to supply the real laps the second half of the
+"done when" required: the estimate lands within **±5%**, repeatable to half a
+second across four laps.
 
-Editor comfort — undo/redo, duplicating a shipped circuit, mirror and rotate — is
-**not started**.
+**It also turned up something that changes M15.** The driver *beat* the perfect
+lap on two circuits, because the model integrates along the centreline while a
+car drives the racing line — measured 6–8% shorter, using the full road width
+without ever leaving it. The error is therefore circuit-dependent (4.9% on tight
+Monte Carlo, 1.3% on open La Sarthe), so no single slack constant can absorb it.
+**M15 should not start until the racing line is modelled**, or medals will be
+built on a number quietly doing two jobs. See the tuning journal, M10.
+
+Editor comfort — undo is already in the editor; duplicating a shipped circuit,
+mirror and rotate are **not started**.
 
 ---
 
@@ -230,6 +236,13 @@ The scale question has to be answered here: the road is 14 m wide and the car is
 ---
 
 ## M15 — Medals
+
+> **Blocked, by a measurement rather than by an opinion.** M10 found the par
+> model is 6–8% pessimistic because it walks the centreline and a car drives the
+> racing line, and that the gap varies with how tight the circuit is. Medals rest
+> directly on par, so calibrating `HUMAN_SLACK` first would bake a path error
+> into a constant that is supposed to mean "how much slower people are". Model
+> the racing line first.
 
 Gold / silver / bronze per circuit per car, with par times **derived** from
 `measure()` rather than authored — so player-drawn circuits get medals for free,
