@@ -92,6 +92,13 @@ func _initialize() -> void:
 
 	var picker := OptionButton.new()
 	picker.name = "Picker"
+	# An OptionButton takes its minimum width from its **longest item**, and the
+	# items are circuit names the player typed. Nothing limits those, so one
+	# long name dragged the whole panel out from 364 units to nine hundred and
+	# swallowed the canvas it was supposed to sit beside.
+	#
+	# Clipping makes the panel width authoritative instead of the contents.
+	picker.clip_text = true
 	rows.add_child(picker)
 
 	# Drawing and shaping are peers, so the switch between them is a visible

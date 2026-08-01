@@ -909,6 +909,18 @@ guide card already answers "now what".
 > readout — the live verdict, wanted on every single edit — under the fold. The
 > current rule is the opposite: feedback is fixed, reference scrolls.
 
+**Width has the same problem, in the circuit picker.** An `OptionButton` takes
+its minimum width from its **longest item**, and the items are names the player
+typed with nothing limiting them. One long name dragged the panel out from 364
+units to around a thousand and swallowed the canvas it is supposed to sit beside.
+`clip_text` on the picker makes the panel width authoritative rather than the
+contents.
+
+Three controls, one rule: **anything displaying text the player supplied, or the
+compiler generated, needs a cap.** The track name button and its blurb on the
+title screen already had `clip_text` for exactly this reason; the editor's picker
+and cards did not.
+
 **The cards need a ceiling, not just a floor.** `custom_minimum_size` sets the
 floor; the guide and readout wrap, and what goes in them comes from the compiler
 — a list of errors, a nudge, a crossing that needs bridging. With no cap they

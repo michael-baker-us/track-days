@@ -1054,6 +1054,34 @@ func test_the_panel_keeps_its_buttons_whatever_the_readout_says() -> void:
 		% [rows.get_combined_minimum_size().y, side.size.y],
 		rows.get_combined_minimum_size().y <= side.size.y)
 
+	# Width, for the same reason and a different control. The circuit picker is
+	# an OptionButton and takes its minimum width from its longest item -- which
+	# is a name the player typed, with nothing limiting it. One long name used to
+	# drag the panel out past nine hundred units and swallow the canvas beside
+	# it. `stage_title_menu` saves exactly such a circuit, so the picker here is
+	# listing one.
+	# Saved and refreshed here rather than relying on what other tests left in the
+	# store, so the picker is definitely listing one.
+	var long_named := sample_layout()
+	long_named.display_name = (
+		"A Circuit With An Extremely Long Name That Nobody Sensible Would Type "
+		+ "But Which The Field Happily Accepts Anyway"
+	)
+	long_named.id = ""
+	TrackStore.save(long_named)
+	staged_track_ids.append(long_named.id)
+	editor._refresh_picker()
+
+	var picker: OptionButton = editor.get_node("Split/Side/Rows/Picker")
+	var longest := 0
+	for i in picker.item_count:
+		longest = maxi(longest, picker.get_item_text(i).length())
+	check_true("the picker is listing a very long name (%d chars)" % longest,
+		longest > 60)
+	check_true("and the panel keeps its width (%.0f, budget %.0f)"
+		% [side.size.x, editor.SIDEBAR_W],
+		side.size.x <= editor.SIDEBAR_W + 2.0)
+
 	# And the buttons that matter are still on screen, which is the thing the
 	# player actually lost.
 	for path in [
@@ -3737,6 +3765,18 @@ func stage_title_menu() -> void:
 		layout.id = ""
 		TrackStore.save(layout)
 		staged_track_ids.append(layout.id)
+	# One circuit named the way a player actually can. Nothing limits what goes
+	# in the name field, and a menu row that grows to fit its longest name would
+	# push the Edit and Delete buttons off the side of the screen -- the same
+	# shape of bug as the editor panel losing Save to a long error message.
+	var long_named := sample_layout()
+	long_named.display_name = (
+		"A Circuit With An Extremely Long Name That Nobody Sensible "
+		+ "Would Type But Which The Field Happily Accepts Anyway"
+	)
+	long_named.id = ""
+	TrackStore.save(long_named)
+	staged_track_ids.append(long_named.id)
 	staged_title = load("res://scenes/title.tscn").instantiate()
 	root.add_child(staged_title)
 
