@@ -917,10 +917,43 @@ either. Worse, it changed the grip the M14 sweep had just been run against, whic
 would have left the spec describing a car that no longer existed. Reverted, and
 the blurb now says what was measured: faster everywhere, same balance.
 
+### Provoking a slide, properly
+
+The probe rewritten to work at **90 km/h** rather than at top speed, where the
+steering falloff still leaves 55% of the lock instead of clamping to its 0.25
+floor. Three provocations, peak slip angle in degrees:
+
+| Car | Power | Handbrake | Lift |
+|---|---|---|---|
+| Racer | 1.3 | 179.1 | 14.7 |
+| Prototype | 1.8 | 178.8 | 15.8 |
+
+**The rig can see a slide now**: the handbrake spins both cars fully round — 179
+degrees of slip and 8.06 rad/s of yaw — where the old probe reported 4 degrees
+for everything.
+
+Three findings:
+
+- **There is no power oversteer at all.** Full throttle and full lock produce
+  under 2 degrees of slip on either car. At 3.65 g and 4.04 g the tyres simply do
+  not care, so the throttle cannot break the back end loose. That is M2's "slides
+  only when provoked" holding exactly, with the handbrake as the only thing that
+  provokes.
+- **The handbrake may provoke too much.** 179 degrees is not a slide, it is a
+  complete spin, from one press at 90 km/h. Recorded rather than changed:
+  `handbrake_rear_friction` is the lever, it was last set in M3b to keep its ratio
+  under the raised grip, and changing it is a feel decision that wants driving
+  rather than measuring.
+- **The two cars have the same balance.** Every figure is within a degree or two
+  across all three probes. The Prototype is faster, not different in character —
+  which is what its blurb now says, and it is worth knowing before a third car is
+  added that "faster" is the only axis the garage currently varies.
+
 ### Still open, from M14
 
-- **Neither car has been tested at the cornering limit.** See above: the probe
-  needs to provoke a slide rather than assume speed will do it.
+- Whether a full-spin handbrake is what the game wants. Measured, not judged.
+- A car that differs in *balance* rather than in pace, which is what would make
+  the garage a choice rather than a ladder.
 - The two cars are within 12% of the same size, which is why the road-versus-car
   scale question is still deferred rather than answered.
 
