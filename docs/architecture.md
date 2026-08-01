@@ -279,6 +279,77 @@ would otherwise carry the freeze into the title screen. Pausing also releases th
 touch pads: a synthesised press is held until something sends the matching
 release, and the pads stop getting events the moment the tree stops.
 
+### Tunnels are covered, not buried
+
+Monte Carlo is roofed out of Portier, which is where Monaco's tunnel actually is.
+The kit has **no tunnel art of any kind**, so the shell is generated and swept
+along the centreline the way the barrier is — a wall down each side and a roof
+across the top.
+
+It is expressed as a **road piece** (`roadStraightTunnel`,
+`roadStraightLongTunnel`) rather than as a separate list of arc ranges, because
+that is how everything else about a circuit is written: a layout says what road
+goes where, and a tunnel is a kind of road. It also means the shell cannot drift
+out of step with the tiles beneath it, which a hand-written range of metres
+would. Those pieces carry a `model` key pointing at the plain straight's `.glb`,
+since there is no tunnel tile to point at.
+
+**No collision**, like all scenery. `car_controller` finds which way is up by
+casting a ray downwards and treating whatever it hits as the road it is standing
+on, so a solid roof would be read as a surface the car was resting against. The
+roof does cast a *shadow*, which is most of what sells it — the tarmac goes dark
+on the way in and comes back on the way out with nothing lit or unlit specially.
+
+> **Genuinely underground road is out of reach, and it is worth writing down
+> why so nobody re-derives it.** Three separate blockers, each independent:
+>
+> - **No art.** There is no tunnel, arch, underpass or portal piece in the kit.
+> - **The ground is solid.** `_build_ground` lays a 4000 x 1 x 4000 collision box
+>   whose *top face is y = 0*. Anything below ground is inside it, so the car
+>   would rest on the field rather than on the road.
+> - **Elevation cannot go negative.** Levels are clamped to `[0, MAX_LEVEL]`
+>   throughout `TrackLayout`, so "below the ground plane" is not expressible.
+>
+> A real tunnel therefore needs a hole in both the ground mesh and its collider,
+> a signed elevation level, and geometry — a milestone, not a feature.
+
+### Closed is not the same as simple
+
+`BuildResult.closed` used to mean "the walk returned to its start **and**
+`absi(turn_total) == 4`". Those are two different claims bolted together: the
+first is "it joins up", the second is "it joins up without ever crossing itself".
+
+A figure of eight fails the second and satisfies the first perfectly — one half
+turns right, the other turns left, and the quarter-turns cancel to **zero**. So
+`closed` now checks position, height and heading (heading returns exactly when
+the turn total is a multiple of four), and the stronger claim lives on as
+`simple`.
+
+`simple` is still what every *painted* circuit must satisfy: `TrackShape` only
+permits a crossing when it is asked to, and nothing asks it to yet.
+
+**Suzuka** (`tools/build_track.gd`) is the shipped circuit that exercises this —
+a rectilinear figure of eight, 991 m, where the back half bridges over the front
+half. It is authored as a segment list, so it reaches the builder without going
+through `TrackShape` at all, which is why it exists before the painted-crossing
+work is finished.
+
+Two things about it are measurements rather than choices:
+
+- **The bridge is at level two, not one.** `roadStraightBridge` carries 0.5 tile
+  units of structure below its deck, which is exactly one level. At level one it
+  stands on the ground — fine for a crest, useless here, because the ground is
+  where the other half of the lap is. At level two the deck sits 7 m up with
+  3.5 m of clear air beneath. The supports stop short of the ground rather than
+  punching through the road below, which is the honest limit of a tile set never
+  drawn for this.
+- **The elevated section is three cells, not the whole straight.** Every elevated
+  cell is a cell of bridge with nothing under it, so short reads as a bridge and
+  long would read as a viaduct on stilts that stop early.
+
+A scripted driver completes laps of it in ~33 s, moving between −0.04 m and
+7.80 m — under the bridge on the way out, over it on the way back.
+
 ## The track builder
 
 `tools/build_track.gd` walks a layout spec, carrying a position, a heading and a

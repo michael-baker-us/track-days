@@ -263,6 +263,58 @@ service for elevated sections.
 invalid shapes is what makes the editor safe, and this deliberately relaxes it.
 Every existing rejection test must still reject.
 
+### Status: step 1 of 4 done — topology
+
+`TrackShape.walk` takes an `allow_crossings` flag. **It is off by default and
+every existing caller leaves it off**, so the editor and the compiler behave
+exactly as before. A shape the editor accepted but the builder could not build
+would be worse than one it refuses, so the switch is thrown last, not first.
+
+What the relaxation permits is exactly one thing: a cell with **four** neighbours,
+which the road passes **straight through** twice. Three neighbours is a T
+junction — a branch — and stays refused however the heights work out.
+
+Pinned by tests: a figure of eight walks to a lap one longer than its cell count
+with the crossing visited twice and no bend at it; T junctions, spurs, broken
+rings, separate loops and road folded against itself are all still refused *with
+the flag on*; and ordinary circuits walk to a byte-identical lap either way, so
+throwing the switch later cannot quietly change an existing circuit.
+
+**One encouraging find while surveying:** a different-level crossing may need **no
+new tile**. `roadStraightBridge` is already in service, so the raised leg is a
+bridge and the lower leg is ordinary road. `roadCrossing.glb` is only needed for
+same-level crossings, which this milestone excludes.
+
+### And a shipped circuit that already crosses: Suzuka
+
+Shipped circuits are **authored segment lists**, not painted cells, so they reach
+`TrackBuilder` without going through `TrackShape` at all. That means a crossover
+circuit was reachable before any of the painted-crossing work is finished, and
+one now ships: a rectilinear figure of eight, 991 m, six corners, where the back
+half bridges over the front half 7 m up. Driving it opens by going *under* the
+road the lap will later cross *over*.
+
+It forced one real change: `BuildResult.closed` demanded `absi(turn_total) == 4`,
+which conflates "it joins up" with "it never crosses itself". A figure of eight
+cancels to **zero** net turns and joins up perfectly. Closure is now position,
+height and heading; the stronger claim survives as `simple`, which is still what
+every painted circuit must satisfy.
+
+A scripted driver laps it in ~33 s between −0.04 m and 7.80 m, so it is drivable
+rather than only geometrically valid.
+
+### Remaining
+
+2. **`corners_valid` and `TrackLayout.compile`** — the junction check currently
+   reports four-neighbour cells as errors, and `corners_valid` re-walks
+   `cells_from_corners`, which emits a crossing cell twice. Plus the gate that
+   makes this safe: *the two passes must resolve to different levels*, which only
+   the compiler can know.
+3. **`TrackBuilder`** — emit the raised leg as a bridge, and check the collision
+   ribbon behaves where it passes over itself.
+4. **The editor** — `edge_at` assumes a cell lies on at most one straight, and
+   the canvas has to draw a crossing as a crossing.
+
 **Explicitly not doing:** diagonals. `roadStraightSkew` exists and is a trap — the
 rectilinear model is why closure is arithmetic rather than trial and error.
 

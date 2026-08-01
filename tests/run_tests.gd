@@ -742,6 +742,234 @@ func test_tyres_only_squeal_when_they_are_sliding() -> void:
 	check_true("and the threshold is below full grip",
 		CarAudio.SQUEAL_FROM < 1.0)
 
+## A rectangle of cells, as the outline only.
+func _ring(w: int, h: int, at := Vector2i.ZERO) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for x in w:
+		out.append(at + Vector2i(x, 0))
+		out.append(at + Vector2i(x, h - 1))
+	for y in range(1, h - 1):
+		out.append(at + Vector2i(0, y))
+		out.append(at + Vector2i(w - 1, y))
+	return out
+
+## A figure of eight: two rings meeting at a single shared cell, which the road
+## passes straight through twice. The smallest interesting crossing.
+func _figure_of_eight() -> Array[Vector2i]:
+	# Two 5x5 rings sharing exactly the corner cell (4, 4) / (0, 0).
+	var out: Array[Vector2i] = _ring(5, 5)
+	for c in _ring(5, 5, Vector2i(4, 4)):
+		if not out.has(c):
+			out.append(c)
+	return out
+
+## The relaxation is opt-in, and with it off nothing whatsoever changes. This is
+## the guard that matters most in M13: `TrackShape.walk` refusing bad shapes is
+## what makes the editor safe, and the editor has not been switched over yet.
+func test_crossings_are_refused_unless_asked_for() -> void:
+	var eight := _figure_of_eight()
+	check_true("a figure of eight has a cell with four neighbours",
+		TrackShape.crossings_in(eight).size() == 1)
+	check_true("and is refused by default",
+		TrackShape.walk(eight).is_empty())
+	check_true("and refused explicitly",
+		TrackShape.walk(eight, false).is_empty())
+
+	# The compiler and every handle edit still go through the default, so a
+	# crossing cannot reach the builder by any route that exists today.
+	var layout := TrackLayout.new()
+	layout.cells = eight
+	layout.start_cell = eight[0]
+	check("the compiler still refuses one", layout.compile().ok, false)
+
+## With crossings allowed, the ring is walked through itself: the crossing cell
+## appears twice and the lap covers every cell.
+func test_a_crossing_is_walked_straight_through() -> void:
+	var eight := _figure_of_eight()
+	var cycle := TrackShape.walk(eight, true)
+	check_true("a figure of eight walks", not cycle.is_empty())
+	if cycle.is_empty():
+		return
+
+	var crossing: Vector2i = TrackShape.crossings_in(eight)[0]
+	check("the ring is one longer than the cell count",
+		cycle.size(), eight.size() + 1)
+	var visits := 0
+	for c in cycle:
+		if c == crossing:
+			visits += 1
+	check("the crossing is on the lap twice", visits, 2)
+
+	# Every other cell exactly once, or the walk has doubled back somewhere.
+	var seen := {}
+	for c in cycle:
+		seen[c] = int(seen.get(c, 0)) + 1
+	var wrong := 0
+	for c in eight:
+		if int(seen.get(c, 0)) != (2 if c == crossing else 1):
+			wrong += 1
+	check("every other cell exactly once", wrong, 0)
+
+	# The road goes over itself rather than turning onto the leg it crosses, so
+	# the crossing is not a bend and does not become a corner.
+	for i in cycle.size():
+		if cycle[i] != crossing:
+			continue
+		var n := cycle.size()
+		var into: Vector2i = cycle[i] - cycle[(i - 1 + n) % n]
+		var away: Vector2i = cycle[(i + 1) % n] - cycle[i]
+		check("the road goes straight through the crossing", into, away)
+
+## Allowing crossings must not allow anything else. Every one of these was
+## refused before and has to stay refused with the relaxation switched on --
+## this is the test that says the invariant was widened by exactly one case.
+func test_allowing_crossings_still_refuses_everything_else() -> void:
+	var cases := {}
+
+	# A T junction: three neighbours. A branch, not a crossing, and no
+	# arrangement of heights makes it drivable as one loop.
+	var tee: Array[Vector2i] = _ring(6, 6)
+	tee.append(Vector2i(3, 6))
+	tee.append(Vector2i(3, 7))
+	cases["a T junction"] = tee
+
+	# Two separate rings that never touch.
+	var apart: Array[Vector2i] = _ring(5, 5)
+	apart.append_array(_ring(5, 5, Vector2i(20, 20)))
+	cases["two separate loops"] = apart
+
+	# A loose end.
+	var tail: Array[Vector2i] = _ring(6, 6)
+	tail.append(Vector2i(7, 3))
+	cases["a spur off the side"] = tail
+
+	# A gap: not closed at all.
+	var broken: Array[Vector2i] = _ring(6, 6)
+	broken.remove_at(0)
+	cases["a broken ring"] = broken
+
+	# Road running alongside itself: cells with three neighbours, no crossing.
+	var doubled: Array[Vector2i] = _ring(6, 6)
+	for x in range(1, 5):
+		doubled.append(Vector2i(x, 1))
+	cases["road folded against itself"] = doubled
+
+	for label in cases:
+		check_true("%s is refused with crossings off" % label,
+			TrackShape.walk(cases[label], false).is_empty())
+		check_true("%s is refused with crossings on" % label,
+			TrackShape.walk(cases[label], true).is_empty())
+
+## An ordinary circuit must walk to exactly the same lap whether or not crossings
+## are permitted. If the two disagree anywhere, switching the editor over later
+## would silently change every existing circuit.
+func test_ordinary_circuits_walk_identically_either_way() -> void:
+	var shapes := {
+		"a rectangle": _ring(8, 6),
+		"a long thin ring": _ring(14, 4),
+		"the suite's sample circuit": sample_layout().cells,
+	}
+	for label in shapes:
+		var strict := TrackShape.walk(shapes[label], false)
+		var relaxed := TrackShape.walk(shapes[label], true)
+		check_true("%s walks" % label, not strict.is_empty())
+		check("%s walks the same lap either way" % label, relaxed, strict)
+
+	# The shipped circuits are deliberately absent from this: they are authored
+	# segment lists rather than painted cells and never go through `walk` at all,
+	# so nothing about crossings can reach them.
+
+## Suzuka is the one shipped circuit that crosses over itself, and the whole
+## point of it is a thing no other track can be checked for: two pieces of road
+## in the same place at different heights.
+##
+## Measured off the built centreline rather than trusted from the layout. The
+## layout says what was asked for; this says what came out.
+func test_the_crossover_circuit_actually_crosses() -> void:
+	var source: GDScript = load("res://tools/build_track.gd")
+	var builder := TrackBuilder.new()
+	var result := builder.measure(source.SUZUKA)
+
+	check_true("it closes", result.closed)
+	# The distinction the closure gate had to learn: a figure of eight comes back
+	# to the same pose with its turns cancelling to zero, rather than to the +/-4
+	# a loop that never crosses itself makes.
+	check("and does so without being a simple loop", result.simple, false)
+	check("its turns cancel", result.turn_total, 0)
+
+	# Find the closest approach between two points that are far apart *along* the
+	# lap. Neighbouring points are always close together; a crossing is two parts
+	# of the road nowhere near each other in lap distance sitting on top of each
+	# other in plan.
+	var line := builder.centreline
+	var n := line.size()
+	var apart := n / 6  # a sixth of a lap is well beyond any corner's own span
+	var best_flat := INF
+	var rise_there := 0.0
+	for i in n:
+		for j in range(i + apart, n - apart):
+			var flat := Vector2(line[i].x, line[i].z).distance_to(
+				Vector2(line[j].x, line[j].z)
+			)
+			if flat < best_flat:
+				best_flat = flat
+				rise_there = absf(line[i].y - line[j].y)
+
+	check_true("two distant parts of the lap meet in plan (%.1f m apart)"
+		% best_flat, best_flat < 2.0)
+	# 3.5 m per level and the bridge is at level two, so the decks are 7 m apart.
+	# The bridge carries 0.5 tile units -- one level, 3.5 m -- of structure below
+	# its deck, so anything less than that and the supports would be sitting in
+	# the road underneath rather than clear above it.
+	check_true("and one is well above the other (%.1f m)" % rise_there,
+		rise_there > 6.0)
+	check_near("at the height two levels buys", result.peak, 7.0, 0.1)
+
+## Monte Carlo is roofed out of Portier, where Monaco's tunnel is. The kit has no
+## tunnel art, so the shell is generated -- which means it has to be checked for
+## rather than assumed to have come out of a .glb.
+func test_the_tunnel_is_built_and_does_not_collide() -> void:
+	var circuit: Node3D = load(
+		"res://scenes/track/track_monte_carlo.tscn"
+	).instantiate()
+	var found := circuit.find_children("Tunnel", "MeshInstance3D", true, false)
+	check_true("monte carlo has a tunnel shell", not found.is_empty())
+	if found.is_empty():
+		circuit.free()
+		return
+
+	var tunnel: MeshInstance3D = found[0]
+	var box := tunnel.mesh.get_aabb()
+	# Tall enough for the roof to clear the car and the chase camera behind it,
+	# which rides 1.4 m up.
+	check_near("the roof is where it was asked to be",
+		box.size.y, TrackBuilder.TUNNEL_HEIGHT, 0.2)
+	# Eight cells of roofed road at 14 m a cell, so the shell runs about 112 m
+	# along whichever axis the straight happens to lie on.
+	check_true("and it runs the length of the roofed straight (%.0f x %.0f m)"
+		% [box.size.x, box.size.z],
+		maxf(box.size.x, box.size.z) > 90.0)
+
+	# Scenery never collides: `car_controller` finds "up" by casting a ray down
+	# and treats whatever it hits as road, so a solid roof would be read as a
+	# surface the car was resting against.
+	var scenery: Node = circuit.get_node_or_null("Scenery")
+	check_true("scenery exists", scenery != null)
+	if scenery != null:
+		check("and nothing in it collides",
+			scenery.find_children("*", "CollisionObject3D", true, false).size(), 0)
+	circuit.free()
+
+	# The other circuits are not roofed, so a tunnel appearing on one would mean
+	# the spans are leaking between builds.
+	for id in ["ardennes", "la_sarthe", "suzuka"]:
+		var other: Node3D = load(
+			"res://scenes/track/track_%s.tscn" % id
+		).instantiate()
+		check("%s has no tunnel" % id,
+			other.find_children("Tunnel", "MeshInstance3D", true, false).size(), 0)
+		other.free()
+
 ## Every entry the title screen offers must actually load and be a usable
 ## circuit. A broken entry here is a dead button on the menu.
 func test_all_tracks_usable() -> void:
@@ -864,6 +1092,23 @@ func test_shipped_circuits_run_clockwise() -> void:
 		# La Source, Sainte Devote and the Dunlop chicane are all right-handers,
 		# and all three are the first corner off the line.
 		check_true("%s turns right off the pit straight" % entry[0], first > 0.0)
+
+	# Suzuka is **deliberately absent** from the list above, and it is worth
+	# saying so out loud rather than leaving it to be noticed: a figure of eight
+	# has no handedness at all. One half turns each way and they cancel, which is
+	# exactly what makes it a crossover. Adding it to the loop above would fail,
+	# and the fix would be to remove it again.
+	var eight := TrackBuilder.new()
+	eight.measure(load("res://tools/build_track.gd").SUZUKA)
+	var net := 0.0
+	var line := eight.centreline
+	for i in range(1, line.size() - 1):
+		var d := Vector2(line[i].x - line[i - 1].x, line[i].z - line[i - 1].z)
+		var e := Vector2(line[i + 1].x - line[i].x, line[i + 1].z - line[i].z)
+		if d.length() < 0.001 or e.length() < 0.001:
+			continue
+		net += e.normalized().dot(Vector2(-d.y, d.x).normalized())
+	check_true("suzuka has no handedness (net %+.1f)" % net, absf(net) < 1.0)
 
 ## The grid editor's whole premise: a painted loop closes by construction, so the
 ## builder should never disagree. If this fails the compiler and the walker have
@@ -3468,6 +3713,8 @@ func _physics_process(_delta: float) -> bool:
 		test_the_car_carries_its_audio()
 		test_engine_pitch_sweeps_rather_than_climbing_once()
 		test_tyres_only_squeal_when_they_are_sliding()
+		test_the_crossover_circuit_actually_crosses()
+		test_the_tunnel_is_built_and_does_not_collide()
 		test_all_tracks_usable()
 		test_no_duplicated_instances()
 		test_spawn_is_behind_the_line()
@@ -3477,6 +3724,10 @@ func _physics_process(_delta: float) -> bool:
 		test_shipped_circuits_run_clockwise()
 		test_painted_loops_close()
 		test_bad_loops_are_rejected()
+		test_crossings_are_refused_unless_asked_for()
+		test_a_crossing_is_walked_straight_through()
+		test_allowing_crossings_still_refuses_everything_else()
+		test_ordinary_circuits_walk_identically_either_way()
 		test_corner_sizing()
 		test_elevation()
 		test_layout_round_trip()

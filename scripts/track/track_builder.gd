@@ -43,6 +43,14 @@ const ROAD_HALF := 0.5 * SCALE
 # of the tarmac is still drivable rather than a cliff.
 const RIBBON_HALF := 0.6 * SCALE
 
+## Tunnel shell: how far out the walls stand, how high the roof sits, and what
+## colour it is. The walls clear `RIBBON_HALF` so the drivable edge of the road
+## is still drivable, and the roof clears the chase camera, which rides 1.4 m up
+## and 4.2 m back.
+const TUNNEL_HALF := 0.68 * SCALE
+const TUNNEL_HEIGHT := 6.5
+const TUNNEL_COLOR := Color(0.30, 0.32, 0.35)
+
 ## Solid walls that would actually stop the car, still switched off — nothing
 ## physically prevents cutting a corner, which is why the ordered gates are what
 ## make a lap time mean anything. Not to be confused with the *visual* barrier
@@ -395,6 +403,32 @@ const PIECES := {
 		"cell": Vector2(1.0, 1.0), "shift": Vector2(0.35, 1.65),
 		"conns": {"N": Vector2(0.5, 0.0), "S": Vector2(0.5, 1.0)},
 	},
+	## Tunnel road. The kit has **no tunnel art of any kind**, so these are
+	## ordinary straights — `model` points at the same .glb — that additionally
+	## ask for a shell to be swept over them (`_build_tunnels`).
+	##
+	## Expressed as pieces rather than as a separate list of arc ranges because
+	## that is how everything else about a circuit is written: a layout says what
+	## road goes where, and a tunnel is a kind of road. It also means the span
+	## cannot drift out of step with the tiles under it, which a hand-written
+	## range of metres would.
+	##
+	## Covered, not buried. Genuinely underground road is out of reach for three
+	## separate reasons — no art, elevation levels clamped to zero and above, and
+	## a 4 km ground slab whose collision top *is* y=0 — so this is Monaco's
+	## tunnel rather than a subway: the road stays where it is and gets a roof.
+	"roadStraightTunnel": {
+		"cell": Vector2(1.0, 1.0), "shift": Vector2(0.35, 1.65),
+		"conns": {"N": Vector2(0.5, 0.0), "S": Vector2(0.5, 1.0)},
+		"model": "roadStraight",
+		"tunnel": true,
+	},
+	"roadStraightLongTunnel": {
+		"cell": Vector2(1.0, 2.0), "shift": Vector2(0.35, 2.65),
+		"conns": {"N": Vector2(0.5, 0.0), "S": Vector2(0.5, 2.0)},
+		"model": "roadStraightLong",
+		"tunnel": true,
+	},
 	# Climbs 0.5 units over its 2 units of length, as a flat wedge: 8 vertices,
 	# so the grade arrives and leaves at a hard crease. Kept because it is a
 	# valid piece, but nothing emits it any more — see `roadRampLongCurved`.
@@ -474,15 +508,19 @@ class BuildResult extends RefCounted:
 	var gap: Vector2          # tile units still between the end and the start
 	var height_gap: float     # tile units of unreturned elevation
 	var turn_total: int       # net quarter-turns; +/-4 for a single clean loop
+	## True when the loop never crosses itself. A figure of eight is `closed` but
+	## not `simple`: its two halves turn opposite ways and cancel to zero.
+	var simple: bool
 	var length: float         # lap distance in metres
 	var peak: float           # highest point in metres
 	var triangles: int        # collision ribbon size
 	var gate_spacing: float   # metres between checkpoints
 
 	func summary() -> String:
-		return "gap = (%.2f, %.2f) height %.2f | net turns %d | %s" % [
+		return "gap = (%.2f, %.2f) height %.2f | net turns %d | %s%s" % [
 			gap.x, gap.y, height_gap, turn_total,
-			"CLOSED" if closed else "*** DOES NOT CLOSE ***"
+			"CLOSED" if closed else "*** DOES NOT CLOSE ***",
+			"" if simple else " (crosses itself)"
 		]
 
 var centreline: Array[Vector3] = []
@@ -492,6 +530,8 @@ var bank := PackedFloat32Array()
 
 var _triangles := 0
 var _gate_spacing := 0.0
+## Centreline index ranges covered by tunnel road, filled during the walk.
+var _tunnel_spans: Array[Vector2i] = []
 ## One entry per placed tile: its node, and the centreline index range it spans.
 ## Filled during the walk and consumed by `_reshape_tiles`, which cannot run until
 ## the whole loop is known — a corner's bank reaches back into the straight
@@ -528,6 +568,7 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 	bank = PackedFloat32Array()
 	_triangles = 0
 	_gate_spacing = 0.0
+	_tunnel_spans.clear()
 	_placed = []
 	_corner_spans = []
 	_sides = []
@@ -577,6 +618,13 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 					chain["index"] = i
 				_trace_straight(piece, r[2], height, r[0], r[5], chain)
 				_record(r[6], from_idx)
+				# Recorded as centreline indices rather than metres, so the shell
+				# is swept over exactly the samples the road was traced onto and
+				# the two cannot disagree about where the tunnel is.
+				if PIECES[piece].get("tunnel", false):
+					_tunnel_spans.append(
+						Vector2i(from_idx, maxi(from_idx, centreline.size() - 1))
+					)
 				pos = r[0]
 				height = r[5]
 				peak = maxf(peak, height)
@@ -641,9 +689,24 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 	result.peak = peak * SCALE * VERT
 	result.triangles = _triangles
 	result.gate_spacing = _gate_spacing
+	# Closed means the walk came back to the pose it set off from: same place,
+	# same height, same heading. Heading returns exactly when the quarter-turns
+	# are a multiple of four.
+	#
+	# This used to demand `absi(turn_total) == 4`, which is a stronger claim —
+	# not just "it joins up" but "it joins up without ever crossing itself". That
+	# was right while a circuit could not cross itself, and it is the thing a
+	# crossover circuit legitimately fails: a figure of eight is one loop turning
+	# one way and one turning the other, so its turns cancel to **zero**. It joins
+	# up perfectly.
+	#
+	# The stronger claim is kept as `simple` rather than dropped, because it is
+	# still what every painted circuit must satisfy — `TrackShape` only permits a
+	# crossing when it is asked to, and it is not asked to yet.
+	result.simple = absi(turn_total) == 4
 	result.closed = (
 		is_zero_approx(pos.x) and is_zero_approx(pos.y) and is_zero_approx(height)
-		and absi(turn_total) == 4
+		and turn_total % 4 == 0
 	)
 	return result
 
@@ -707,8 +770,12 @@ func _place(
 					holder.rotation.y = deg_to_rad(theta)
 					parent.add_child(holder)
 
+					# `model` lets a piece borrow another's art. A tunnel is an
+					# ordinary straight with a shell over it, and the kit has no
+					# tunnel tile to point at.
 					var inst: Node3D = load(
-						"res://assets/kenney/racing_kit/%s.glb" % piece
+						"res://assets/kenney/racing_kit/%s.glb"
+						% desc.get("model", piece)
 					).instantiate()
 					var shift: Vector2 = desc["shift"]
 					inst.position = Vector3(shift.x, 0.0, shift.y)
@@ -1698,6 +1765,76 @@ func _build_scenery(root_node: Node3D, track_name: String) -> void:
 	_scenery_posts(scenery, road)
 	_scenery_trees(scenery, rng, road)
 	_scenery_paddock(scenery, road)
+	_build_tunnels(scenery)
+
+## Sweeps a shell over every stretch of tunnel road: a wall down each side and a
+## roof across the top.
+##
+## Generated rather than placed, because the kit has no tunnel art at all. That
+## is the same reason the collision ribbon and the barrier are generated — the
+## tiles are a vocabulary, not a complete one.
+##
+## **No collision**, like every other piece of scenery here. `car_controller`
+## finds which way is up by casting a ray downwards and treating whatever it hits
+## as the road it is standing on; a solid roof would be read as a surface the car
+## was resting against. The walls are equally decorative — the barriers they sit
+## outside of do not collide either.
+##
+## The roof does cast a shadow, which is most of what sells it: the tarmac
+## underneath goes dark on the way in and comes back on the way out, without
+## anything being lit or unlit specially.
+func _build_tunnels(scenery: Node3D) -> void:
+	if _tunnel_spans.is_empty() or _sides.size() != centreline.size():
+		return
+
+	var mat := StandardMaterial3D.new()
+	mat.resource_name = "tunnel"
+	mat.albedo_color = TUNNEL_COLOR
+	mat.roughness = 0.95
+	# Seen from the inside as much as the outside, and a tunnel with a
+	# back-faced roof is a tunnel with no roof from underneath.
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var quads := 0
+	for span in _tunnel_spans:
+		for i in range(span.x, span.y):
+			quads += _tunnel_span(st, i, i + 1)
+	if quads == 0:
+		return
+
+	var mi := MeshInstance3D.new()
+	mi.name = "Tunnel"
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, mat)
+	mi.mesh = mesh
+	scenery.add_child(mi)
+
+## One slice of shell between two centreline samples. Returns how many quads it
+## added, so a degenerate span contributes nothing rather than a sliver.
+func _tunnel_span(st: SurfaceTool, i: int, j: int) -> int:
+	if centreline[i].distance_to(centreline[j]) < 0.001:
+		return 0
+	# Taken across the banked cross-section, the way the barrier is, so a tunnel
+	# on a banked corner would stand on the road rather than lean through it.
+	var a_l := _ribbon_point(centreline[i], _sides[i], bank[i], -TUNNEL_HALF)
+	var a_r := _ribbon_point(centreline[i], _sides[i], bank[i], TUNNEL_HALF)
+	var b_l := _ribbon_point(centreline[j], _sides[j], bank[j], -TUNNEL_HALF)
+	var b_r := _ribbon_point(centreline[j], _sides[j], bank[j], TUNNEL_HALF)
+	var up := Vector3.UP * TUNNEL_HEIGHT
+
+	_quad(st, a_l, b_l, b_l + up, a_l + up)          # left wall
+	_quad(st, a_r, b_r, b_r + up, a_r + up)          # right wall
+	_quad(st, a_l + up, b_l + up, b_r + up, a_r + up)  # roof
+	return 3
+
+func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
+	var normal := (b - a).cross(d - a)
+	if normal.length() > 0.001:
+		st.set_normal(normal.normalized())
+	for v in [a, b, c, a, c, d]:
+		st.add_vertex(v)
 
 ## One continuous barrier down each side, swept along the centreline so it curves
 ## with the road and rises with it.

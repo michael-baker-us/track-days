@@ -155,9 +155,17 @@ const MONTE_CARLO := [
 	["S", "roadStraightLong", 1],
 	["C", "roadCornerSmall", "right", 0.0],
 	["S", "roadStraightLong", 2],
-	# Portier, onto the longest straight on the circuit.
+	# Portier, onto the longest straight on the circuit -- and the tunnel, which
+	# is where Monaco's actually is: out of Portier, under the hotel, and back
+	# into daylight braking for the chicane.
+	#
+	# Same thirteen cells as before, so the loop closes exactly as it did; eight
+	# of them are now roofed. Covered rather than buried: see the note on
+	# `roadStraightTunnel`.
 	["C", "roadCornerSmall", "right", 0.0],
-	["S", "roadStraightLong", 6],
+	["S", "roadStraightLong", 1],
+	["S", "roadStraightLongTunnel", 4],
+	["S", "roadStraightLong", 1],
 	["S", "roadStraight", 1],
 	# The Nouvelle Chicane.
 	["C", "roadCornerSmall", "right", 0.0],
@@ -250,12 +258,93 @@ const LA_SARTHE := [
 	["S", "roadStraight", 1],
 ]
 
+# Suzuka: the one circuit in the world that is a figure of eight, and the reason
+# crossings are worth having at all. The back half of the lap runs over the front
+# half on a bridge, so the road passes over itself once and the two halves turn
+# opposite ways.
+#
+# ## Why this one closes with zero net turns
+#
+# The other three are simple loops: four more turns one way than the other, a net
+# of -4. A figure of eight is one loop turning right and one turning left, so its
+# turns **cancel to zero** — and it still joins up perfectly, because closure is
+# about coming back to the same place, height and heading, not about how many
+# times you went round. `TrackBuilder` used to conflate the two; see the note on
+# `BuildResult.simple`.
+#
+# ## Why the bridge is at level two, not one
+#
+# `roadStraightBridge` carries 0.5 tile units of structure below its deck, which
+# is exactly one level. At level one it stands on the ground — fine for a crest,
+# useless here, because the ground is where the other half of the lap is. At
+# level two the deck sits 7 m up with **3.5 m of clear air beneath it**, which is
+# what the road underneath needs. The supports stop short of the ground rather
+# than punching through the road below, which is the honest limit of a tile set
+# that was never drawn for this.
+#
+# The climb is two ramps up and two down, four cells each, with three cells of
+# held bridge in the middle — and the crossing sits on the middle one of those
+# three, so the road is level and at full height exactly where it passes over.
+#
+# ## The shape
+#
+# Two 6-unit squares sharing one cell, traced as a single lap:
+#
+#     +-----+           the long E-W straight runs along the middle, on the
+#     |     |           ground, and carries the start line. The long N-S
+#     +--X--+           straight crosses it at X, on the bridge. Everything
+#     |     |           else is the two loops that join them up.
+#     +-----+
+#
+# Deliberately plain otherwise: six corners, all the smallest tile, nothing
+# banked. This circuit exists to show one thing, and dressing it up would only
+# make it harder to see whether that one thing works.
+const SUZUKA := [
+	# The pit straight, on the ground, heading east. Seventeen cells between the
+	# corner behind and the corner ahead, of which the grid and the line take
+	# four. The bridge crosses over the middle of this, five cells past the line —
+	# so the lap opens by driving *under* the road it will cross *over* later.
+	["S", "roadStartPositions", 1],
+	["S", "roadStart", 1],
+	["S", "roadStraightLong", 6],
+	["S", "roadStraight", 1],
+	# North-east loop: three lefts back to the top of the crossing straight.
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 4],
+	["C", "roadCornerSmall", "left", 0.0],
+	["S", "roadStraightLong", 4],
+	["C", "roadCornerSmall", "left", 0.0],
+	# The crossing straight, heading south. Flat, up two levels, across, down
+	# again, flat — seventeen cells, with the crossing on the middle one of the
+	# three held cells so the road is level and at full height exactly where it
+	# passes over.
+	#
+	# The elevated section is kept to three cells rather than run the length of
+	# the straight. The supports hang 3.5 m clear of the ground at this height, so
+	# every elevated cell is a cell of bridge with nothing under it: short reads
+	# as a bridge, long would read as a viaduct on stilts that stop early.
+	["S", "roadStraightLong", 1],
+	["S", "roadStraight", 1],
+	["S", "roadRampLongCurved", 2, 1],
+	["S", "roadStraightBridge", 3],
+	["S", "roadRampLongCurved", 2, -1],
+	["S", "roadStraightLong", 1],
+	["S", "roadStraight", 1],
+	# South-west loop: three rights back onto the pit straight.
+	["C", "roadCornerSmall", "right", 0.0],
+	["S", "roadStraightLong", 4],
+	["C", "roadCornerSmall", "right", 0.0],
+	["S", "roadStraightLong", 4],
+	["C", "roadCornerSmall", "right", 0.0],
+]
+
 const TRACKS := {
 	"ardennes": {"file": "res://scenes/track/track_ardennes.tscn", "layout": ARDENNES},
 	"monte_carlo": {
 		"file": "res://scenes/track/track_monte_carlo.tscn", "layout": MONTE_CARLO
 	},
 	"la_sarthe": {"file": "res://scenes/track/track_la_sarthe.tscn", "layout": LA_SARTHE},
+	"suzuka": {"file": "res://scenes/track/track_suzuka.tscn", "layout": SUZUKA},
 }
 
 func _initialize() -> void:

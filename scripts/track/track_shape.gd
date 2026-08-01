@@ -26,10 +26,29 @@ const MIN_EDGE := 2
 
 # --- reading the loop ---
 
-## Cells in visiting order, or empty if they are not one simple closed ring.
+## Cells in visiting order, or empty if they are not one closed ring.
 ## This is the single definition of "a valid painted loop"; `TrackLayout` and
 ## the handle edits both defer to it.
-static func walk(cells: Array[Vector2i]) -> Array[Vector2i]:
+##
+## ## Crossings
+##
+## `allow_crossings` lets the ring pass through itself at a cell with all four
+## neighbours, which the road then goes **straight through** twice. That is how a
+## figure-of-eight, a Dunlop bridge or a Suzuka crossover gets drawn, and it is
+## the biggest class of circuit the grid cannot otherwise express.
+##
+## It is **off by default and every current caller leaves it off**, so the editor
+## and the compiler behave exactly as they did. Crossings are being built in
+## stages (`docs/roadmap.md`, M13) and a shape the editor would accept but the
+## builder could not build would be worse than one it refuses.
+##
+## The two passes must end up at different heights, but that is not decided here:
+## this is topology and elevation belongs to the compiler, which is the only
+## thing that knows what level each segment sits at. `walk` says the shape is
+## drawable; `TrackLayout.compile` says whether it is a bridge or a collision.
+static func walk(
+	cells: Array[Vector2i], allow_crossings: bool = false
+) -> Array[Vector2i]:
 	var empty: Array[Vector2i] = []
 	if cells.size() < 4:
 		return empty
@@ -39,31 +58,101 @@ static func walk(cells: Array[Vector2i]) -> Array[Vector2i]:
 		if occupied.has(c):
 			return empty  # a cell painted twice is not a ring
 		occupied[c] = true
-	for c in cells:
-		if neighbour_count(occupied, c) != 2:
-			return empty
 
-	var order: Array[Vector2i] = [cells[0]]
-	var prev: Vector2i = cells[0]
-	var cur: Vector2i = cells[0]
-	for d in NEIGHBOURS:
-		if occupied.has(cells[0] + d):
-			cur = cells[0] + d
+	# Two neighbours is an ordinary piece of road. Four is a crossing, and only
+	# four — three is a T junction, which is a branch and has no place in a
+	# circuit however the heights work out.
+	var crossings := {}
+	for c in cells:
+		var n := neighbour_count(occupied, c)
+		if n == 2:
+			continue
+		if allow_crossings and n == 4:
+			crossings[c] = true
+			continue
+		return empty
+
+	# Started from ordinary road, because a crossing has no "the way I came" to
+	# reason from until the walk arrives at it with a direction. One must exist:
+	# a crossing needs four neighbours, so a ring cannot be made of them alone.
+	var start := Vector2i.ZERO
+	var started := false
+	for c in cells:
+		if not crossings.has(c):
+			start = c
+			started = true
 			break
-	while cur != cells[0]:
-		order.append(cur)
-		var next := cur
-		for d in NEIGHBOURS:
-			var cand := cur + d
-			if occupied.has(cand) and cand != prev:
-				next = cand
-				break
-		prev = cur
-		cur = next
-		if order.size() > cells.size():
+	if not started:
+		return empty
+
+	var heading := Vector2i.ZERO
+	for d in NEIGHBOURS:
+		if occupied.has(start + d):
+			heading = d
+			break
+
+	# A crossing is on the ring twice, so the ring is longer than the cell count
+	# by one per crossing.
+	var expected := cells.size() + crossings.size()
+	var order: Array[Vector2i] = []
+	var at := start
+	var closed := false
+
+	for _step in expected:
+		order.append(at)
+		var next := at + heading
+		if not occupied.has(next):
 			return empty
-	# A shorter ring than the cell count means there is a second loop elsewhere.
-	return order if order.size() == cells.size() else empty
+		if not crossings.has(next):
+			# Ordinary road: leave by the neighbour that is not where we came in.
+			var came_from := -heading
+			var onward := Vector2i.ZERO
+			for d in NEIGHBOURS:
+				if d != came_from and occupied.has(next + d):
+					onward = d
+					break
+			if onward == Vector2i.ZERO:
+				return empty
+			heading = onward
+		# A crossing keeps `heading`: the road goes straight over itself rather
+		# than turning onto the leg it is crossing. That is what makes the two
+		# passes independent, and it is the whole reason a crossing is not a
+		# junction.
+		at = next
+		# Arriving back at `start` is closure, and only because `start` was
+		# deliberately picked from ordinary road: an ordinary cell is on the ring
+		# once, so reaching it again can only mean the lap is complete. Starting
+		# from a crossing would make this wrong — the ring passes through one
+		# twice, mid-lap, and the walk would stop half way round.
+		if at == start:
+			closed = true
+			break
+
+	if not closed or order.size() != expected:
+		return empty
+
+	# Every cell walked the right number of times: once for road, twice for a
+	# crossing. Catches a figure that closes early and leaves a second ring
+	# somewhere else, which is the failure the old length check caught.
+	var seen := {}
+	for c in order:
+		seen[c] = int(seen.get(c, 0)) + 1
+	for c in cells:
+		if int(seen.get(c, 0)) != (2 if crossings.has(c) else 1):
+			return empty
+	return order
+
+## Cells the ring passes straight through twice, in no particular order. Empty
+## for an ordinary circuit.
+static func crossings_in(cells: Array[Vector2i]) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var occupied := {}
+	for c in cells:
+		occupied[c] = true
+	for c in cells:
+		if neighbour_count(occupied, c) == 4:
+			out.append(c)
+	return out
 
 static func neighbour_count(occupied: Dictionary, c: Vector2i) -> int:
 	var n := 0

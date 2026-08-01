@@ -41,6 +41,12 @@ const TRACKS := [
 		"blurb": "Huge straights, chicanes, one big sweeper",
 		"scene": "res://scenes/track/track_la_sarthe.tscn",
 	},
+	{
+		"id": "suzuka",
+		"name": "Suzuka",
+		"blurb": "A figure of eight - the lap bridges over itself",
+		"scene": "res://scenes/track/track_suzuka.tscn",
+	},
 ]
 
 static var selected_index: int = 0
