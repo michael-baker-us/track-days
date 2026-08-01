@@ -262,7 +262,10 @@ func _hit_test(pos: Vector2) -> Array:
 	if draw_mode or _corners.is_empty():
 		return [Hit.NONE, -1]
 
-	if compiled != null and compiled.ok:
+	# `has_structure`, not `ok`: a circuit refused for a crossing with no
+	# headroom is fixed by pressing the elevation badge on one of these very
+	# runs, so gating them on validity hid the fix behind the problem.
+	if compiled != null and compiled.has_structure():
 		for i in compiled.corners.size():
 			var corner: TrackLayout.Bend = compiled.corners[i]
 			if at.distance_to(_radius_badge_at(corner)) < grab:
@@ -765,7 +768,7 @@ func _notification(what: int) -> void:
 func _rebuild_preview() -> void:
 	_preview = PackedVector2Array()
 	_preview_cols = PackedColorArray()
-	if compiled == null or not compiled.ok or compiled.segments.is_empty():
+	if compiled == null or not compiled.has_structure():
 		return
 	var builder := TrackBuilder.new()
 	var result := builder.measure(compiled.segments)
@@ -785,7 +788,7 @@ func _draw() -> void:
 	if compiled != null:
 		_draw_problems()
 		_draw_centreline()
-		if compiled.ok and not draw_mode:
+		if compiled.has_structure() and not draw_mode:
 			_draw_badges()
 			_draw_start()
 	if not draw_mode:

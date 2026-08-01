@@ -335,6 +335,21 @@ The compiler then refuses a crossing with less than
 > you are told to raise is the one that silently refuses to rise**, and the
 > editor gave no sign which half you were in.
 
+> **And the fix was hidden behind the problem.** The canvas drew and hit-tested
+> its badges only when `compiled.ok`, and `compile` returned early on a crossing
+> error before filling `segments`, `cycle` and `to_grid`. So a circuit refused
+> for a crossing showed "raise one side" beside a canvas with **nothing on it to
+> press** — the one failure a player fixes by clicking the circuit was the one
+> where clicking was switched off.
+>
+> Two changes. `compile` no longer bails on a crossing error: it finishes, fills
+> the geometry and leaves `ok` false, which is enough for the title screen and
+> Test drive to keep refusing it. And the canvas gates on
+> `Compiled.has_structure()` — corners and segments exist — rather than on `ok`.
+> Failures earlier than that (loose ends, junctions, a shape that is not a ring)
+> return before any structure is built, so they still get a bare canvas, which is
+> right: there is nothing meaningful to decorate yet.
+
 Three things follow from that, and all three are about the failure being
 *actionable* rather than merely correct:
 

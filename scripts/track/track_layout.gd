@@ -143,6 +143,19 @@ class Compiled extends RefCounted:
 	## lets the editor draw real arcs over the painted cells.
 	var to_grid := Transform2D()
 
+	## Whether there is enough here for the editor to draw and decorate, which is
+	## **not** the same as `ok`.
+	##
+	## A circuit refused for a crossing with no headroom still has corners, runs
+	## and segments, and the badge that fixes it sits on one of those runs. The
+	## canvas used to gate its badges on `ok`, which hid the only control that
+	## would have made the circuit valid. Failures that are earlier than this —
+	## loose ends, junctions, a shape that is not a ring — return before any of
+	## it is built, so they still get a bare canvas, which is right: there is
+	## nothing meaningful to decorate yet.
+	func has_structure() -> bool:
+		return not corners.is_empty() and not segments.is_empty()
+
 var id := ""
 var display_name := "Untitled"
 var cells: Array[Vector2i] = []
@@ -253,9 +266,17 @@ func compile() -> Compiled:
 	# corner has to be at ground level for the loop's height to close.
 	_resolve_elevation(out)
 
+	# Deliberately does **not** return early. A crossing without headroom is the
+	# one failure a player fixes by clicking something on the circuit itself —
+	# the elevation badge on the leg that should go over — and the badges are
+	# drawn from `segments`, `cycle` and `to_grid`, all of which are filled
+	# below. Bailing out here left the editor showing an error next to a canvas
+	# with nothing on it to press, which is the same as having no fix at all.
+	#
+	# `ok` still ends up false, so nothing downstream will build or race it: the
+	# title screen disables an unfinished circuit and the editor disables Test
+	# drive.
 	_check_crossings_clear(occupied, out)
-	if not out.errors.is_empty():
-		return out
 
 	out.segments = _emit(out)
 	out.cycle = _order_from(cycle, out)

@@ -1015,6 +1015,52 @@ func test_the_start_straight_offers_no_headroom() -> void:
 			over += 1
 	check_true("and the other leg can rise far enough to bridge", over > 0)
 
+## The fix for a crossing has to be reachable *while the circuit is refused*,
+## because being refused is the only state it is ever offered from.
+##
+## The canvas used to draw and hit-test its badges only when `ok`, so a crossing
+## with no headroom hid the elevation badge that was the entire remedy: the
+## editor said "raise one side" next to a canvas with nothing on it to press.
+## This drives the real control on the real canvas rather than setting elevation
+## through the compiler, which is the gap that let the feature ship broken.
+func test_a_refused_crossing_can_still_be_raised_on_the_canvas() -> void:
+	var editor: Control = staged_editor
+	if editor == null:
+		return
+	var eight := _eight_layout(14)
+	editor._layout = eight
+	editor._grid.layout = eight
+	editor._recompile()
+
+	check("the crossing circuit is refused", editor._compiled.ok, false)
+	check_true("but it still has structure to decorate",
+		editor._compiled.has_structure())
+
+	# The leg that can actually rise: not the start straight, which is pinned to
+	# the ground so the lap's height closes.
+	var crossing: Vector2i = TrackShape.crossings_in(eight.cells)[0]
+	var target := Vector2i.ZERO
+	var found := false
+	for run in editor._compiled.runs:
+		if run.is_start or not run.cells.has(crossing):
+			continue
+		target = run.key
+		found = true
+		break
+	check_true("there is a raisable leg over the crossing", found)
+	if not found:
+		return
+
+	# Two presses of the badge, which is what the guide card tells the player to
+	# do. Nothing here reaches into the compiler.
+	editor._cycle_elevation(target)
+	check("one press is not enough", editor._compiled.ok, false)
+	editor._cycle_elevation(target)
+	check_true("two presses clears it (%s)"
+		% ", ".join(editor._compiled.errors), editor._compiled.ok)
+	check_true("and it has a lap to drive",
+		editor._compiled.segments.size() > 0)
+
 ## The readout says what is wrong; the guide card has to say which control puts
 ## it right. A correct diagnosis with nowhere to click is why this was reported
 ## as unusable rather than as broken.
@@ -4066,6 +4112,7 @@ func _physics_process(_delta: float) -> bool:
 		# final some frames after the scene is added.
 		test_title_menu_fits_however_many_tracks()
 		test_a_pasted_code_opens_through_the_field()
+		test_a_refused_crossing_can_still_be_raised_on_the_canvas()
 		test_the_editor_says_how_to_fix_a_crossing()
 		test_editor_panel_is_wired_and_fits()
 		return false
