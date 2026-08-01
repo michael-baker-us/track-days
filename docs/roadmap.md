@@ -99,6 +99,13 @@ the analogue figures against the binary ones.
 
 **Risk:** the re-measure is the real work. The code change is small.
 
+**Status: built, and half measured.** Four trigger positions swept and recorded
+in the journal; full throttle reproduces M1's figures exactly, so nothing already
+measured was invalidated. What is *not* done is in the journal under "Still open,
+from M8": no corner has been driven at partial throttle, braking was never swept,
+and the steering exponent is a starting point rather than a measurement. All
+three need a physical pad.
+
 ---
 
 ## M9 — The time attack loop
@@ -121,6 +128,12 @@ because the `.pck` has to download in a browser.
 
 **Done when:** a second lap shows a live delta against the first, a ghost of the
 best lap replays over a fresh attempt, and a headless run reproduces both.
+
+**Status: built.** Sampled at 60 Hz and deflated, stored under `user://ghosts/`
+keyed the same way the lap record is. Not yet driven by a human — the ghost is
+asserted to record, save, reload, interpolate and carry no collision, but
+whether it *reads* well at speed has not been seen. See `docs/architecture.md`
+for the eight decisions inside it.
 
 ---
 

@@ -886,6 +886,76 @@ Lap time accumulates in `_physics_process`, so times track the simulation rather
 than the render framerate — headless runs therefore produce the same times as
 the game.
 
+### Sector splits, for free
+
+The sixteen gates were already ordered, so recording the clock at each one turns
+them into sixteen sector times without a single new node. `splits[i]` is the
+elapsed time when gate `i` was taken; comparing against the stored best lap's
+splits gives the live delta on the HUD.
+
+Two details that look arbitrary and are not:
+
+- **Index 0 holds the time the lap was *closed* at**, not a zero at the
+  beginning. Crossing the line is what ends a lap, so that entry is the lap time
+  itself — which is what makes it comparable with a stored one.
+- **A slot is 0.0 until its gate is taken**, so a lap in progress is a partially
+  filled array rather than a short one. Index therefore always means gate number,
+  which is what lets two laps be compared slot for slot without either carrying a
+  length.
+
+The delta is **NAN, not 0.0, when there is nothing to compare against**. Dead
+level with the record is a real and interesting reading, and it must not look
+like an absent one. It resets to NAN at the line, because carrying the last
+gate's delta into a new lap shows a comparison against a gate the car has not
+reached yet.
+
+`_delta_at` refuses to compare when the stored splits are a different length from
+the current gate count. That is the case where a circuit was edited after its
+record was set: without the check it would read out a confident delta between two
+different places on the track.
+
+### Ghosts
+
+Recording the car every physics tick was cheap *because of a decision already
+made*: lap timing accumulates in `_physics_process` so headless runs reproduce
+real times, and sampling on that same fixed step is what makes a recording
+reproducible rather than dependent on framerate.
+
+- **60 Hz, not the 120 Hz the physics runs at.** A two-minute lap is ~14,400
+  ticks; at 60 Hz and seven floats a sample that is ~230 KB, and at 165 km/h a
+  sample every 76 cm. Playback interpolates, and a ghost is a translucent shape
+  at a distance rather than something being collided with.
+- **Samples are aligned to the lap, not to an accumulator.** Sample *n* is always
+  the pose at *n*/HZ seconds in, because the recorder compares `lap_time` against
+  the count it already has. A self-resetting accumulator would drift by up to a
+  physics step per sample, and two recordings of the same circuit would stop
+  being comparable frame for frame.
+- **Recording stops at `MAX_SAMPLES`.** The cap exists on the reading side to
+  stop a corrupt count sizing a huge allocation, so it has to be obeyed on the
+  writing side too — otherwise a long enough lap writes a file the same code
+  refuses to read.
+- **The replay is meshes and nothing else.** No collision body, for two separate
+  reasons that would each be enough: `car_controller` finds "up" by raycasting
+  down and would read a solid ghost as banking, exactly as it would a trackside
+  prop; and the gates fire on `body_entered`, so a second body wearing the car's
+  shape would trip all sixteen and time a lap nobody drove.
+- **It follows the lap clock, not its own.** Pausing stops both together, and a
+  lap restarted at the line restarts the ghost with it.
+- **It reads the recording from the tracker every frame** rather than being
+  handed one. The tracker loads the stored ghost on its first *physics* frame,
+  not in `_ready`, because the checkpoints it binds to are instanced at runtime —
+  and a new best lap replaces it mid-session.
+
+Stored as bytes under `user://ghosts/`, not in `records.cfg`: a ghost is a few
+hundred kilobytes of binary and `ConfigFile` is a text format read whole on every
+lookup, including by the title screen. The *name* still comes from `GameState`,
+so a ghost is keyed on exactly what its lap time is keyed on. `from_bytes`
+returns null for anything it does not fully understand rather than a
+half-populated lap, which would read as a driving mistake rather than a broken
+file — and the compressed body's length is in the header purely so a truncated
+file is caught by arithmetic instead of by handing bad data to `decompress`,
+which logs an engine error on its way to failing.
+
 ### How a record is keyed, and why the track is a section
 
 A time is only comparable to another set **in the same car on the same surface**,

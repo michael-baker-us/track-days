@@ -37,7 +37,13 @@ func _initialize() -> void:
 
 	# Right-aligned and fixed width: the panel hugs the screen edge, so anything
 	# that grows it pushes content off-screen.
+	# Delta sits directly under the running clock, because it is a reading *of*
+	# that clock rather than another time in its own right, and above the last and
+	# best rows, which are history. Its colour is set from the theme palette by
+	# hud.gd as it changes -- green for ahead, red for behind -- so it is left
+	# uncoloured here.
 	for spec in [["Lap", "OUT LAP", 20], ["Current", "--:--.---", 30],
+			["Delta", "", 22],
 			["Last", "last   --:--.---", 15], ["Best", "best   --:--.---", 15]]:
 		var l := _label(spec[0], spec[1], spec[2])
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT

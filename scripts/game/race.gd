@@ -30,6 +30,21 @@ func _ready() -> void:
 	var spawn: Marker3D = track.get_node("SpawnPoint")
 	_place_car(spawn.position, spawn.rotation.y)
 
+	_add_ghost()
+
+## The recorded best lap, if there is one, as a translucent car to chase.
+##
+## Added here rather than baked into race.tscn because whether there is a ghost
+## at all depends on which circuit was picked and whether it has ever been
+## driven — and because the tracker has to have loaded one first. It is created
+## even when empty so that a best lap set *during* this session has something to
+## play back on the next lap without the scene being rebuilt.
+func _add_ghost() -> void:
+	var ghost_car := GhostCar.new()
+	ghost_car.name = "GhostCar"
+	add_child(ghost_car)
+	ghost_car.setup(_tracker)
+
 ## A shipped circuit is a packed scene; a custom one is built here from its grid
 ## layout by the same builder that baked the shipped ones, so the two are made
 ## of identical geometry and everything downstream — lap gates, collision ribbon,

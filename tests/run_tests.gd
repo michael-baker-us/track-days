@@ -45,9 +45,12 @@ func _initialize() -> void:
 	# would otherwise leave a bogus best time on the title screen.
 	GameState.records_path = "user://test_records.cfg"
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(GameState.records_path))
-	# Likewise never write into the player's saved circuits.
+	# Likewise never write into the player's saved circuits, or over the ghosts of
+	# their best laps -- the suite completes laps, so it records both.
 	TrackStore.dir = "user://test_tracks"
 	_clear_dir(TrackStore.dir)
+	GhostStore.dir = "user://test_ghosts"
+	_clear_dir(GhostStore.dir)
 	root.add_child(load("res://scenes/race.tscn").instantiate())
 
 func _clear_dir(path: String) -> void:
@@ -171,8 +174,8 @@ func test_old_records_migrate_to_the_composite_key() -> void:
 ## Two cars on one circuit are two records, and deleting the circuit takes both.
 func test_records_are_kept_per_car_and_surface() -> void:
 	var track := "test_keying"
-	GameState.save_best_lap(track, 60.0, "hatchback", "tarmac")
-	GameState.save_best_lap(track, 48.0, "kart", "tarmac")
+	GameState.save_best_lap(track, 60.0, PackedFloat32Array(), "hatchback", "tarmac")
+	GameState.save_best_lap(track, 48.0, PackedFloat32Array(), "kart", "tarmac")
 	check_near("one car's time", GameState.best_lap_for(track, "hatchback", "tarmac"),
 		60.0, 0.001)
 	check_near("the other's, separately",
@@ -184,7 +187,7 @@ func test_records_are_kept_per_car_and_surface() -> void:
 	# from [a-z0-9_], so `best_test_keying_kart` reads equally well as the kart on
 	# "test keying" and as the default car on "test keying kart". This is that
 	# collision, and it must not be one.
-	GameState.save_best_lap("test_keying_kart", 12.0, "default", "tarmac")
+	GameState.save_best_lap("test_keying_kart", 12.0, PackedFloat32Array(), "default", "tarmac")
 	check_near("a circuit named after a car keeps its own record",
 		GameState.best_lap_for("test_keying_kart", "default", "tarmac"), 12.0, 0.001)
 	check_near("and did not stand on the kart's time",
@@ -276,6 +279,121 @@ func test_shipped_circuits_carry_the_colour_grade() -> void:
 		check_true("%s fog is the sky's horizon" % id,
 			env.fog_light_color.is_equal_approx(TrackBuilder.SKY_HORIZON))
 		circuit.free()
+
+func _sample_ghost() -> Ghost:
+	var ghost := Ghost.new()
+	for i in 5:
+		ghost.add(Transform3D(
+			Basis(Vector3.UP, float(i) * 0.25), Vector3(float(i), 1.0, float(i) * 2.0)
+		))
+	return ghost
+
+## A ghost is written as bytes, so the write and the read have to agree exactly.
+## A lap that came back subtly wrong would look like a driving mistake rather
+## than a broken file, which is the reason to pin this rather than trust it.
+func test_a_ghost_round_trips_through_bytes() -> void:
+	var original := _sample_ghost()
+	var restored := Ghost.from_bytes(original.to_bytes())
+	check_true("a ghost survives the trip", restored != null)
+	if restored == null:
+		return
+	check("same number of samples", restored.count(), original.count())
+	check_near("same duration", restored.duration(), original.duration(), 0.0001)
+	for i in original.count():
+		var want := original.pose_at(float(i) / Ghost.HZ)
+		var got := restored.pose_at(float(i) / Ghost.HZ)
+		check_true("sample %d position" % i,
+			got.origin.is_equal_approx(want.origin))
+		check_true("sample %d rotation" % i, absf(
+			got.basis.get_rotation_quaternion().dot(
+				want.basis.get_rotation_quaternion())
+		) > 0.9999)
+
+## Ghosts are files, and `docs/roadmap.md` M11 puts them inside share codes, so
+## they will eventually arrive from other people. Every way one can be wrong has
+## to end at null rather than at a half-loaded lap.
+func test_a_damaged_ghost_is_refused() -> void:
+	var good := _sample_ghost().to_bytes()
+
+	check("empty", Ghost.from_bytes(PackedByteArray()), null)
+	check("too short to hold a header", Ghost.from_bytes(good.slice(0, 8)), null)
+	check("truncated body", Ghost.from_bytes(good.slice(0, good.size() - 4)), null)
+	var padded := good.duplicate()
+	padded.append(0)
+	check("padded body", Ghost.from_bytes(padded), null)
+
+	var wrong_magic := good.duplicate()
+	wrong_magic.encode_u32(0, 0x4B4F4F4C)
+	check("not one of ours", Ghost.from_bytes(wrong_magic), null)
+
+	var future := good.duplicate()
+	future.encode_u32(4, Ghost.VERSION + 1)
+	check("from a later version", Ghost.from_bytes(future), null)
+
+	# A count the body cannot possibly match. Checked because it is the field an
+	# allocation is sized from, so believing it is the expensive mistake.
+	var absurd := good.duplicate()
+	absurd.encode_u32(8, Ghost.MAX_SAMPLES + 1)
+	check("an impossible sample count", Ghost.from_bytes(absurd), null)
+
+## Playback interpolates, so 60 Hz samples do not have to be dense enough to be
+## seen individually, and clamps at both ends rather than wrapping.
+func test_a_ghost_interpolates_and_then_holds() -> void:
+	var ghost := _sample_ghost()
+	# Samples sit at whole multiples of 1/HZ along x, so halfway between the
+	# first two is x = 0.5 exactly.
+	var midway := ghost.pose_at(0.5 / Ghost.HZ)
+	check_near("interpolated between samples", midway.origin.x, 0.5, 0.001)
+
+	check_near("before the start it sits on the first sample",
+		ghost.pose_at(-5.0).origin.x, 0.0, 0.001)
+	# Holding rather than vanishing or looping: a ghost that finished its lap
+	# says so by staying where it finished.
+	check_near("past the end it holds the last",
+		ghost.pose_at(999.0).origin.x, float(ghost.count() - 1), 0.001)
+
+## Deleting a circuit takes its recordings too. An inherited lap record is a
+## number that is too good; an inherited ghost is a translucent car driving
+## through the scenery of a circuit it has never seen.
+func test_ghosts_go_with_a_deleted_circuit() -> void:
+	var layout := TrackLayout.new()
+	layout.cells = sample_layout().cells
+	layout.start_cell = sample_layout().start_cell
+	layout.display_name = "Ghosted"
+	TrackStore.save(layout)
+
+	check("a ghost is stored",
+		GhostStore.save(layout.id, _sample_ghost()), OK)
+	check_true("and reads back",
+		GhostStore.load_ghost(layout.id) != null)
+
+	# A circuit whose id merely starts the same must not be swept with it -- the
+	# same class of ambiguity the record key had to avoid.
+	var neighbour := layout.id + "_2"
+	check("a neighbour's ghost is stored",
+		GhostStore.save(neighbour, _sample_ghost()), OK)
+
+	GameState.delete_track(layout.id)
+	check("the ghost went with the circuit",
+		GhostStore.load_ghost(layout.id), null)
+	check_true("the neighbour kept its own",
+		GhostStore.load_ghost(neighbour) != null)
+
+## The replay is meshes and nothing else. A second physics body wearing the car's
+## shape would trip all sixteen gates on its way round and time a lap nobody
+## drove, and `car_controller` finds "up" by raycasting down -- it would read a
+## solid ghost as banking, exactly as it would a trackside prop.
+func test_the_ghost_car_is_not_a_physics_body() -> void:
+	var ghost_car := _find_first("GhostCar", "Node3D")
+	check_true("the race scene has a ghost car", ghost_car != null)
+	if ghost_car == null:
+		return
+	check("it is not a second player car",
+		ghost_car.is_in_group("player_car"), false)
+	var bodies := ghost_car.find_children("*", "CollisionObject3D", true, false)
+	check("and carries no collision at all", bodies.size(), 0)
+	check_true("but does carry meshes",
+		ghost_car.find_children("*", "MeshInstance3D", true, false).size() > 0)
 
 ## Every entry the title screen offers must actually load and be a usable
 ## circuit. A broken entry here is a dead button on the menu.
@@ -1048,7 +1166,7 @@ func test_title_deletes_a_custom_track() -> void:
 	# A record to leave behind. Ids are derived from the name and handed back out
 	# as soon as the file is gone, so this must not outlive the circuit it
 	# belongs to or the next "Delete Me" inherits a lap it never drove.
-	GameState.save_best_lap(doomed.id, 42.0)
+	GameState.save_best_lap(doomed.id, 42.0, PackedFloat32Array())
 
 	var title: Control = load("res://scenes/title.tscn").instantiate()
 	root.add_child(title)
@@ -2940,6 +3058,11 @@ func _physics_process(_delta: float) -> bool:
 		test_partial_throttle_reaches_the_engine()
 		test_the_steering_curve_leaves_full_lock_alone()
 		test_shipped_circuits_carry_the_colour_grade()
+		test_a_ghost_round_trips_through_bytes()
+		test_a_damaged_ghost_is_refused()
+		test_a_ghost_interpolates_and_then_holds()
+		test_ghosts_go_with_a_deleted_circuit()
+		test_the_ghost_car_is_not_a_physics_body()
 		test_all_tracks_usable()
 		test_no_duplicated_instances()
 		test_spawn_is_behind_the_line()
@@ -3105,11 +3228,16 @@ func _physics_process(_delta: float) -> bool:
 			check_near("best persisted for this track",
 				GameState.best_lap_for("ardennes"), tracker.best_lap, 0.001)
 			check("other track unaffected", GameState.best_lap_for("monte_carlo"), 0.0)
+			check_splits_recorded()
+			check_ghost_recorded()
 			gates[1].passed.emit(1)
 			gates[2].passed.emit(2)
 			gates[9].passed.emit(9)  # skip ahead - a cut
 		6:
 			check("cut rejected", tracker._next_required, 3)
+			# Two gates into the second lap, with the first lap stored: the only
+			# point in this sequence where a live delta exists to be read.
+			check_delta_against_the_stored_best()
 			gates[0].passed.emit(0)  # try to claim the lap early
 		7:
 			check("early line ignored", laps.size(), 1)
@@ -3122,6 +3250,75 @@ func _physics_process(_delta: float) -> bool:
 			_report()
 			return true
 	return false
+
+## Sixteen ordered gates are also sixteen free sector times. Checked inside the
+## scripted lap sequence rather than as a test of its own, because a split only
+## exists as a side effect of a gate being taken in order -- which is the thing
+## that sequence exists to drive.
+## Read from `best_splits` rather than from `splits`, and that distinction is the
+## point rather than a workaround: `splits` is the lap being *driven*, and
+## crossing the line both closes one lap and opens the next, so by the time
+## anything can look at a finished lap the live array has already been cleared
+## for the new one. The completed lap survives in `best_splits`.
+func check_splits_recorded() -> void:
+	# Typed explicitly: `tracker` is an untyped Node, so anything read off it is a
+	# Variant and cannot be inferred from.
+	var finished: PackedFloat32Array = tracker.best_splits
+	check("a split per gate", finished.size(), tracker.checkpoint_count)
+	if finished.size() != tracker.checkpoint_count:
+		return
+	# Index 0 is the line, and holds the time the lap was *closed* at rather than
+	# a zero at the beginning: crossing it is what ends a lap.
+	check_near("the line's split is the lap time",
+		finished[0], tracker.last_lap, 0.0001)
+	var rising := true
+	for i in range(1, finished.size()):
+		if finished[i] <= 0.0 or finished[i] > finished[0]:
+			rising = false
+		if i > 1 and finished[i] < finished[i - 1]:
+			rising = false
+	check_true("every gate has a split, in order, inside the lap", rising)
+	check_near("and they were stored with the record",
+		GameState.best_sectors_for("ardennes")[0], tracker.last_lap, 0.0001)
+
+## The recording is taken on the physics step, alongside the lap clock, which is
+## what makes a headless run reproduce it.
+func check_ghost_recorded() -> void:
+	check_true("a ghost was recorded", tracker.ghost != null)
+	if tracker.ghost == null:
+		return
+	check_true("with samples in it", tracker.ghost.count() > 0)
+	# 60 Hz against a lap timed on the 120 Hz physics step, so roughly half as
+	# many samples as ticks -- and never more than one per tick.
+	check_true("sampled no faster than the clock allows",
+		float(tracker.ghost.count()) <= tracker.last_lap * Ghost.HZ + 2.0)
+	var stored := GhostStore.load_ghost("ardennes")
+	check_true("and saved beside the record", stored != null)
+	if stored != null:
+		check("the saved ghost is the recorded one",
+			stored.count(), tracker.ghost.count())
+
+## The delta is what makes a time attack game addictive, and it is only
+## meaningful once there is a stored lap to measure against.
+##
+## Checked *mid-lap*, after two gates of the second lap have been taken. Not at a
+## lap boundary: crossing the line opens a new lap and the delta goes back to
+## NAN, deliberately, because carrying the last gate's reading into the next lap
+## would show a comparison against a gate the car has not reached yet.
+func check_delta_against_the_stored_best() -> void:
+	check_true("a delta once there is a best lap to compare with",
+		not is_nan(tracker.delta))
+	check("the best lap kept its splits",
+		tracker.best_splits.size(), tracker.checkpoint_count)
+	# The second lap is driven by emitting gates by hand on the same frames, so
+	# its splits land within a few physics steps of the first lap's. The value is
+	# not the point; that it is a real comparison rather than a placeholder is.
+	check_true("and it is a plausible size", absf(tracker.delta) < 5.0)
+	check_true("and it reads out signed",
+		tracker.format_delta(tracker.delta).begins_with("+")
+		or tracker.format_delta(tracker.delta).begins_with("-"))
+	check("with nothing to show when there is no comparison",
+		tracker.format_delta(NAN), "")
 
 func _report() -> void:
 	if failures.is_empty():

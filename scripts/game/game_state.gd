@@ -124,6 +124,14 @@ static func record_key(car_id: String = "", surface_id: String = "") -> String:
 		surface_id if not surface_id.is_empty() else selected_surface,
 	]
 
+## The splits of the best lap live beside the time itself, under the same
+## car-and-surface key with a suffix. `|` cannot appear in an id, so the suffix
+## cannot be mistaken for part of one — and keeping them in the *same section*
+## means `clear_best_lap` still takes everything a circuit accumulated with one
+## `erase_section`.
+static func sector_key(car_id: String = "", surface_id: String = "") -> String:
+	return "%s|sectors" % record_key(car_id, surface_id)
+
 static func best_lap_for(
 	track_id: String, car_id: String = "", surface_id: String = ""
 ) -> float:
@@ -132,11 +140,29 @@ static func best_lap_for(
 		record_section(track_id), record_key(car_id, surface_id), 0.0
 	)
 
+static func best_sectors_for(
+	track_id: String, car_id: String = "", surface_id: String = ""
+) -> PackedFloat32Array:
+	var cfg := _open()
+	return cfg.get_value(
+		record_section(track_id), sector_key(car_id, surface_id),
+		PackedFloat32Array()
+	)
+
+## The time and its splits are written in one open-and-save, and `splits` is
+## required rather than optional, because they describe the same lap and are only
+## meaningful together. A new record left beside the previous lap's splits would
+## show a live delta against a lap nobody ever drove — and it would look
+## plausible, which is the dangerous part. Making the caller produce both is the
+## cheapest way to make that state unrepresentable.
 static func save_best_lap(
-	track_id: String, seconds: float, car_id: String = "", surface_id: String = ""
+	track_id: String, seconds: float, splits: PackedFloat32Array,
+	car_id: String = "", surface_id: String = ""
 ) -> void:
 	var cfg := _open()
-	cfg.set_value(record_section(track_id), record_key(car_id, surface_id), seconds)
+	var section := record_section(track_id)
+	cfg.set_value(section, record_key(car_id, surface_id), seconds)
+	cfg.set_value(section, sector_key(car_id, surface_id), splits)
 	cfg.save(records_path)
 
 ## Every time set on the circuit, not just the current car's — a deleted circuit
@@ -234,5 +260,10 @@ static func _migrate(cfg: ConfigFile) -> void:
 static func delete_track(track_id: String) -> void:
 	TrackStore.delete(track_id)
 	clear_best_lap(track_id)
+	# The recording goes for exactly the same reason the time does, and it is the
+	# more visible failure of the two: an inherited lap record is a number that
+	# is too good, while an inherited ghost is a translucent car driving through
+	# the scenery of a circuit it has never seen.
+	GhostStore.clear(track_id)
 	if editing_id == track_id:
 		editing_id = ""
