@@ -1038,6 +1038,36 @@ big graphic skies, bright and readable, never grimy. The Kenney kit is already
 untextured flat-shaded geometry, which is the expensive half of that look done,
 and it survives the compatibility renderer the web build is stuck with.
 
+### The car's rim light
+
+A car in flat colour against a road in flat colour has no silhouette at speed.
+The fix this look actually uses is a **fresnel edge tinted towards the sky** — not
+reflections and not clearcoat, both of which `ideas.md` reverses an earlier
+instinct about because they pull towards realism.
+
+So the car's material is a `ShaderMaterial` now
+(`assets/shaders/car_body.gdshader`). Everything the `StandardMaterial3D` was
+doing it does identically — the shared palette atlas, nearest filtering because
+neighbouring swatches are unrelated colours, double-sided for the single-sided
+windscreen, flat paint at roughness one. The rim is the only addition.
+
+Two decisions inside it:
+
+- **It is `EMISSION`, not a light contribution.** It has to show on the *shaded*
+  side of the car, which is exactly where the silhouette is hardest to read. A
+  rim that needed the sun would vanish where it is most wanted.
+- **The colour is set by `race.gd`, not baked into the car.** One car scene is
+  driven on every circuit, and the rim is meant to pick up the sky — a car edged
+  in noon blue on Monte Carlo's sunset would read as belonging to a different
+  scene. Converted with `srgb_to_linear()` on the way in, for the same reason the
+  sky's colours are.
+
+> The atlas link is the thing to guard when touching this. An earlier hand-made
+> car scene sampled nothing and rendered flat white, tyres and glass included,
+> which is why the scene is generated at all — and swapping the material is
+> exactly the change that could drop it again. The suite checks every painted
+> surface still has the texture.
+
 ### The car's own shadow
 
 The sun's shadow lands on the **road and nothing else**. `ground_grid.gdshader`

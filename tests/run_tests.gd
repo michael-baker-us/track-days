@@ -805,6 +805,65 @@ func test_the_car_is_silent_when_sound_is_off() -> void:
 	check("engine stopped", audio._engine.playing, false)
 	check("tyres stopped", audio._tyre.playing, false)
 
+## The car's paint, and the rim that gives it a silhouette.
+##
+## The atlas link is the thing under guard here. Losing it is not hypothetical:
+## an earlier hand-made car scene sampled nothing and rendered flat white, tyres
+## and glass included, which is why the scene is generated at all. Swapping the
+## standard material for a shader is exactly the kind of change that could drop
+## it again.
+func test_the_car_is_painted_and_rimmed() -> void:
+	for spec in GameState.cars():
+		var car: Node3D = load(spec.scene_path()).instantiate()
+		var surfaces := 0
+		for node in car.find_children("*", "MeshInstance3D", true, false):
+			var mesh: Mesh = (node as MeshInstance3D).mesh
+			# The shadow is a mesh too, and deliberately not painted: it carries a
+			# `material_override` of its own rather than the shared paint.
+			if mesh == null or (node as MeshInstance3D).material_override != null:
+				continue
+			for i in mesh.get_surface_count():
+				var mat := mesh.surface_get_material(i) as ShaderMaterial
+				check_true("%s/%s uses the body shader" % [spec.id, node.name],
+					mat != null)
+				if mat == null:
+					continue
+				surfaces += 1
+				# The atlas, without which the whole car renders flat white.
+				check_true("%s/%s samples the palette atlas" % [spec.id, node.name],
+					mat.get_shader_parameter("albedo_texture") != null)
+		check_true("%s has painted surfaces (%d)" % [spec.id, surfaces],
+			surfaces > 0)
+		car.free()
+
+## The rim picks up the sky, so it is set per circuit rather than baked into the
+## car: one car scene is driven on every hour, and a car edged in noon blue on
+## Monte Carlo's sunset would read as belonging to a different scene.
+func test_the_rim_takes_the_circuits_own_sky() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	if car == null:
+		return
+	# The suite races Ardennes, so the rim should be its horizon -- in linear,
+	# because a shader uniform is radiance and `set_shader_parameter` converts
+	# nothing. Getting that wrong is what turned the sky white two milestones ago.
+	var want: Color = (SkyPreset.for_track("ardennes")["horizon"] as Color).srgb_to_linear()
+	var checked := 0
+	for node in car.find_children("*", "MeshInstance3D", true, false):
+		var mesh: Mesh = (node as MeshInstance3D).mesh
+		if mesh == null:
+			continue
+		for i in mesh.get_surface_count():
+			var mat := mesh.surface_get_material(i) as ShaderMaterial
+			if mat == null:
+				continue
+			var rim = mat.get_shader_parameter("rim_color")
+			if rim == null:
+				continue
+			checked += 1
+			check_true("the rim is tinted to this circuit's horizon (%s)" % rim,
+				(rim as Color).is_equal_approx(want))
+	check_true("a rim colour was actually set (%d surfaces)" % checked, checked > 0)
+
 ## The car needs a shadow of its own because the one the sun casts only lands on
 ## the road: `ground_grid.gdshader` is unshaded and receives nothing, so the
 ## moment the car runs wide it has no shadow at all and appears to float.
@@ -4748,6 +4807,8 @@ func _physics_process(_delta: float) -> bool:
 		test_the_car_is_silent_when_sound_is_off()
 		test_the_car_carries_its_audio()
 		test_the_car_has_a_shadow_on_whatever_it_stands_on()
+		test_the_car_is_painted_and_rimmed()
+		test_the_rim_takes_the_circuits_own_sky()
 		test_engine_pitch_sweeps_rather_than_climbing_once()
 		test_tyres_only_squeal_when_they_are_sliding()
 		test_the_crossover_circuit_actually_crosses()

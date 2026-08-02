@@ -33,12 +33,34 @@ func _ready() -> void:
 
 	_car = load(GameState.selected_car_spec().scene_path()).instantiate()
 	_car.name = "Car"
+	_tint_car_rim(_car, String(track_info["id"]))
 	add_child(_car)
 
 	var spawn: Marker3D = track.get_node("SpawnPoint")
 	_place_car(spawn.position, spawn.rotation.y)
 
 	_add_ghost()
+
+## Points the car's rim light at the hour this circuit is raced at.
+##
+## Set here rather than baked into the car, because one car scene is driven on
+## every circuit and the rim is meant to pick up the *sky* — a car edged in noon
+## blue on Monte Carlo's sunset would read as belonging to a different scene.
+##
+## Converted to linear on the way in, for the same reason the sky's colours are:
+## a shader uniform is used as radiance and `set_shader_parameter` converts
+## nothing, while the `Color` properties it replaced converted internally. See
+## `docs/architecture.md`.
+func _tint_car_rim(car: Node, track_id: String) -> void:
+	var rim: Color = SkyPreset.for_track(track_id)["horizon"]
+	for node in car.find_children("*", "MeshInstance3D", true, false):
+		var mesh: Mesh = (node as MeshInstance3D).mesh
+		if mesh == null:
+			continue
+		for i in mesh.get_surface_count():
+			var mat := mesh.surface_get_material(i) as ShaderMaterial
+			if mat != null:
+				mat.set_shader_parameter("rim_color", rim.srgb_to_linear())
 
 ## The recorded best lap, if there is one, as a translucent car to chase.
 ##

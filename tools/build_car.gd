@@ -28,6 +28,7 @@ const WHEEL_REST_LENGTH := 0.1
 ## GLBs as an external file. Only the .glb files were vendored originally, so the
 ## texture was missing and the material fell back to untextured white.
 const COLORMAP := "res://assets/kenney/car_kit/Textures/colormap.png"
+const BODY_SHADER := "res://assets/shaders/car_body.gdshader"
 
 ## Every car the garage offers. The geometry is *not* here: it is measured out of
 ## each spec's own model, which reproduces the constants this file used to
@@ -216,17 +217,22 @@ func _player(node_name: String, stream_path: String, unit_size: float) -> AudioS
 
 ## One material shared by every surface, mirroring how the kit is authored: the
 ## mesh UVs pick a flat swatch out of the atlas, so there is nothing per-part to
-## vary. Nearest filtering because neighbouring swatches are unrelated colours
-## and linear sampling blends them into seams along every UV island edge.
-func _material() -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
+## vary.
+##
+## A `ShaderMaterial` rather than a `StandardMaterial3D`, for one addition: a
+## fresnel rim tinted towards the sky, which is what gives a flat-coloured car a
+## silhouette against a flat-coloured road at speed. Everything else the standard
+## material was doing — the atlas, nearest filtering, double-sided, flat paint —
+## the shader does identically. See assets/shaders/car_body.gdshader.
+##
+## The rim *colour* is not set here. It belongs to the hour the circuit is raced
+## at, and one car scene is driven on all of them, so `race.gd` sets it when it
+## instances the car.
+func _material() -> ShaderMaterial:
+	var mat := ShaderMaterial.new()
 	mat.resource_name = "colormap"
-	mat.albedo_texture = load(COLORMAP)
-	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
-	# The source model is authored double-sided; the windscreen is single-sided
-	# geometry and disappears from one side without this.
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.metallic = 0.0
+	mat.shader = load(BODY_SHADER)
+	mat.set_shader_parameter("albedo_texture", load(COLORMAP))
 	return mat
 
 ## Copies a mesh out of the imported GLB and detaches it from it. `duplicate`

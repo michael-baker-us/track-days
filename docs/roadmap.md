@@ -503,8 +503,15 @@ and floated. Placed by raycast onto whatever is actually beneath it, so it works
 on climbs, on banking and under Suzuka's bridge, and `top_level` so it does not
 roll with the body.
 
-**Also not done:** denser roadside objects, the camera pass, the car rim light,
-scenery themes and weather. And **the hours have not been looked
+**The car's rim light is in.** A fresnel edge tinted to the circuit's own sky,
+as `EMISSION` so it shows on the shaded side where the silhouette is hardest to
+read. The car's material became a shader to carry it; everything the standard
+material did it still does.
+
+**Also not done:** denser roadside objects, the camera pass, scenery themes and
+weather. The camera pass is deliberately last of those — it is a *feel* change,
+and the numbers are already parameterised, so it wants driving rather than
+guessing. And **the hours have not been looked
 at** — the suite asserts each circuit carries its own and that the presets are
 complete, which is not the same as it looking good.
 
