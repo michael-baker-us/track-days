@@ -805,6 +805,57 @@ func test_the_car_is_silent_when_sound_is_off() -> void:
 	check("engine stopped", audio._engine.playing, false)
 	check("tyres stopped", audio._tyre.playing, false)
 
+## The car needs a shadow of its own because the one the sun casts only lands on
+## the road: `ground_grid.gdshader` is unshaded and receives nothing, so the
+## moment the car runs wide it has no shadow at all and appears to float.
+##
+## Driven against the real car in the real physics world, because everything that
+## can go wrong here is about where it ends up — under the road on an elevated
+## section, buried in an embankment on a banked corner, or rolling with the body.
+func test_the_car_has_a_shadow_on_whatever_it_stands_on() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	check_true("there is a car", car != null)
+	if car == null:
+		return
+	var shadow: MeshInstance3D = car.get_node_or_null("Shadow")
+	check_true("with a shadow", shadow != null)
+	if shadow == null:
+		return
+
+	# Detached from the car's transform, or it would roll and pitch with the body.
+	check_true("that does not inherit the car's rotation", shadow.top_level)
+	# It is a shadow; casting one would be circular.
+	check("and casts no shadow itself",
+		shadow.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+
+	shadow._physics_process(1.0 / 120.0)
+	check_true("it is showing under a car on the road", shadow.visible)
+
+	# On the surface the car is standing on, not on the ground plane. The car is
+	# on the grid, so the two nearly coincide -- what is checked is that it is
+	# *just below the car* and level with it, rather than at some fixed height.
+	var car_y: float = (car as Node3D).global_position.y
+	var shadow_y: float = shadow.global_position.y
+	check_true("just under the car (%.2f below)" % (car_y - shadow_y),
+		shadow_y < car_y and car_y - shadow_y < 2.0)
+	check_true("and directly beneath it",
+		Vector2(shadow.global_position.x, shadow.global_position.z).distance_to(
+			Vector2((car as Node3D).global_position.x,
+				(car as Node3D).global_position.z)) < 0.5)
+	# Lying flat on the surface rather than standing up in it.
+	check_true("lying flat on the surface",
+		shadow.global_transform.basis.y.normalized().dot(Vector3.UP) > 0.9)
+
+	# Lifted into the air, it fades and then gives up rather than following the
+	# car up or snapping to the ground plane.
+	var was: Transform3D = (car as Node3D).global_transform
+	(car as Node3D).global_position += Vector3.UP * 20.0
+	shadow._physics_process(1.0 / 120.0)
+	check("no surface within reach, no shadow", shadow.visible, false)
+	(car as Node3D).global_transform = was
+	shadow._physics_process(1.0 / 120.0)
+	check_true("and it comes back when the car does", shadow.visible)
+
 ## The car carries its own sound, and it must not be a second physics body or a
 ## second anything -- the owner rule that once shipped this car with eight wheels
 ## applies to whatever gets added to it.
@@ -4696,6 +4747,7 @@ func _physics_process(_delta: float) -> bool:
 		test_sound_is_off_until_asked_for()
 		test_the_car_is_silent_when_sound_is_off()
 		test_the_car_carries_its_audio()
+		test_the_car_has_a_shadow_on_whatever_it_stands_on()
 		test_engine_pitch_sweeps_rather_than_climbing_once()
 		test_tyres_only_squeal_when_they_are_sliding()
 		test_the_crossover_circuit_actually_crosses()

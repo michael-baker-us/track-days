@@ -124,6 +124,7 @@ func _bake(spec: CarSpec) -> bool:
 		wheel.add_child(mi)
 
 	car.add_child(_audio())
+	car.add_child(_shadow())
 
 	TrackBuilder.set_owner_recursive(car, car)
 
@@ -150,6 +151,29 @@ func _find_mesh(source: Node3D, mesh_name: String) -> MeshInstance3D:
 		if child is MeshInstance3D and String(child.name) == mesh_name:
 			return child
 	return null
+
+const SHADOW_SHADER := "res://assets/shaders/car_shadow.gdshader"
+
+## The patch of dark under the car. Built here rather than at runtime so it is in
+## the committed scene like everything else, and as a plain node rather than an
+## instanced sub-scene — setting `owner` on an instance's internals is the trap
+## that once shipped this car with eight wheels.
+##
+## A `PlaneMesh` rather than a `QuadMesh`: a quad faces +Z and would need
+## rotating flat, and `car_shadow.gd` builds the basis itself from the surface
+## normal. A plane is already in the XZ plane, which is the orientation that
+## basis produces.
+func _shadow() -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = "Shadow"
+	mi.set_script(load("res://scripts/car/car_shadow.gd"))
+	var plane := PlaneMesh.new()
+	plane.size = CarShadow.SIZE
+	mi.mesh = plane
+	var mat := ShaderMaterial.new()
+	mat.shader = load(SHADOW_SHADER)
+	mi.material_override = mat
+	return mi
 
 const ENGINE_STREAM := "res://resources/audio/engine.tres"
 const TYRE_STREAM := "res://resources/audio/tyre.tres"

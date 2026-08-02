@@ -1038,6 +1038,37 @@ big graphic skies, bright and readable, never grimy. The Kenney kit is already
 untextured flat-shaded geometry, which is the expensive half of that look done,
 and it survives the compatibility renderer the web build is stuck with.
 
+### The car's own shadow
+
+The sun's shadow lands on the **road and nothing else**. `ground_grid.gdshader`
+is `unshaded` — deliberately, because flat bright grass is the look and a lit
+ground plane would sink it into gradients this style does not want — and unshaded
+means it receives no shadow. So the moment the car ran wide its shadow vanished
+and it appeared to float.
+
+`ideas.md` reaches the same conclusion from the other side: what is missing is not
+global shading but **one reliable shadow**, and the fix is a blob that works
+whatever is underneath.
+
+Three things about it are load-bearing:
+
+- **`top_level`.** It is a child of the car so it travels with it and is baked
+  into the car scene, but it must not inherit the car's transform: the body
+  rolls, pitches and leaves the ground, and a shadow doing any of those is a dark
+  rectangle waving about underneath. It is placed in world space each physics
+  frame instead.
+- **Placed by raycast, not dropped to y = 0.** The circuits climb, bank, and on
+  Suzuka cross over themselves. Dropping to the ground plane would leave the
+  shadow *under the road* on an elevated section and buried in the embankment on
+  a banked corner. The ray asks the same question `car_controller._surface_up`
+  asks, and corrects the inverted normal from the two-sided collision ribbon the
+  same way.
+- **`depth_draw_never` in the shader.** It sits 3 cm above the road and would
+  otherwise fight the tarmac for the depth buffer at distance.
+
+It fades with height rather than growing, because a shadow that grew as the car
+rose would read as the car *sinking*.
+
 ### A time of day per circuit
 
 Four hours, one per shipped circuit: Ardennes at **noon**, Monte Carlo at

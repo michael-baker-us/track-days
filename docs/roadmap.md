@@ -497,8 +497,14 @@ internally. Handing it the old numbers rendered the sky at roughly twice its
 intended brightness and washed the whole distance white. Presets stay authored in
 sRGB; `srgb_to_linear()` is applied once at the boundary.
 
+**The car's blob shadow is in.** The sun's shadow only lands on the road — the
+ground plane is unshaded and receives nothing — so off-road the car had no shadow
+and floated. Placed by raycast onto whatever is actually beneath it, so it works
+on climbs, on banking and under Suzuka's bridge, and `top_level` so it does not
+roll with the body.
+
 **Also not done:** denser roadside objects, the camera pass, the car rim light,
-the blob shadow, scenery themes and weather. And **the hours have not been looked
+scenery themes and weather. And **the hours have not been looked
 at** — the suite asserts each circuit carries its own and that the presets are
 complete, which is not the same as it looking good.
 
