@@ -25,28 +25,28 @@ static var records_path: String = RECORDS_PATH
 const TRACKS := [
 	{
 		"id": "ardennes",
-		"par": {"race": 47.75, "race_future": 45.25},
+		"par": {"race|tarmac": 47.75, "race|dirt": 51.70, "race|snow": 56.59, "race_future|tarmac": 45.25, "race_future|dirt": 49.13, "race_future|snow": 53.93},
 		"name": "Ardennes",
 		"blurb": "A hairpin, a long climb, fast sweepers",
 		"scene": "res://scenes/track/track_ardennes.tscn",
 	},
 	{
 		"id": "monte_carlo",
-		"par": {"race": 38.15, "race_future": 36.35},
+		"par": {"race|tarmac": 38.15, "race|dirt": 41.43, "race|snow": 45.25, "race_future|tarmac": 36.35, "race_future|dirt": 39.55, "race_future|snow": 43.28},
 		"name": "Monte Carlo",
 		"blurb": "Fourteen tight corners, not one banked",
 		"scene": "res://scenes/track/track_monte_carlo.tscn",
 	},
 	{
 		"id": "la_sarthe",
-		"par": {"race": 59.01, "race_future": 56.09},
+		"par": {"race|tarmac": 59.01, "race|dirt": 63.72, "race|snow": 69.26, "race_future|tarmac": 56.09, "race_future|dirt": 60.69, "race_future|snow": 66.11},
 		"name": "La Sarthe",
 		"blurb": "Huge straights, chicanes, one big sweeper",
 		"scene": "res://scenes/track/track_la_sarthe.tscn",
 	},
 	{
 		"id": "suzuka",
-		"par": {"race": 34.43, "race_future": 32.78},
+		"par": {"race|tarmac": 34.43, "race|dirt": 36.30, "race|snow": 38.30, "race_future|tarmac": 32.78, "race_future|dirt": 34.65, "race_future|snow": 36.62},
 		"name": "Suzuka",
 		"blurb": "A figure of eight - the lap bridges over itself",
 		"scene": "res://scenes/track/track_suzuka.tscn",
@@ -111,17 +111,20 @@ static func medal_name(medal: Medal) -> String:
 ## working them out: the layouts live in `tools/`, and the game does not depend on
 ## `tools/` at runtime. The suite recomputes every one and fails if it has
 ## drifted, which is the same arrangement the generated theme resource has.
-static func par_for(info: Dictionary, car_id: String = "") -> float:
-	var want: String = car_id if not car_id.is_empty() else selected_car
+static func par_for(
+	info: Dictionary, car_id: String = "", surface_id: String = ""
+) -> float:
+	var want := record_key(car_id, surface_id)
 	var par = info.get("par", null)
 	if par is float or par is int:
-		return float(par)          # a custom circuit, already computed for this car
+		# A custom circuit, already computed for the car and surface being raced.
+		return float(par)
 	if par is Dictionary:
 		if par.has(want):
 			return float(par[want])
-		# A save from before the garage, or a car with no baked par: fall back to
-		# the first car rather than reporting no target at all.
-		return float(par.get(car_spec(want).id, par.values()[0] if par.size() > 0 else 0.0))
+		# Nothing baked for this combination: no target rather than a wrong one.
+		# A medal against the wrong par is worse than no medal.
+		return 0.0
 	return 0.0
 
 static var selected_index: int = 0
@@ -178,7 +181,9 @@ static func _facts(layout: TrackLayout) -> Dictionary:
 		text += ", climbs %.1f m" % result.peak
 	return {
 		"blurb": text,
-		"par": ParTime.ideal_lap(builder.centreline, selected_car_spec()),
+		"par": ParTime.ideal_lap(
+			builder.centreline, selected_car_spec(), selected_surface
+		),
 	}
 
 static func selected() -> Dictionary:

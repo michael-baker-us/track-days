@@ -54,7 +54,8 @@ const TRACK_LIST_MAX_H := CARD_H * 3.0 + ROW_GAP * 2.0
 @onready var _scroll: ScrollContainer = $Centre/Rows/TrackScroll
 @onready var _tracks: VBoxContainer = $Centre/Rows/TrackScroll/Tracks
 @onready var _count: Label = $Centre/Rows/ListHeader/Count
-@onready var _car_button: Button = $Centre/Rows/CarButton
+@onready var _car_button: Button = $Centre/Rows/ChoiceRow/CarButton
+@onready var _surface_button: Button = $Centre/Rows/ChoiceRow/SurfaceButton
 @onready var _editor_button: Button = $Centre/Rows/EditorButton
 
 var _entries: Array[Dictionary] = []
@@ -75,6 +76,7 @@ func _ready() -> void:
 	GameState.return_scene = TITLE_SCENE
 	_populate()
 	_car_button.pressed.connect(_on_car_pressed)
+	_surface_button.pressed.connect(_on_surface_pressed)
 	_editor_button.pressed.connect(_on_editor_pressed)
 	# So the keyboard works without touching the mouse first.
 	_focus_row(0)
@@ -103,6 +105,7 @@ func _populate() -> void:
 	)
 	_count.text = _count_text()
 	_refresh_car()
+	_refresh_surface()
 	_reveal()
 
 ## How many circuits, and how many of them are the player's. Two shipped tracks
@@ -365,6 +368,23 @@ func _on_car_pressed() -> void:
 	GameState.selected_car = specs[(at + 1) % specs.size()].id
 	_populate()
 	_car_button.grab_focus()
+
+## Cycles the conditions the next lap is driven in.
+##
+## Beside the car for the same reason: both are chosen before a lap rather than
+## being part of the circuit, and a lap record is keyed on `track|car|surface`.
+## Changing either re-reads every row, because the times on them are that
+## combination's times — a dry record is not a snow record and never was.
+func _on_surface_pressed() -> void:
+	GameState.selected_surface = RoadSurface.after(GameState.selected_surface)
+	_populate()
+	_surface_button.grab_focus()
+
+func _refresh_surface() -> void:
+	_surface_button.text = RoadSurface.label_of(GameState.selected_surface)
+	_surface_button.tooltip_text = (
+		"Conditions. Less grip, a slower target, and records of its own."
+	)
 
 func _refresh_car() -> void:
 	var spec := GameState.selected_car_spec()

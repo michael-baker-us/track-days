@@ -1038,6 +1038,115 @@ big graphic skies, bright and readable, never grimy. The Kenney kit is already
 untextured flat-shaded geometry, which is the expensive half of that look done,
 and it survives the compatibility renderer the web build is stuck with.
 
+### Tyre marks: what shape, where, and for how long
+
+Three separate rules, each of which has been wrong at some point.
+
+**Shape.** On dirt and snow a mark is a shallow trough with a **raised shoulder
+either side** — displaced material, not a carved hole — built as real geometry
+with real normals and *lit*, so the sun catches one ridge and not the other.
+That shape is forced: the road is Kenney tiles, and a rut displaced *downwards*
+would be hidden behind the tile it lies on. **You cannot dig into geometry you do
+not own.** It is also what a tyre on something loose really does — pushes material
+aside rather than removing it — so the constraint and the physics agree.
+
+Tarmac gets none of it. Rubber is a film; it displaces nothing, so a rubber mark
+standing proud of the road would be a lie visible from any angle the light is low
+at. Tarmac's mark is flat and **unshaded**, which is also what the baked
+racing-line rubber in `road_overlay.gdshader` already is — the same material laid
+down by the same thing should not be two materials. `RoadSurface.mark_depth`
+carries the distinction, alongside `mark_always`: on tarmac a tyre marks only when
+it is *sliding*, which is what makes laying rubber mean something; on loose
+surfaces it marks by rolling and sliding only deepens it.
+
+**Where.** Marks stop at the verge, tested against the collision world rather than
+against the centreline: `TrackBuilder` puts the drivable ribbon's body in the
+group `road_surface`, and `TyreMarks.on_road` raycasts for it. Grass grips
+*exactly* like tarmac here, so nothing in the physics distinguishes on from off,
+and a set of ruts wandering across a field is the clearest possible sign that
+marks are drawn by a rule rather than by a surface. The ribbon already knows about
+crossings and bridge decks; a distance-from-centreline test would be a second
+approximation to maintain, and would mark the deck and the road beneath it at
+once. The cost is one ray per *mark*, not per frame.
+
+> Two traps live in that one raycast.
+>
+> **`add_to_group` is not persistent by default.** Without `add_to_group(name,
+> true)` the group lives only on the node in memory and `PackedScene.pack` drops
+> it — so runtime-built circuits would have known where their road was and every
+> shipped one would not.
+>
+> **The probe walks down through what it hits.** The flat sections of the ribbon
+> and the top face of the ground slab are both at y = 0 — exactly, not nearly — so
+> which one a ray returns first is arbitrary. It returned `Ground` from a point
+> the car was standing on, which would have suppressed marks on every flat part of
+> every circuit.
+
+**How long.** For the whole session. They were a ring buffer, which is the cheap
+answer and the wrong one: a trail that erases itself from behind means the line
+you took two corners ago is gone before the lap is finished, and coming round to
+a circuit that remembers you is the entire appeal on dirt.
+
+Permanence is affordable **because of** the quantisation, not in spite of it. A
+mark is claimed against a patch of ground, so a second pass over the same line
+deepens the mark already there instead of laying another beside it — which is what
+a rut really does, and which bounds growth by *distinct ground touched* rather
+than by session length. New ground goes into a fresh 640-instance chunk;
+`MultiMesh.buffer` can only be assigned whole, so a single growing buffer would
+re-upload the whole session's marks every time a wheel turned. A chunk is a fixed
+40 KB however many chunks exist. Past a 96-chunk ceiling the car stops marking
+new ground and, deliberately, nothing already laid disappears.
+
+> **Written through `MultiMesh.buffer`, never `set_instance_transform`.** The
+> per-instance setters do not survive a headless run — this project already has
+> the scar, from barriers whose transforms all collapsed to identity (tuning
+> journal, M3b). Confirmed again here: headless, a colour set to alpha 0 reads
+> back opaque and a zero-scaled basis reads back as identity, while the buffer
+> round-trips exactly. It is also the only form the suite can check, which is the
+> more important half — the first version of this test passed 640 marks off as
+> "none on the road" because it was reading through the broken getter.
+
+Carving real depth still needs the drivable surface to *be* a dense generated
+ribbon that can be displaced in a vertex shader. The ribbon's coordinate system
+exists; the road being made of it does not.
+
+### Surfaces have to be made of something
+
+Grip is what makes snow *be* snow, but colour alone is not what makes it *look*
+like snow. Dirt and snow first shipped as recolours of the tarmac shader and read
+as coloured card, because they are surfaces **made of relief** and had none.
+
+So `tarmac.gdshader` bends the surface normal with the same procedural height
+field it already tints with: two extra taps give a gradient, the gradient
+perturbs the world normal, and the scene's own sun lights the near side of every
+clod and drift. Bump mapping with no texture and no UVs the road does not have —
+which matters, because the road's UVs come from tiles of three different lengths
+and any sampled texture seams at every join.
+
+`relief` is **zero on tarmac**, and that is the point: all three run the same
+shader, and tarmac asking for no relief is what makes the other two feel like
+different materials rather than different tints. Tarmac genuinely is flat, so
+colour noise alone describes it honestly.
+
+Two surface-specific terms sit on top. `stones` scatters lighter, rougher
+specks on dirt, thresholded hard so they read as objects lying on it rather than
+as more noise in it. `sparkle` is snow's alone, and it is **not drawn as light**:
+it punches holes of low roughness through the surface so the real sun makes real
+specular highlights that come and go as the camera moves. Drawn as emission they
+would sit on the snow like confetti and be just as bright at midnight.
+
+The condition also leaves the road. `field`/`field_amount` blend the ground plane
+toward the surface — a white circuit through a green summer field read as a
+painted road, not as weather. *Blended*, not replaced, so the circuit's theme and
+its hour still come through and a snowy dusk stays dusk.
+
+> `surface_road` runs on load, so it must be safe to run repeatedly. The field's
+> material lives inside a packed scene and `instantiate()` **shares** resources
+> rather than copying them, so tinting it in place would compound with every race
+> started. It reads the untouched mesh material and writes a fresh surface
+> override, which makes the call idempotent — and clears the override on tarmac,
+> so drying out actually dries the field out.
+
 ### The road's own coordinate system
 
 Rubber down the racing line, and later tyre tracks, both need the road to carry

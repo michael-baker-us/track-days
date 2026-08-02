@@ -26,7 +26,7 @@ func _ready() -> void:
 	# instanced tile does not survive being packed into a .tscn — see
 	# TrackBuilder.surface_road. Applying it on load treats a shipped circuit and
 	# a player's the same way.
-	TrackBuilder.surface_road(track)
+	TrackBuilder.surface_road(track, GameState.selected_surface)
 	# Ahead of the car so the car keeps rendering order and group lookups work.
 	add_child(track)
 	move_child(track, 0)

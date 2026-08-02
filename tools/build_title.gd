@@ -88,11 +88,17 @@ func _initialize() -> void:
 	# pick it in.
 	#
 	# The label is written by title_screen.gd from the selected spec.
+	# Car and conditions on one row. Both are things you choose *before* a lap
+	# rather than parts of the circuit, and a lap record is keyed on the pair —
+	# so they belong together and beneath the list they apply to.
 	var car_button := Button.new()
 	car_button.name = "CarButton"
 	car_button.text = "Car"
-	car_button.custom_minimum_size = Vector2(MENU_W, 40.0)
-	rows.add_child(car_button)
+	var surface_button := Button.new()
+	surface_button.name = "SurfaceButton"
+	surface_button.text = "Dry"
+	surface_button.custom_minimum_size = Vector2(150.0, 40.0)
+	rows.add_child(_row("ChoiceRow", [car_button, surface_button]))
 
 	rows.add_child(_spacer(4))
 
@@ -222,6 +228,19 @@ func _label(node_name: String, text: String) -> Label:
 	l.name = node_name
 	l.text = text
 	return l
+
+## A row of controls sharing the width, the wider one first.
+func _row(node_name: String, controls: Array) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = node_name
+	row.add_theme_constant_override("separation", 8)
+	for i in controls.size():
+		var c: Control = controls[i]
+		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if i == 0:
+			c.size_flags_stretch_ratio = 2.6
+		row.add_child(c)
+	return row
 
 func _spacer(height: int) -> Control:
 	var c := Control.new()

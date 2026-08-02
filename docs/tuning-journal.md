@@ -957,6 +957,49 @@ Three findings:
 - The two cars are within 12% of the same size, which is why the road-versus-car
   scale question is still deferred rather than answered.
 
+## M17 — conditions
+
+Surfaces arrived as a **race-time choice** rather than a property of the circuit.
+`docs/ideas.md` proposed a winter Ardennes; racing one is the same thing from the
+other side — the circuit does not change, the conditions do — and a lap record has
+been keyed on `track|car|surface` since M8 precisely so the two could never be
+compared.
+
+`grip` multiplies the tyre friction the car's tuning asks for, so it composes:
+the Prototype is still grippier than the Racer on snow. Dry 1.0, dirt 0.72, snow
+0.5.
+
+**What this model does and does not change, and it is the wrong way round.** M2b
+measured that braking here is *brake-limited* rather than traction-limited —
+stopping distance was byte-identical at grip 1.4, 2.5 and 4.0, because
+`brake_force` sits below its saturation point. So lowering grip changes cornering
+and **leaves braking alone**. On real snow braking is the first thing to go. The
+honest fix is for a surface to scale `brake_force` as well as friction, and it is
+not done: brake force interacts with the saturation ceiling that M2b spent a
+milestone finding, and changing it wants its own sweep rather than a guess
+alongside this one.
+
+Par follows grip, so a snow lap is judged against a snow target:
+
+| Circuit | Dry | Dirt | Snow |
+|---|---|---|---|
+| Ardennes | 47.75 s | 51.70 s | 56.59 s |
+| Monte Carlo | 38.15 s | 41.43 s | 45.25 s |
+| La Sarthe | 59.01 s | 63.72 s | 69.26 s |
+| Suzuka | 34.43 s | 36.30 s | 38.30 s |
+
+### Still open, from M17
+
+- **Braking does not degrade with the surface.** See above; it needs its own
+  sweep against the saturation ceiling.
+- **No surface has had a handling sweep of its own.** Every figure in this journal
+  is a dry-tarmac figure. The grip multipliers are *stated*, and what they produce
+  — lateral g, corner speeds, whether the car still recovers from a slide at 0.5
+  grip — has not been measured. That is the same debt the Prototype had, and it
+  wants the same rig.
+- Grass still grips like tarmac, so leaving the road on snow is *more* grip, not
+  less. That is now visibly wrong rather than merely convenient.
+
 ### Still open
 
 - The hills are still the hardest part of the circuit to drive: 0.84 s airborne

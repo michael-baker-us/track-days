@@ -755,6 +755,161 @@ func test_the_road_carries_a_lateral_coordinate() -> void:
 		% [furthest, ParTime.LINE_HALF_WIDTH],
 		furthest <= ParTime.LINE_HALF_WIDTH + 0.01)
 
+## Conditions, and the record key finally doing the job it was built for.
+##
+## The `surface` slot has been in the key since M8, when there was one surface and
+## it looked like over-engineering. This is what it was for: the same circuit in
+## the same car on snow keeps its own record, its own par and its own medal, and
+## none of them can be mistaken for the dry ones.
+func test_conditions_are_a_separate_record_and_a_separate_target() -> void:
+	var was := GameState.selected_surface
+	var track := "test_surfaces"
+
+	# A lap on each surface, all in the same car on the same circuit.
+	var times := {"tarmac": 60.0, "dirt": 66.0, "snow": 72.0}
+	for surface in times:
+		GameState.selected_surface = surface
+		GameState.save_best_lap(track, times[surface], PackedFloat32Array())
+	for surface in times:
+		GameState.selected_surface = surface
+		check_near("%s keeps its own record" % surface,
+			GameState.best_lap_for(track), times[surface], 0.001)
+
+	# Deleting the circuit still takes all of them: one section per track.
+	GameState.clear_best_lap(track)
+	for surface in times:
+		GameState.selected_surface = surface
+		check_near("%s record went with the circuit" % surface,
+			GameState.best_lap_for(track), 0.0, 0.001)
+	GameState.selected_surface = was
+
+	# Grip is the mechanic. The colours make it read as snow; this makes it be
+	# snow, and it composes with the car rather than replacing it.
+	check_near("dry is full grip", RoadSurface.grip_of("tarmac"), 1.0, 0.001)
+	for surface in RoadSurface.ORDER:
+		var grip := RoadSurface.grip_of(surface)
+		check_true("%s grip is usable (%.2f)" % [surface, grip],
+			grip > 0.2 and grip <= 1.0)
+	check_true("snow is the loosest",
+		RoadSurface.grip_of("snow") < RoadSurface.grip_of("dirt")
+		and RoadSurface.grip_of("dirt") < RoadSurface.grip_of("tarmac"))
+
+	# An unknown surface falls back rather than returning nothing, so a save from
+	# a later version cannot make the car undriveable.
+	check_near("an unknown surface is dry", RoadSurface.grip_of("lava"), 1.0, 0.001)
+
+	# And the cycle reaches every one of them.
+	var seen := {}
+	var at := RoadSurface.DEFAULT
+	for _i in RoadSurface.ORDER.size():
+		at = RoadSurface.after(at)
+		seen[at] = true
+	check("the cycle reaches every surface", seen.size(), RoadSurface.ORDER.size())
+
+	# The look, which is the other half of a surface being a surface. Dirt and
+	# snow read as coloured card without relief: they are made of shape, and the
+	# road shader has no shape to give them unless they ask for it. Tarmac really
+	# is flat, so it asking for none is the thing that makes the other two differ.
+	for surface in RoadSurface.ORDER:
+		var spec := RoadSurface.named(surface)
+		for key in ["relief", "relief_scale", "patch", "stones", "sparkle",
+				"field", "field_amount", "mark_depth"]:
+			check_true("%s describes its %s" % [surface, key], spec.has(key))
+	check_near("tarmac is flat", RoadSurface.named("tarmac")["relief"], 0.0, 0.0001)
+	check_true("dirt is not", RoadSurface.named("dirt")["relief"] > 0.5)
+	check_true("nor is snow", RoadSurface.named("snow")["relief"] > 0.5)
+	check_true("dirt breaks up more than snow drifts",
+		RoadSurface.named("dirt")["relief"] > RoadSurface.named("snow")["relief"])
+	check_true("only snow glints", RoadSurface.named("snow")["sparkle"] > 0.0
+		and RoadSurface.named("dirt")["sparkle"] == 0.0
+		and RoadSurface.named("tarmac")["sparkle"] == 0.0)
+	# Only tarmac leaves the outfield alone. Snow that stopped at the kerb read as
+	# a painted road rather than as weather.
+	check_near("dry racing does not repaint the field",
+		RoadSurface.named("tarmac")["field_amount"], 0.0, 0.0001)
+	check_true("snow does", RoadSurface.named("snow")["field_amount"] > 0.5)
+	check_true("and dirt does", RoadSurface.named("dirt")["field_amount"] > 0.2)
+
+## Re-surfacing a built circuit, which happens on load rather than at bake time
+## and therefore has to be safe to do repeatedly.
+##
+## The trap it guards is the ground tint. The field's material is a resource
+## inside a packed scene, and `instantiate()` *shares* resources rather than
+## copying them — so tinting it in place would compound every time a race started,
+## and five races on snow would leave the field five blends whiter than one race
+## did. Reading the untouched original and writing a fresh override is what makes
+## the call idempotent.
+func test_surfacing_a_circuit_is_repeatable() -> void:
+	var track := load("res://scenes/track/track_monte_carlo.tscn")
+	if track == null:
+		return
+	var root := (track as PackedScene).instantiate() as Node3D
+	var mi := root.get_node_or_null("Ground/GroundMesh") as MeshInstance3D
+	check_true("the circuit has a field to tint", mi != null)
+	if mi == null:
+		root.free()
+		return
+	var green = (mi.mesh.surface_get_material(0) as ShaderMaterial).get_shader_parameter(
+		"base_color"
+	)
+
+	TrackBuilder.surface_road(root, "snow")
+	var once := mi.get_surface_override_material(0) as ShaderMaterial
+	check_true("snow reaches the field", once != null)
+	if once == null:
+		root.free()
+		return
+	var white: Color = once.get_shader_parameter("base_color")
+	check_true("and the field is not the green it was",
+		not white.is_equal_approx(green as Color))
+	check_true("it went most of the way to white (%.2f)" % white.r,
+		white.r > (green as Color).r)
+
+	TrackBuilder.surface_road(root, "snow")
+	var twice: Color = (mi.get_surface_override_material(0) as ShaderMaterial).get_shader_parameter(
+		"base_color"
+	)
+	check_true("racing on snow twice does not double the snow",
+		twice.is_equal_approx(white))
+
+	# And drying out puts it back rather than leaving the last condition on.
+	TrackBuilder.surface_road(root, "tarmac")
+	check_true("a dry race clears the field again",
+		mi.get_surface_override_material(0) == null)
+
+	# The road itself carries the surface's shape through to the shader.
+	var relief_seen := false
+	for child in root.find_children("*", "MeshInstance3D", true, false):
+		var mesh_node := child as MeshInstance3D
+		if mesh_node.mesh == null:
+			continue
+		# Every surface, not surface zero: the drivable face of a Kenney tile is
+		# rarely the first one on the mesh.
+		for i in mesh_node.mesh.get_surface_count():
+			var m := mesh_node.get_surface_override_material(i) as ShaderMaterial
+			if m == null or m.get_shader_parameter("relief") == null:
+				continue
+			relief_seen = true
+			check_near("dry tarmac asks the road shader for no relief",
+				float(m.get_shader_parameter("relief")), 0.0, 0.0001)
+			break
+		if relief_seen:
+			break
+	check_true("the road was re-surfaced at all", relief_seen)
+	root.free()
+
+	# Every parameter the surface sends actually exists on the shader.
+	# `set_shader_parameter` is silent about names it does not recognise, so a
+	# renamed uniform would leave dirt looking exactly like tarmac and say
+	# nothing about it.
+	var shader: Shader = load("res://assets/shaders/tarmac.gdshader")
+	var uniforms := {}
+	for u in shader.get_shader_uniform_list():
+		uniforms[String(u["name"])] = true
+	for name in ["base_color", "grit_color", "grain_amount", "base_roughness",
+			"relief", "relief_scale", "patch_amount", "stones", "sparkle"]:
+		check_true("the road shader takes %s" % name, uniforms.has(name))
+
 ## Every preset has to be complete. They are dictionaries, so a missing key is a
 ## crash at bake time rather than a compile error, and the one that gets forgotten
 ## is always the one only a later preset needed.
@@ -1226,6 +1381,150 @@ func test_the_rim_takes_the_circuits_own_sky() -> void:
 				(rim as Color).is_equal_approx(want))
 	check_true("a rim colour was actually set (%d surfaces)" % checked, checked > 0)
 
+## What the tyres leave behind: what shape it is, where it is allowed to be, and
+## why it never fades.
+##
+## Three separate claims, and each one has been wrong at some point:
+##
+## - A loose-surface mark is a trough with a **raised shoulder either side** —
+##   displaced material, not a carved hole, because the road is Kenney tiles and a
+##   rut pushed downwards would be hidden behind the tile it lies on. Tarmac gets
+##   no relief at all: rubber is a film and displaces nothing.
+## - Marks stop at the verge. Grass grips exactly like tarmac here, so nothing in
+##   the physics distinguishes on from off, and ruts across a field would be the
+##   clearest possible sign that marks are drawn by a rule rather than by a
+##   surface.
+## - They persist for the whole session. Repeated passes deepen the mark already
+##   in that patch of ground rather than laying a second one, which is both what a
+##   rut really does and what makes never forgetting affordable.
+func test_tyre_marks_have_real_depth() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	if car == null:
+		return
+	var marks := car.get_node_or_null("TyreMarks") as TyreMarks
+	check_true("the car leaves marks", marks != null)
+	if marks == null:
+		return
+
+	# World space, or the marks would travel with the car that made them.
+	check_true("they stay on the road, not on the car", marks.top_level)
+	check("and cast no shadow", marks.cast_shadow,
+		GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+
+	# The two shapes, built directly rather than by racing on both surfaces.
+	var rut := TyreMarks.mark_mesh(true)
+	var box := rut.get_aabb()
+	check_true("a rut stands proud of the road (%.3f m)" % (box.position.y + box.size.y),
+		box.position.y + box.size.y >= TyreMarks.RIDGE - 0.001)
+	check_true("and dips below it (%.4f m)" % box.position.y, box.position.y < 0.0)
+	check_true("across the width of a tyre (%.2f m)" % box.size.x,
+		absf(box.size.x - TyreMarks.WIDTH) < 0.01)
+
+	var film := TyreMarks.mark_mesh(false)
+	var flat := film.get_aabb()
+	check_true("rubber has no thickness at all (%.4f m)" % flat.size.y,
+		flat.size.y < 0.0001)
+	check_true("and floats clear of the road rather than into it (%.4f m)" % flat.position.y,
+		flat.position.y > 0.0)
+
+	# Normals actually vary on the rut, or the geometry is there and the lighting
+	# is not. And they cannot vary on rubber, or it is not flat.
+	check_true("the trough has faces at different angles (%d)" % _normal_count(rut),
+		_normal_count(rut) >= 3)
+	check("rubber is one plane", _normal_count(film), 1)
+
+	# Lit is the whole reason a rut reads as three-dimensional: the sun has to
+	# catch one side of each ridge and not the other. Rubber has no relief for
+	# light to find, so lighting it would only give a film of rubber a specular
+	# the road under it does not have.
+	check("a rut is lit", TyreMarks.mark_material(Color.RED, true).shading_mode,
+		BaseMaterial3D.SHADING_MODE_PER_PIXEL)
+	check("rubber is not", TyreMarks.mark_material(Color.RED, false).shading_mode,
+		BaseMaterial3D.SHADING_MODE_UNSHADED)
+
+	# What the car actually got is what this surface asked for.
+	var spec := RoadSurface.named(GameState.selected_surface)
+	var mat := marks.material_override as StandardMaterial3D
+	check_true("the mark is materialised at all", mat != null)
+	if mat != null:
+		check("and matches the surface being raced on (%s)" % GameState.selected_surface,
+			mat.shading_mode == BaseMaterial3D.SHADING_MODE_PER_PIXEL,
+			bool(spec["mark_depth"]))
+		check_true("carrying per-mark strength", mat.vertex_color_use_as_albedo)
+
+	# Read through `buffer`, not the per-instance getters. Those do not survive a
+	# headless run — a colour set to alpha 0 reads back opaque and a zero-scaled
+	# basis reads back as identity — which is the same trap that once collapsed
+	# every barrier transform to the origin. The buffer round-trips exactly, and
+	# the first version of this check passed 640 marks off as "none" by reading
+	# through the broken getter.
+	var buf: PackedFloat32Array = marks.multimesh.buffer
+	check("the buffer is sized for a whole chunk",
+		buf.size(), TyreMarks.CHUNK * TyreMarks.FLOATS_PER_MARK)
+	var laid := 0
+	for i in TyreMarks.CHUNK:
+		if buf[i * TyreMarks.FLOATS_PER_MARK + 15] > 0.01:
+			laid += 1
+	check("no marks before anyone has driven", laid, 0)
+	check("and none claimed", marks.mark_count(), 0)
+
+	# One appears where a wheel is put down. Driven through the real `_place`, so
+	# the buffer packing is exercised rather than assumed.
+	marks._place(Vector3(3.0, 0.0, 4.0), Vector3.UP, Vector3.FORWARD, 0.5)
+	buf = marks.multimesh.buffer
+	check_near("a mark carries its strength", buf[15], 0.5, 0.001)
+	check_near("at the point the tyre touched", buf[3], 3.0, 0.001)
+	check_near("and on the surface", buf[11], 4.0, 0.001)
+	check_true("with a basis that is not degenerate",
+		absf(buf[1]) + absf(buf[5]) + absf(buf[9]) > 0.5)
+
+	# A second pass over the same ground deepens the groove instead of laying a
+	# second mark beside it. This is what makes permanence affordable: a
+	# hundredth lap of the same line costs nothing.
+	marks._place(Vector3(3.05, 0.0, 4.02), Vector3.UP, Vector3.FORWARD, 0.95)
+	check("the same patch is still one mark", marks.mark_count(), 1)
+	check_near("worn deeper by the second pass", marks.multimesh.buffer[15], 0.95, 0.001)
+
+	# And a lighter pass over a groove does not fill it back in.
+	marks._place(Vector3(3.02, 0.0, 4.05), Vector3.UP, Vector3.FORWARD, 0.2)
+	check_near("a lighter pass leaves it alone", marks.multimesh.buffer[15], 0.95, 0.001)
+
+	# New ground is new geometry.
+	marks._place(Vector3(9.0, 0.0, 4.0), Vector3.UP, Vector3.FORWARD, 0.5)
+	check("ground the car has not touched gets its own mark", marks.mark_count(), 2)
+
+	_check_marks_stop_at_the_verge(car, marks)
+
+func _normal_count(mesh: Mesh) -> int:
+	var arrays: Array = mesh.surface_get_arrays(0)
+	var distinct := {}
+	for n: Vector3 in (arrays[Mesh.ARRAY_NORMAL] as PackedVector3Array):
+		distinct[n.snapped(Vector3(0.01, 0.01, 0.01))] = true
+	return distinct.size()
+
+## Marks belong on the road and nowhere else.
+##
+## Asked of the collision world rather than of the centreline, so this also checks
+## the other half: that `TrackBuilder` actually puts the drivable ribbon in the
+## group `TyreMarks` looks for. Naming the body was not enough — the group is what
+## survives being packed into a shipped `.tscn`.
+func _check_marks_stop_at_the_verge(car: Node, marks: TyreMarks) -> void:
+	var bodies: Array = get_nodes_in_group(TrackBuilder.ROAD_GROUP)
+	check_true("the drivable ribbon is findable by group (%d)" % bodies.size(),
+		bodies.size() >= 1)
+
+	var here: Vector3 = (car as Node3D).global_position
+	# Sampled at the road rather than at the car: the car's origin is its body
+	# centre, and a probe that reaches 0.4 m either side of *that* can pass over
+	# the tarmac entirely. The start run is flat and pinned to ground level, which
+	# is what makes a fixed height right here.
+	check_true("the car is standing on road",
+		marks.on_road(Vector3(here.x, 0.05, here.z)))
+	# Half a kilometre out is field: the ground plane is 4 km across, so there is
+	# something to stand on there, just nothing a tyre could mark.
+	check_true("half a kilometre off the circuit is not",
+		not marks.on_road(Vector3(here.x + 500.0, 0.05, here.z + 500.0)))
+
 ## The car needs a shadow of its own because the one the sun casts only lands on
 ## the road: `ground_grid.gdshader` is unshaded and receives nothing, so the
 ## moment the car runs wide it has no shadow at all and appears to float.
@@ -1689,7 +1988,7 @@ func test_the_panel_keeps_its_buttons_whatever_the_readout_says() -> void:
 	# player actually lost.
 	for path in [
 		"Split/Side/Rows/Actions/UndoRow/SaveButton",
-		"Split/Side/Rows/Actions/TestButton",
+		"Split/Side/Rows/Actions/TestRow/TestButton",
 		"Split/Side/Rows/Actions/ExitRow/BackButton",
 	]:
 		var button: Control = editor.get_node_or_null(path)
@@ -2234,17 +2533,26 @@ func test_shipped_par_times_match_the_model() -> void:
 		var builder := TrackBuilder.new()
 		builder.measure(layouts[id])
 		for spec in GameState.cars():
-			var recorded := GameState.par_for(entry, spec.id)
-			check_true("%s records a par for %s" % [id, spec.id], recorded > 0.0)
-			check_near("%s par for %s is still what the model says" % [id, spec.id],
-				recorded, ParTime.ideal_lap(builder.centreline, spec), 0.05)
+			for surface in RoadSurface.ORDER:
+				var recorded := GameState.par_for(entry, spec.id, surface)
+				check_true("%s records a par for %s on %s" % [id, spec.id, surface],
+					recorded > 0.0)
+				check_near("%s par for %s on %s still matches the model"
+					% [id, spec.id, surface], recorded,
+					ParTime.ideal_lap(builder.centreline, spec, surface), 0.05)
 
 	# And the quicker car has the quicker par everywhere, or the medals are
 	# measuring the circuit rather than the drive.
 	for entry in GameState.TRACKS:
 		check_true("%s is quicker in the Prototype" % entry["id"],
-			GameState.par_for(entry, "race_future")
-			< GameState.par_for(entry, "race"))
+			GameState.par_for(entry, "race_future", "tarmac")
+			< GameState.par_for(entry, "race", "tarmac"))
+		# And slower with less grip, on both cars. A surface that did not move par
+		# would hand out the dry medals for a snow lap.
+		for spec in GameState.cars():
+			check_true("%s is slower on snow in the %s" % [entry["id"], spec.id],
+				GameState.par_for(entry, spec.id, "snow")
+				> GameState.par_for(entry, spec.id, "tarmac"))
 
 ## Medals are read off the lap time and the par, never stored. That is what makes
 ## it impossible for a saved medal to disagree with the time that earned it, and
@@ -4940,7 +5248,7 @@ func test_editor_panel_is_wired_and_fits() -> void:
 		"Split/Side/Rows/Actions/CloseButton",
 		"Split/Side/Rows/Actions/UndoRow/UndoButton",
 		"Split/Side/Rows/Actions/UndoRow/SaveButton",
-		"Split/Side/Rows/Actions/TestButton",
+		"Split/Side/Rows/Actions/TestRow/TestButton",
 		"Split/Side/Rows/Actions/ExitRow/DeleteButton",
 		"Split/Side/Rows/Actions/ExitRow/BackButton",
 		"LegendFlyout",
@@ -5163,6 +5471,7 @@ func _physics_process(_delta: float) -> bool:
 		test_roadside_markers_are_dense_enough_to_read_as_speed()
 		test_weather_changes_the_look_and_not_the_lap()
 		test_the_road_carries_a_lateral_coordinate()
+		test_conditions_are_a_separate_record_and_a_separate_target()
 		test_a_ghost_round_trips_through_bytes()
 		test_a_damaged_ghost_is_refused()
 		test_a_ghost_interpolates_and_then_holds()
@@ -5189,6 +5498,8 @@ func _physics_process(_delta: float) -> bool:
 		test_the_car_is_silent_when_sound_is_off()
 		test_the_car_carries_its_audio()
 		test_the_car_has_a_shadow_on_whatever_it_stands_on()
+		test_tyre_marks_have_real_depth()
+		test_surfacing_a_circuit_is_repeatable()
 		test_the_car_is_painted_and_rimmed()
 		test_the_rim_takes_the_circuits_own_sky()
 		test_engine_pitch_sweeps_rather_than_climbing_once()

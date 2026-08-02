@@ -32,10 +32,20 @@ func _apply_tuning_to_wheels() -> void:
 		wheel.damping_compression = tuning.damping_compression
 		wheel.damping_relaxation = tuning.damping_relaxation
 
+	var grip := _surface_grip()
 	for wheel in _front_wheels:
-		wheel.wheel_friction_slip = tuning.friction_front
+		wheel.wheel_friction_slip = tuning.friction_front * grip
 	for wheel in _rear_wheels:
-		wheel.wheel_friction_slip = tuning.friction_rear
+		wheel.wheel_friction_slip = tuning.friction_rear * grip
+
+## How much of the car's own grip the road allows, 1.0 on dry tarmac.
+##
+## A multiplier rather than a replacement, so it composes: a grippier car is
+## still grippier on snow. Read once per frame rather than cached, because the
+## surface is chosen on the title screen and a race can be restarted into a
+## different one without this node being rebuilt.
+func _surface_grip() -> float:
+	return RoadSurface.grip_of(GameState.selected_surface)
 
 func _physics_process(delta: float) -> void:
 	var steer_input := _curve(Input.get_axis("steer_left", "steer_right"))
@@ -76,7 +86,7 @@ func _physics_process(delta: float) -> void:
 
 	var rear_friction: float = (
 		tuning.handbrake_rear_friction if handbrake_pressed else tuning.friction_rear
-	)
+	) * _surface_grip()
 	for wheel in _rear_wheels:
 		wheel.wheel_friction_slip = rear_friction
 

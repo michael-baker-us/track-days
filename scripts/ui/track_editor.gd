@@ -45,7 +45,8 @@ const UNDO_LIMIT := 64
 @onready var _close_button: Button = $Split/Side/Rows/Actions/CloseButton
 @onready var _undo_button: Button = $Split/Side/Rows/Actions/UndoRow/UndoButton
 @onready var _save_button: Button = $Split/Side/Rows/Actions/UndoRow/SaveButton
-@onready var _test_button: Button = $Split/Side/Rows/Actions/TestButton
+@onready var _test_button: Button = $Split/Side/Rows/Actions/TestRow/TestButton
+@onready var _surface_button: Button = $Split/Side/Rows/Actions/TestRow/SurfaceButton
 @onready var _copy_code_button: Button = $Split/Side/Rows/Actions/ExitRow/CopyCodeButton
 @onready var _delete_button: Button = $Split/Side/Rows/Actions/ExitRow/DeleteButton
 @onready var _back_button: Button = $Split/Side/Rows/Actions/ExitRow/BackButton
@@ -98,6 +99,7 @@ func _ready() -> void:
 	_undo_button.pressed.connect(_undo_last)
 	_save_button.pressed.connect(_on_save)
 	_test_button.pressed.connect(_on_test)
+	_surface_button.pressed.connect(_cycle_surface)
 	_copy_code_button.pressed.connect(_on_copy_code)
 	_paste_open_button.pressed.connect(_on_paste_open)
 	_paste_cancel_button.pressed.connect(_close_paste)
@@ -112,6 +114,7 @@ func _ready() -> void:
 	_name_edit.text = _layout.display_name
 	_cross_button.button_pressed = _layout.allow_crossings
 	_refresh_look()
+	_refresh_surface()
 	_refresh_picker()
 	_reset_undo()
 	_recompile()
@@ -916,6 +919,30 @@ func _refresh_look() -> void:
 
 func _look_label() -> String:
 	return String(CircuitLook.resolve("", _layout.look)["label"])
+
+## Cycles what the circuit is raced on: dry tarmac, dirt, snow.
+##
+## Deliberately *not* stored on the layout. The surface is a condition rather than
+## a property of the circuit — the same drawing raced on snow keeps its own lap
+## record, its own ghost and its own medal, which is what `track|car|surface`
+## keying is for — so this sets the same global the title screen sets. Building a
+## circuit and immediately testing it in the conditions you had in mind is the
+## whole reason it is reachable from here.
+func _cycle_surface() -> void:
+	GameState.selected_surface = RoadSurface.after(GameState.selected_surface)
+	_refresh_surface()
+	_flash("Surface: %s. Test drive to feel it." % _surface_label())
+	_update_panel()
+
+func _refresh_surface() -> void:
+	_surface_button.text = _surface_label()
+	_surface_button.tooltip_text = (
+		"Test drive on %s. A condition, not part of the drawing: each surface keeps its own lap record."
+		% _surface_label()
+	)
+
+func _surface_label() -> String:
+	return RoadSurface.label_of(GameState.selected_surface)
 
 func _on_save() -> void:
 	_layout.display_name = _name_edit.text.strip_edges()

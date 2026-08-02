@@ -12,6 +12,30 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 // rates and seams at every join; and the web export is single-threaded, where a
 // generated NoiseTexture2D is a thread away from being a problem. World-space
 // noise has neither issue and costs no asset.
+//
+// ## Why the loose surfaces need more than a recolour
+//
+// Tarmac is genuinely flat, so colour noise is an honest description of it and
+// the road reads correctly. Dirt and snow are not flat, and painting them as if
+// they were is what made them look like coloured card: a rutted field and a
+// snowfield are both *surfaces made of relief*, and with no relief the eye has
+// nothing to judge them by except a tint.
+//
+// So the same height field that tints the road now also **bends its normal**.
+// Two extra taps give a gradient, the gradient perturbs the world normal, and
+// the scene's own sun does the rest — the near side of every clod and drift
+// lights and the far side does not. It is bump mapping with a procedural height
+// field, which costs no texture and needs no UVs the road does not have.
+//
+// `relief` is zero on tarmac. That is the point: the three surfaces run the same
+// shader, and tarmac asking for no relief is what makes the other two feel
+// different rather than merely differently coloured.
+//
+// `sparkle` is snow's alone, and it is not drawn as glitter. It punches holes of
+// low roughness through the surface, so what you see are real specular
+// highlights from the real sun, appearing and vanishing as the camera moves.
+// Drawn as emission they would sit on the snow like confetti and would be just as
+// bright at midnight.
 
 uniform vec3 base_color : source_color = vec3(0.21, 0.21, 0.22);
 uniform vec3 grit_color : source_color = vec3(0.38, 0.38, 0.39);
@@ -21,10 +45,28 @@ uniform float grain_scale = 5.0;
 uniform float grain_amount : hint_range(0.0, 1.0) = 0.55;
 uniform float base_roughness : hint_range(0.0, 1.0) = 0.86;
 
+// How hard the height field bends the normal. 0 leaves the road perfectly flat.
+uniform float relief : hint_range(0.0, 4.0) = 0.0;
+// Metres per unit of the *relief* field, kept apart from `grain_scale` because
+// what you see the shape of is bigger than what you see the speckle of: clods and
+// drifts are a foot across, aggregate is a centimetre.
+uniform float relief_scale = 1.6;
+// Broad, slow variation over tens of metres — worn patches, drifted banks —
+// applied as a brightness rather than a second colour.
+uniform float patch_scale = 26.0;
+uniform float patch_amount : hint_range(0.0, 0.6) = 0.0;
+// Loose stones scattered on dirt: small, lighter, and rougher than what is
+// around them.
+uniform float stones : hint_range(0.0, 1.0) = 0.0;
+// Snow's specular glinting, as holes of low roughness rather than added light.
+uniform float sparkle : hint_range(0.0, 1.0) = 0.0;
+
 varying vec3 world_pos;
+varying vec3 world_normal;
 
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	world_normal = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 
 // Kept to small constants and a couple of multiplies. The usual
@@ -47,13 +89,61 @@ float value_noise(vec2 p) {
 	);
 }
 
+// The shape of the surface, in arbitrary units. Two octaves: the lumps and the
+// grit riding on them.
+float height(vec2 world_xz) {
+	vec2 p = world_xz / relief_scale;
+	return value_noise(p) * 0.7 + value_noise(p * 3.7) * 0.3;
+}
+
 void fragment() {
 	vec2 p = world_pos.xz / grain_scale;
 	float n = value_noise(p) * 0.55 + value_noise(p * 6.0) * 0.45;
-	ALBEDO = mix(base_color, grit_color, n * grain_amount);
+	vec3 albedo = mix(base_color, grit_color, n * grain_amount);
+
+	// Broad wear, as a brightness on whatever colour the grain arrived at, so a
+	// worn patch is the same material seen in a different state rather than a
+	// stain of a second colour laid over it.
+	if (patch_amount > 0.0) {
+		float broad = value_noise(world_pos.xz / patch_scale);
+		albedo *= 1.0 + (broad - 0.5) * 2.0 * patch_amount;
+	}
+
+	float roughness = base_roughness - n * 0.10;
+
+	// Loose stones. Cell noise thresholded hard so they read as objects lying on
+	// the dirt rather than as more noise in it.
+	if (stones > 0.0) {
+		float s = hash(floor(world_pos.xz * 7.0));
+		float stone = smoothstep(0.93, 0.985, s) * stones;
+		albedo = mix(albedo, grit_color * 1.25, stone);
+		roughness += stone * 0.05;
+	}
+
+	// Snow's glints, as roughness holes for the sun to find.
+	if (sparkle > 0.0) {
+		float g = hash(floor(world_pos.xz * 130.0));
+		roughness -= smoothstep(0.975, 1.0, g) * sparkle * 0.75;
+	}
+
+	ALBEDO = albedo;
 	// Rougher where the aggregate sits proud, so the sun picks out the texture
 	// instead of leaving one even sheen across the whole width.
-	ROUGHNESS = clamp(base_roughness - n * 0.10, 0.0, 1.0);
+	ROUGHNESS = clamp(roughness, 0.02, 1.0);
 	METALLIC = 0.0;
 	SPECULAR = 0.35;
+
+	// Two extra taps rather than four: the centre sample is shared with the
+	// gradient, so the finite difference costs one height() per axis. Relief is
+	// added to the world normal rather than replacing it, which keeps a banked
+	// corner banked — the road is never far from horizontal, and the difference
+	// between this and a proper tangent frame is smaller than the bumps are.
+	if (relief > 0.0) {
+		float e = 0.22;
+		float h0 = height(world_pos.xz);
+		float hx = height(world_pos.xz + vec2(e, 0.0)) - h0;
+		float hz = height(world_pos.xz + vec2(0.0, e)) - h0;
+		vec3 bent = normalize(world_normal + vec3(-hx, 0.0, -hz) * relief);
+		NORMAL = normalize((VIEW_MATRIX * vec4(bent, 0.0)).xyz);
+	}
 }

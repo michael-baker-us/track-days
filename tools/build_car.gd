@@ -126,6 +126,12 @@ func _bake(spec: CarSpec) -> bool:
 
 	car.add_child(_audio())
 	car.add_child(_shadow())
+	# What the tyres leave behind. A plain node like the others; it configures
+	# itself from the surface being raced on when it enters the tree.
+	var marks := MultiMeshInstance3D.new()
+	marks.name = "TyreMarks"
+	marks.set_script(load("res://scripts/car/tyre_marks.gd"))
+	car.add_child(marks)
 
 	TrackBuilder.set_owner_recursive(car, car)
 

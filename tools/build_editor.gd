@@ -319,7 +319,20 @@ func _actions() -> VBoxContainer:
 	var test_button := _button("TestButton", "Test drive")
 	test_button.theme_type_variation = UiTheme.V_PRIMARY
 	test_button.custom_minimum_size = Vector2(0.0, 38.0)
-	actions.add_child(test_button)
+	test_button.size_flags_stretch_ratio = 2.6
+
+	# What you are about to drive on, beside the button that goes and drives on
+	# it. The surface is a race condition rather than a property of the circuit —
+	# it is why a lap record is keyed `track|car|surface` — so this is the same
+	# choice the title screen offers, not a new field on the layout.
+	#
+	# It shares the row rather than taking one: the column is 720 units on every
+	# window and has none spare, and this is the one control whose answer you want
+	# in front of you at the moment you press Test drive. Dry, Dirt and Snow are
+	# the shortest labels in the panel, so a third of the row is plenty.
+	var surface_button := _button("SurfaceButton", "Dry")
+	surface_button.custom_minimum_size = Vector2(0.0, 38.0)
+	actions.add_child(_row("TestRow", [surface_button, test_button]))
 
 	var delete_button := _button("DeleteButton", "Delete")
 	delete_button.theme_type_variation = UiTheme.V_DANGER

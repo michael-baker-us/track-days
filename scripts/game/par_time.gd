@@ -219,9 +219,14 @@ static func racing_line(line: Array[Vector3]) -> Array[Vector3]:
 ## `centreline` is the builder's, which `measure()` fills without instancing a
 ## single tile — so this costs the editor only the relaxation on top of the walk
 ## it was already doing on every mouse move.
-static func ideal_lap(centreline: Array[Vector3], spec: CarSpec = null) -> float:
+static func ideal_lap(
+	centreline: Array[Vector3], spec: CarSpec = null, surface: String = ""
+) -> float:
 	var top := spec.top_speed_kmh / 3.6 if spec != null else TOP_SPEED
-	var lateral := spec.lateral_g if spec != null else LATERAL_G
+	# The surface scales the car's grip, exactly as it does on the car itself, so
+	# a perfect lap on snow is a slower perfect lap rather than the same one.
+	var lateral := (spec.lateral_g if spec != null else LATERAL_G) \
+		* RoadSurface.grip_of(surface)
 	var braking := spec.braking_g if spec != null else BRAKING_G
 	var launch := spec.launch_accel if spec != null else LAUNCH_ACCEL
 	var walk := resample(racing_line(centreline), lateral, top)
@@ -254,8 +259,10 @@ static func ideal_lap(centreline: Array[Vector3], spec: CarSpec = null) -> float
 ## What the same lap is worth as a target for a person rather than for the
 ## simulation. Separate from `ideal_lap` so the unmeasured constant is applied
 ## in exactly one visible place.
-static func par_lap(centreline: Array[Vector3], spec: CarSpec = null) -> float:
-	return ideal_lap(centreline, spec) * HUMAN_SLACK
+static func par_lap(
+	centreline: Array[Vector3], spec: CarSpec = null, surface: String = ""
+) -> float:
+	return ideal_lap(centreline, spec, surface) * HUMAN_SLACK
 
 ## Fastest the car can hold the bend at `i`, from the radius of the circle
 ## through its neighbours.

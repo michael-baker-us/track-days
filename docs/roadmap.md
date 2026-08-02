@@ -592,8 +592,75 @@ a realism target. `ground_grid.gdshader` stays `unshaded`.
 > the lap by 1.8%.
 2. **Surfaces per circuit** — snow and dirt as shader variants through the
    `surface_road` hook that already exists, each with its own grip sweep.
+
+> **Built, as a race-time choice rather than a circuit property.** Racing a winter
+> Ardennes is the same thing seen from the other side: the circuit does not
+> change, the conditions do — and the record key has carried `surface` since M8
+> for exactly this. Chosen beside the car on the title screen, so the same circuit
+> in the same car on snow keeps its own record, ghost, splits, par and medal.
+>
+> The grip multiplier composes with the car rather than replacing it. Par follows
+> it, so a snow lap is judged against a snow target.
+>
+> **Not done: the grip sweep.** The multipliers are stated, not measured — the
+> same debt the Prototype carried. And braking does *not* degrade with the
+> surface, because M2b established braking here is brake-limited rather than
+> traction-limited; fixing that means scaling `brake_force` against a saturation
+> ceiling that wants its own sweep. Both are in the tuning journal under M17.
 3. **Tyre tracks**, in three steps: trail geometry, then a track-space deformation
    texture accumulating across laps, then real vertex displacement.
+
+> **Marks are in, with real depth on the surfaces that should have it — and the
+> depth is displaced material, not a carved hole.** That is forced rather than
+> chosen: the road is Kenney tiles, so a rut pushed *downwards* is hidden behind
+> the tile it lies on. **You cannot dig into geometry you do not own.**
+>
+> A tyre on something loose does not remove material, it pushes it aside — so on
+> dirt and snow a mark is a shallow trough with a raised shoulder either side,
+> built as real geometry with real normals and **lit**, so the sun catches one
+> side of each ridge and not the other. Tarmac gets a flat, unshaded mark and only
+> when the tyre *slides*: rubber is a film and displaces nothing, and a rubber
+> mark standing proud of the road would be visibly wrong every time the light got
+> low.
+>
+> **Marks last the whole session**, and that is affordable because a mark is
+> claimed against a quantised patch of ground: a second pass deepens the mark
+> already there rather than laying another beside it. Growth is bounded by
+> distinct ground touched, not by session length — which is also what a rut really
+> does. Chunked into 640-instance `MultiMesh`es because `buffer` can only be
+> assigned whole, so the cost of a mark never depends on how many are already
+> down.
+>
+> **They stop at the verge**, asked of the collision world — the drivable ribbon
+> is a body in a known group — rather than of the centreline. Grass grips exactly
+> like tarmac here, so nothing in the physics distinguishes on from off, and ruts
+> across a field would advertise that marks are drawn by a rule rather than by a
+> surface.
+>
+> **Carving properly is still ahead**, and it needs the drivable surface to *be*
+> a dense generated ribbon that can be displaced in a vertex shader. The ribbon's
+> coordinate system already exists from step 1; the road being made of it does
+> not. That is the remaining half of step 3, and it is a milestone-sized change:
+> the tiles' `road` surface would be hidden and replaced, with the painted lines
+> and kerbs left on their own surface.
+
+4. **Surfaces that look made of something.** Dirt and snow shipped as recolours of
+   the tarmac shader and read as coloured card — they are surfaces *made of
+   relief* and had none. The road shader now bends its normal with the same
+   procedural height field it tints with, so the sun lights the near side of every
+   clod and drift. `relief` is zero on tarmac deliberately: all three run one
+   shader, and tarmac asking for no shape is what makes the other two feel like
+   different materials. Snow adds `sparkle` — holes of low roughness rather than
+   emitted light, so the glints are the real sun and vanish at night — and dirt
+   adds loose stones. The condition also leaves the road: the outfield blends
+   toward it, because a white circuit through a green summer field read as a
+   painted road rather than as weather.
+
+5. **The surface is switchable from the editor**, beside Test drive, because
+   building a circuit and immediately driving it in the conditions you had in mind
+   is the whole point. It sets the same global the title screen sets rather than
+   becoming a property of the layout — the surface is a *condition*, which is why
+   a lap record is keyed `track|car|surface`.
 
 The ribbon parameterisation is what makes step 3 tractable: a 4096 x 128 texture
 covers a 1500 m lap. The world-space equivalent is unallocatable.

@@ -1380,12 +1380,27 @@ static func _relative_transform(node: Node3D, ancestor: Node3D) -> Transform3D:
 		at = at.get_parent() as Node3D
 	return out
 
+## The group the drivable ribbon's body joins, so anything that needs to know
+## whether a point is on the road can ask the collision world rather than
+## re-deriving it from the centreline.
+const ROAD_GROUP := "road_surface"
+
 ## The driving surface: a ribbon of quads along the centreline, as one concave
 ## shape. Seamless for the raycast wheels, and it follows the elevation changes
 ## that the flat ground plane cannot.
 func _build_road_collision(root_node: Node3D) -> void:
 	var body := StaticBody3D.new()
 	body.name = "RoadSurface"
+	# Grouped, not just named. This is the collision world's answer to "is that
+	# point on the road", which `TyreMarks` asks before laying anything so ruts
+	# stop at the verge instead of wandering across a field that grips exactly
+	# like tarmac. A group survives being packed into a `.tscn`, so it works for
+	# the baked circuits and the ones built at runtime alike.
+	# `true` for persistent, which is **not** the default. Without it the group
+	# lives only on the node in memory and is dropped by `PackedScene.pack`, so
+	# every runtime-built circuit knew where its road was and every shipped one
+	# did not — marks would simply have stopped appearing on the baked tracks.
+	body.add_to_group(ROAD_GROUP, true)
 	root_node.add_child(body)
 
 	var cuts := _ribbon_cuts()
@@ -1795,9 +1810,22 @@ func _build_lighting(root_node: Node3D, track_name: String = "") -> void:
 ## and the painted grid boxes are all on the `grey` surface and the verges on
 ## `grass`, so both survive — which is why this matches by name rather than by
 ## surface index, the pieces not agreeing on the order.
-static func surface_road(track_root: Node3D) -> void:
+static func surface_road(track_root: Node3D, surface: String = "") -> void:
+	var spec := RoadSurface.named(surface)
 	var tarmac := ShaderMaterial.new()
 	tarmac.shader = load("res://assets/shaders/tarmac.gdshader")
+	# Linear on the way in, like every other colour handed to a shader.
+	tarmac.set_shader_parameter("base_color", (spec["base"] as Color).srgb_to_linear())
+	tarmac.set_shader_parameter("grit_color", (spec["grit"] as Color).srgb_to_linear())
+	tarmac.set_shader_parameter("grain_amount", spec["grain"])
+	tarmac.set_shader_parameter("base_roughness", spec["roughness"])
+	# The shape of the surface, which is what separates dirt and snow from a
+	# recoloured road. Zero on tarmac, deliberately: see `RoadSurface`.
+	tarmac.set_shader_parameter("relief", spec.get("relief", 0.0))
+	tarmac.set_shader_parameter("relief_scale", spec.get("relief_scale", 1.6))
+	tarmac.set_shader_parameter("patch_amount", spec.get("patch", 0.0))
+	tarmac.set_shader_parameter("stones", spec.get("stones", 0.0))
+	tarmac.set_shader_parameter("sparkle", spec.get("sparkle", 0.0))
 	for mi in _mesh_instances(track_root):
 		if mi.mesh == null:
 			continue
@@ -1805,6 +1833,43 @@ static func surface_road(track_root: Node3D) -> void:
 			var mat := mi.mesh.surface_get_material(i)
 			if mat != null and mat.resource_name == ROAD_SURFACE:
 				mi.set_surface_override_material(i, tarmac)
+
+	_surface_field(track_root, spec)
+
+## Carries the condition off the road and out into the field beside it.
+##
+## Without this, snow was a white ribbon laid across a green summer lawn, which
+## reads as a painted road rather than as weather. The outfield is *blended*
+## toward the condition rather than replaced by it, so the circuit's theme colour
+## and the hour's darkening still come through underneath — a snowy dusk stays
+## dusk.
+##
+## Written as a surface override built from the mesh material, never by editing
+## the mesh material itself. That material is a resource inside a packed scene and
+## `instantiate()` shares resources rather than copying them, so mutating it would
+## compound every time a race started — five races on snow and the field would be
+## five blends further from where it began. Reading the untouched original and
+## writing a fresh override makes the call idempotent.
+static func _surface_field(track_root: Node3D, spec: Dictionary) -> void:
+	var amount: float = spec.get("field_amount", 0.0)
+	var mi := track_root.get_node_or_null("Ground/GroundMesh") as MeshInstance3D
+	if mi == null or mi.mesh == null:
+		return
+	if amount <= 0.0:
+		# Cleared rather than skipped: the same circuit can be raced on dirt and
+		# then on tarmac without being rebuilt in between.
+		mi.set_surface_override_material(0, null)
+		return
+	var source := mi.mesh.surface_get_material(0) as ShaderMaterial
+	if source == null:
+		return
+	var tinted := source.duplicate() as ShaderMaterial
+	var field: Color = (spec.get("field", Color.WHITE) as Color).srgb_to_linear()
+	for key in ["base_color", "line_color"]:
+		var was = source.get_shader_parameter(key)
+		if was is Color:
+			tinted.set_shader_parameter(key, (was as Color).lerp(field, amount))
+	mi.set_surface_override_material(0, tinted)
 
 ## Dresses the circuit: barriers the whole way round, lighting columns, trees on
 ## the outfield, and a paddock of grandstands and pit garages at the start line.
