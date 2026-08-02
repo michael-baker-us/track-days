@@ -21,6 +21,8 @@ extends RefCounted
 const THEMES := {
 	# Deep forest, close to the road. The Ardennes is trees.
 	"forest": {
+		"marker": "flagGreen",
+		"marker_step": 0.9,
 		"ground": Color(0.30, 0.46, 0.33),
 		"lines": Color(0.34, 0.51, 0.37),
 		"tree_chance": 0.92,
@@ -29,6 +31,8 @@ const THEMES := {
 	# A harbour: pale dry ground, and almost nothing growing. What stands beside
 	# a street circuit is barriers, not woodland.
 	"coastal": {
+		"marker": "flagRed",
+		"marker_step": 0.75,
 		"ground": Color(0.58, 0.56, 0.46),
 		"lines": Color(0.62, 0.60, 0.50),
 		"tree_chance": 0.18,
@@ -37,6 +41,8 @@ const THEMES := {
 	# Open parkland, the Sarthe countryside: grass with stands of trees rather
 	# than a wall of them.
 	"parkland": {
+		"marker": "flagGreen",
+		"marker_step": 1.1,
 		"ground": Color(0.36, 0.50, 0.36),
 		"lines": Color(0.40, 0.55, 0.40),
 		"tree_chance": 0.55,
@@ -44,6 +50,8 @@ const THEMES := {
 	},
 	# The default, and what every circuit looked like before themes existed.
 	"meadow": {
+		"marker": "flagCheckersSmall",
+		"marker_step": 1.0,
 		"ground": Color(0.40, 0.54, 0.42),
 		"lines": Color(0.44, 0.59, 0.46),
 		"tree_chance": 0.8,

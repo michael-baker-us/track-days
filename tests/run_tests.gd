@@ -490,6 +490,66 @@ func test_the_ground_takes_its_theme_and_its_hour() -> void:
 	check_true("themes differ in how much grows (%d densities)" % densities.size(),
 		densities.size() >= 3)
 
+## Markers down the verges, close enough together to read as speed.
+##
+## "Density is speed" (`docs/ideas.md`): pace is sold by a lot of things streaming
+## past at the edge of vision, not by a bigger number on the speedometer. Trees
+## are too far out and too sparse to do it.
+func test_roadside_markers_are_dense_enough_to_read_as_speed() -> void:
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var found := circuit.find_children("Markers", "MultiMeshInstance3D", true, false)
+		check_true("%s has roadside markers" % id, not found.is_empty())
+		if found.is_empty():
+			circuit.free()
+			continue
+
+		var mm: MultiMesh = (found[0] as MultiMeshInstance3D).multimesh
+		var theme := SceneryTheme.for_track(id)
+		var lap: float = TrackBuilder.new().measure(
+			_layout_for(id)
+		).length if _layout_for(id).size() > 0 else 0.0
+
+		# Both verges, at the theme's spacing, so a lap should carry roughly twice
+		# the lap length over the step. Loose bounds: the clearance test drops
+		# markers wherever the circuit doubles back on itself.
+		var step: float = float(theme["marker_step"]) * TrackBuilder.SCALE
+		var expected := 2.0 * lap / step
+		check_true("%s carries a marker every few metres (%d for %.0f m)"
+			% [id, mm.instance_count, lap],
+			mm.instance_count > expected * 0.4)
+
+		# One draw call, and never a shadow caster: a few hundred small props
+		# casting shadows would swamp the atlas the car's own shadow needs.
+		check("%s markers cast no shadow" % id,
+			(found[0] as MultiMeshInstance3D).cast_shadow,
+			GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+		circuit.free()
+
+	# Themes differ in what stands beside the road and how often, or every place
+	# looks the same at speed however different its ground is.
+	var props := {}
+	var steps := {}
+	for name in SceneryTheme.THEMES:
+		props[SceneryTheme.THEMES[name]["marker"]] = true
+		steps[SceneryTheme.THEMES[name]["marker_step"]] = true
+	check_true("themes use different markers (%d)" % props.size(), props.size() >= 2)
+	check_true("at different spacings (%d)" % steps.size(), steps.size() >= 3)
+
+func _layout_for(id: String) -> Array:
+	var src: GDScript = load("res://tools/build_track.gd")
+	match id:
+		"ardennes":
+			return src.ARDENNES
+		"monte_carlo":
+			return src.MONTE_CARLO
+		"la_sarthe":
+			return src.LA_SARTHE
+		"suzuka":
+			return src.SUZUKA
+	return []
+
 ## Every preset has to be complete. They are dictionaries, so a missing key is a
 ## crash at bake time rather than a compile error, and the one that gets forgotten
 ## is always the one only a later preset needed.
@@ -4880,6 +4940,7 @@ func _physics_process(_delta: float) -> bool:
 		test_circuits_have_a_horizon()
 		test_night_lights_the_columns_it_needs()
 		test_the_ground_takes_its_theme_and_its_hour()
+		test_roadside_markers_are_dense_enough_to_read_as_speed()
 		test_a_ghost_round_trips_through_bytes()
 		test_a_damaged_ghost_is_refused()
 		test_a_ghost_interpolates_and_then_holds()

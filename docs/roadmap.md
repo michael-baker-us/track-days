@@ -522,9 +522,20 @@ than a one-off — every unshaded surface is outside the lighting model and need
 its own answer for the hour, and the ground, the horizon ring, the light pools
 and the car's rim have each needed one separately.
 
-**Also not done:** denser roadside objects, and weather. The camera pass is
-deliberately last — it is a *feel* change and the numbers are already
-parameterised, so it wants driving rather than guessing.
+**Roadside markers are in** — small flags down both verges a few metres apart,
+themed per circuit. "Density is speed": pace is sold by a lot of things streaming
+past at the edge of vision, not by a bigger number on the speedometer, and the
+trees were always too far out and too sparse to do it. At 160 km/h they arrive
+about twenty a second.
+
+They cast no shadow, and that is now an option on the multimesh helper rather
+than a property of markers: anything placed in the hundreds would crowd the
+directional light's atlas, which the **car's** shadow needs and which is the one
+shadow that matters.
+
+**Also not done:** weather. The camera pass is deliberately last — it is a *feel*
+change and the numbers are already parameterised, so it wants driving rather than
+guessing.
 
 And **none of the hours or places have been looked at.** The suite asserts each
 circuit carries its own and that the presets are complete, which is not the same

@@ -60,6 +60,12 @@ const TUNNEL_COLOR := Color(0.30, 0.32, 0.35)
 ## The pool of light under a trackside column: how wide, how bright, how far off
 ## the road, and what colour. Columns sit 70 m apart, so a 24 m radius leaves dark
 ## between them — which is the point. A continuous wash would be daylight.
+## Roadside markers: how far off the tarmac they stand, how big they are, and how
+## much room they need from another leg of the circuit.
+const MARKER_GAP := 0.72
+const MARKER_CLEARANCE := 0.7
+const MARKER_SCALE := 3.2
+
 const POOL_SHADER := "res://assets/shaders/light_pool.gdshader"
 const POOL_RADIUS := 24.0
 const POOL_LIFT := 0.05
@@ -1806,6 +1812,7 @@ func _build_scenery(root_node: Node3D, track_name: String) -> void:
 	_scenery_posts(scenery, road, track_name)
 	_scenery_trees(scenery, rng, road, track_name)
 	_scenery_paddock(scenery, road)
+	_scenery_markers(scenery, road, track_name)
 	_build_tunnels(scenery)
 	_build_horizon(scenery, track_name)
 
@@ -2115,6 +2122,38 @@ func _light_pools(
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	scenery.add_child(mi)
 
+## Small markers down both verges, close together.
+##
+## "Density is speed" (`docs/ideas.md`): what sells pace in this kind of racer is
+## a lot of things streaming past at the edge of vision, not a bigger number on
+## the speedometer. Trees are too far out and too sparse to do it — they read as
+## landscape. These stand just off the tarmac at a few metres apart, so at
+## 160 km/h they arrive about twenty a second.
+##
+## Cheap by construction: one `MultiMesh` per circuit, a model of a few triangles,
+## no collision and no shadow. The same clearance test the barrier uses keeps them
+## off another leg of the circuit, so a marker never appears in the middle of the
+## road where the lap doubles back.
+func _scenery_markers(
+	scenery: Node3D, road: Dictionary, track_name: String
+) -> void:
+	var theme := SceneryTheme.for_track(track_name)
+	var prop := _prop(String(theme["marker"]))
+	var step: float = float(theme["marker_step"]) * SCALE
+	var xforms: Array[Transform3D] = []
+	for sgn in [-1.0, 1.0]:
+		var side := float(sgn)
+		for p in _resample(_offset_line(side, MARKER_GAP * SCALE), step):
+			var pt: Vector3 = p[0]
+			if not _clear_of_road(road, pt, MARKER_CLEARANCE * SCALE):
+				continue
+			# Facing across the road, so the flag reads as a flag rather than as
+			# an edge-on sliver from the driver's seat.
+			xforms.append(_prop_xform(
+				pt, _yaw_facing(p[1], side), MARKER_SCALE, prop["offset"]
+			))
+	_multimesh(scenery, "Markers", prop, xforms, false)
+
 ## Trees on the outfield, at a random distance out and skipping the paddock, so
 ## the horizon has something in it without walling the circuit in.
 func _scenery_trees(
@@ -2329,8 +2368,15 @@ static func _yaw_facing(tan: Vector2, side: float) -> float:
 ## cache: not committed, and renamed whenever the import settings change. Baking
 ## that path into a shipped circuit would leave it pointing at nothing on a fresh
 ## checkout. Duplicating clears the path, so PackedScene writes the data out.
+## One draw call per prop type.
+##
+## `casts_shadow` is off for anything placed in the hundreds. A few small props
+## either side of the road are not worth a shadow each, and they would crowd the
+## directional light's atlas — which the *car's* shadow needs, and which is the
+## one shadow that matters.
 func _multimesh(
-	parent: Node3D, node_name: String, prop: Dictionary, xforms: Array[Transform3D]
+	parent: Node3D, node_name: String, prop: Dictionary,
+	xforms: Array[Transform3D], casts_shadow: bool = true
 ) -> void:
 	if xforms.is_empty():
 		return
@@ -2354,6 +2400,8 @@ func _multimesh(
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = node_name
 	mmi.multimesh = mm
+	if not casts_shadow:
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mmi)
 
 ## Packs instance transforms the way `MultiMesh.buffer` wants them: twelve floats
