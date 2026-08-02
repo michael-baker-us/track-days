@@ -444,6 +444,52 @@ func test_night_lights_the_columns_it_needs() -> void:
 			% [name, preset["ambient_energy"], preset["sun_energy"]],
 			preset["ambient_energy"] < 0.6 and preset["sun_energy"] < 0.4)
 
+## The land around a circuit, and the fix for a bug night introduced.
+##
+## The ground plane is `unshaded` — deliberately, because flat bright grass is the
+## look — which means it receives no light. Adding a night preset therefore left
+## La Sarthe with noon-bright green grass under a midnight sky. The hour supplies
+## a tint the lighting cannot.
+func test_the_ground_takes_its_theme_and_its_hour() -> void:
+	var colours := {}
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var mesh: MeshInstance3D = circuit.get_node("Ground/GroundMesh")
+		var mat := mesh.mesh.material as ShaderMaterial
+		check_true("%s ground is shaded by the grid shader" % id, mat != null)
+		if mat == null:
+			circuit.free()
+			continue
+
+		var theme := SceneryTheme.for_track(id)
+		var tint: float = SkyPreset.for_track(id)["ground_tint"]
+		var got: Color = mat.get_shader_parameter("base_color")
+		check_true("%s ground is its theme at its hour (%s)" % [id, got],
+			got.is_equal_approx((theme["ground"] as Color) * tint))
+		colours[got] = true
+		circuit.free()
+
+	# Four circuits, four grounds. A bug collapsing theme or tint would pass every
+	# check above and fail this one.
+	check_true("the circuits stand on different ground (%d)" % colours.size(),
+		colours.size() >= 3)
+
+	# The specific thing that was wrong: a lit-column hour has to darken the
+	# ground, or the grass glows at midnight.
+	for name in SkyPreset.PRESETS:
+		var preset: Dictionary = SkyPreset.PRESETS[name]
+		if preset.get("lit", false):
+			check_true("%s darkens the ground (%.2f)" % [name, preset["ground_tint"]],
+				preset["ground_tint"] < 0.4)
+
+	# And themes vary how much grows, which is the other half of a place.
+	var densities := {}
+	for name in SceneryTheme.THEMES:
+		densities[SceneryTheme.THEMES[name]["tree_chance"]] = true
+	check_true("themes differ in how much grows (%d densities)" % densities.size(),
+		densities.size() >= 3)
+
 ## Every preset has to be complete. They are dictionaries, so a missing key is a
 ## crash at bake time rather than a compile error, and the one that gets forgotten
 ## is always the one only a later preset needed.
@@ -4833,6 +4879,7 @@ func _physics_process(_delta: float) -> bool:
 		test_every_sky_preset_is_complete()
 		test_circuits_have_a_horizon()
 		test_night_lights_the_columns_it_needs()
+		test_the_ground_takes_its_theme_and_its_hour()
 		test_a_ghost_round_trips_through_bytes()
 		test_a_damaged_ghost_is_refused()
 		test_a_ghost_interpolates_and_then_holds()

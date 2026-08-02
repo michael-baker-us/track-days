@@ -510,12 +510,25 @@ as `EMISSION` so it shows on the shaded side where the silhouette is hardest to
 read. The car's material became a shader to carry it; everything the standard
 material did it still does.
 
-**Also not done:** denser roadside objects, the camera pass, scenery themes and
-weather. The camera pass is deliberately last of those — it is a *feel* change,
-and the numbers are already parameterised, so it wants driving rather than
-guessing. And **the hours have not been looked
-at** — the suite asserts each circuit carries its own and that the presets are
-complete, which is not the same as it looking good.
+**Scenery themes are in** — forest, coastal, parkland, meadow — kept separate
+from the hours, so four places and four hours make sixteen looks rather than
+four. The kit has two pieces of vegetation, so a theme varies colour and density
+rather than a prop table, which is most of the effect anyway.
+
+They also carried the fix for a bug night introduced: the ground plane is
+`unshaded` and receives no light, so La Sarthe had **noon-bright green grass
+under a midnight sky** until the hour supplied a tint. That is a shape rather
+than a one-off — every unshaded surface is outside the lighting model and needs
+its own answer for the hour, and the ground, the horizon ring, the light pools
+and the car's rim have each needed one separately.
+
+**Also not done:** denser roadside objects, and weather. The camera pass is
+deliberately last — it is a *feel* change and the numbers are already
+parameterised, so it wants driving rather than guessing.
+
+And **none of the hours or places have been looked at.** The suite asserts each
+circuit carries its own and that the presets are complete, which is not the same
+as it looking good.
 
 **Not doing, and the reversal is deliberate:** clearcoat paint, sky reflections,
 road wear, a fully lit ground plane, SSAO. Those are realism tools and this is not

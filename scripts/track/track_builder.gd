@@ -169,8 +169,6 @@ const TREE_STEP := 0.85 * SCALE
 
 ## Trees are the one prop not left at tile scale: at 1.5 units tall a full-size
 ## one stands 21 m over a 14 m road and closes the circuit in.
-const TREE_SCALE := 0.62
-const TREE_CHANCE := 0.8
 
 ## The run of road the paddock occupies, in tile units relative to the start
 ## line, negative being before it.
@@ -678,7 +676,7 @@ func build(track_name: String, layout: Array, with_geometry := true) -> BuildRes
 			_build_walls(root_node)
 		_build_road_collision(root_node)
 		_build_checkpoints(root_node)
-		_build_ground(root_node)
+		_build_ground(root_node, track_name)
 		_build_lighting(root_node, track_name)
 		_build_scenery(root_node, track_name)
 
@@ -1582,7 +1580,7 @@ func _resample(line: Array[Vector3], step: float) -> Array:
 		carry = t - seg_len
 	return out
 
-func _build_ground(root_node: Node3D) -> void:
+func _build_ground(root_node: Node3D, track_name: String = "") -> void:
 	var ground := StaticBody3D.new()
 	ground.name = "Ground"
 	root_node.add_child(ground)
@@ -1602,8 +1600,14 @@ func _build_ground(root_node: Node3D) -> void:
 	# the ground with a visible edge, and matching the kit exactly instead made
 	# the trees disappear into the field they stand in. A middle value leaves the
 	# verge reading as a mown strip and the trees as objects on it.
-	shader_mat.set_shader_parameter("base_color", Color(0.40, 0.54, 0.42))
-	shader_mat.set_shader_parameter("line_color", Color(0.44, 0.59, 0.46))
+	# Theme for the colour, hour for how dark it reads. The ground plane is
+	# `unshaded` — deliberately, because flat bright grass is the look — which
+	# means it receives no light and would otherwise stay noon-bright green under
+	# a night sky. The tint is what the lighting cannot do for it.
+	var theme := SceneryTheme.for_track(track_name)
+	var tint: float = SkyPreset.for_track(track_name).get("ground_tint", 1.0)
+	shader_mat.set_shader_parameter("base_color", (theme["ground"] as Color) * tint)
+	shader_mat.set_shader_parameter("line_color", (theme["lines"] as Color) * tint)
 	plane.material = shader_mat
 	mi.mesh = plane
 	mi.position.y = -0.02
@@ -1800,7 +1804,7 @@ func _build_scenery(root_node: Node3D, track_name: String) -> void:
 
 	_scenery_barrier(scenery, road)
 	_scenery_posts(scenery, road, track_name)
-	_scenery_trees(scenery, rng, road)
+	_scenery_trees(scenery, rng, road, track_name)
 	_scenery_paddock(scenery, road)
 	_build_tunnels(scenery)
 	_build_horizon(scenery, track_name)
@@ -2113,7 +2117,13 @@ func _light_pools(
 
 ## Trees on the outfield, at a random distance out and skipping the paddock, so
 ## the horizon has something in it without walling the circuit in.
-func _scenery_trees(scenery: Node3D, rng: RandomNumberGenerator, road: Dictionary) -> void:
+func _scenery_trees(
+	scenery: Node3D, rng: RandomNumberGenerator, road: Dictionary,
+	track_name: String
+) -> void:
+	var theme := SceneryTheme.for_track(track_name)
+	var chance: float = theme["tree_chance"]
+	var tree_scale: float = theme["tree_scale"]
 	var large := _prop("treeLarge")
 	var small := _prop("treeSmall")
 	var large_x: Array[Transform3D] = []
@@ -2125,7 +2135,7 @@ func _scenery_trees(scenery: Node3D, rng: RandomNumberGenerator, road: Dictionar
 	for sgn in [-1.0, 1.0]:
 		var side := float(sgn)
 		for p in _resample(_offset_line(side, TREE_GAP_NEAR * SCALE), TREE_STEP):
-			if rng.randf() > TREE_CHANCE:
+			if rng.randf() > chance:
 				continue
 			var tan: Vector2 = p[1]
 			var outward := Vector3(-tan.y, 0.0, tan.x) * side
@@ -2136,7 +2146,7 @@ func _scenery_trees(scenery: Node3D, rng: RandomNumberGenerator, road: Dictionar
 				continue
 			if not _clear_of_road(road, pt, TREE_CLEARANCE * SCALE):
 				continue
-			var s := TREE_SCALE * SCALE * rng.randf_range(0.75, 1.15)
+			var s := tree_scale * SCALE * rng.randf_range(0.75, 1.15)
 			var basis := Basis(Vector3.UP, rng.randf_range(0.0, TAU)).scaled(Vector3(s, s, s))
 			if rng.randf() < 0.55:
 				large_x.append(Transform3D(basis, pt + basis * (large["offset"] as Vector3)))

@@ -1099,6 +1099,31 @@ Three things about it are load-bearing:
 It fades with height rather than growing, because a shadow that grew as the car
 rose would read as the car *sinking*.
 
+### Where a circuit is, as distinct from when
+
+`SceneryTheme` says what the land is made of — its colour and how much grows on
+it — and is kept **separate from `SkyPreset`** because they answer different
+questions and the pairs are not fixed. A forest can be raced at noon or at
+midnight; Monaco is a harbour at any hour. Four hours and four places make
+sixteen looks rather than four.
+
+The racing kit has exactly two pieces of vegetation, so a theme varies **colour
+and density** rather than a prop table. That is most of the effect anyway: a
+dense dark treeline and a sparse pale one read as different countries without
+either needing a model the kit does not have.
+
+> **The ground plane needed the hour, and night is what exposed it.**
+> `ground_grid.gdshader` is `unshaded` — deliberately, because flat bright grass
+> is the look — which means it receives no light. Adding a night preset therefore
+> left La Sarthe with **noon-bright green grass under a midnight sky**. So the
+> hour carries a `ground_tint` the theme's colour is multiplied by: the lighting
+> cannot darken an unshaded surface, so something has to.
+>
+> Worth noting as a shape rather than a one-off. Every unshaded surface in the
+> game is outside the lighting model and needs its own answer for the hour — the
+> ground, the horizon ring, the light pools and the car's rim have each needed
+> one separately.
+
 ### A time of day per circuit
 
 Four hours, one per shipped circuit: Ardennes at **noon**, Monte Carlo at
