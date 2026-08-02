@@ -1038,6 +1038,32 @@ big graphic skies, bright and readable, never grimy. The Kenney kit is already
 untextured flat-shaded geometry, which is the expensive half of that look done,
 and it survives the compatibility renderer the web build is stuck with.
 
+### The road's own coordinate system
+
+Rubber down the racing line, and later tyre tracks, both need the road to carry
+two numbers at every point: how far **along** the lap, and how far **across** the
+road. The tarmac cannot carry them. It is Kenney tiles — shared cached meshes,
+one resource serving every instance of a piece — and `_reshape_tiles` only
+rebuilds the handful that are banked or lifted. Giving the rest a per-vertex
+coordinate would mean inlining every road mesh into every circuit.
+
+So a **separate overlay ribbon** is generated from the centreline, laid 2 cm over
+the tarmac. Built across the road, it has both coordinates by construction, and
+it is the dense visual ribbon the deformation texture will want in any case.
+
+The rubber is **baked into vertex colour** from `ParTime.racing_line` — the same
+line the lap estimate is computed on, so what is dark on the tarmac is literally
+the line the game thinks is quickest. One draw call, no texture, nothing
+per-frame.
+
+> **Scenery is excluded from `_road_vertices` in the suite, and this is why.**
+> Several elevation tests take the highest vertex within a few metres of a point
+> and compare it against the centreline, which only means "the tarmac follows the
+> ribbon" while the geometry sampled *is* tarmac. The overlay has a vertex at
+> every centreline sample, so on a 1-in-11 ramp it supplies a point five metres
+> uphill and half a metre higher — a true fact about a slope, and nothing to do
+> with the tiles. It failed the moment the overlay landed.
+
 ### The car's rim light
 
 A car in flat colour against a road in flat colour has no silhouette at speed.

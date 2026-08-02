@@ -671,6 +671,90 @@ func test_a_drawn_circuit_can_choose_its_look() -> void:
 		check_true("%s still names its own look" % id,
 			CircuitLook.LOOKS.has(CircuitLook.BY_TRACK[id]))
 
+## The road's own coordinate system, and the rubber that proves it works.
+##
+## M17's first step: both the racing-line rubber and the tyre-track deformation
+## texture need the road to carry how far *along* the lap and how far *across* the
+## road at every point. The tiles cannot — they are shared cached meshes and only
+## the banked and lifted ones are rebuilt — so it lives on a ribbon generated from
+## the centreline, which has both by construction.
+func test_the_road_carries_a_lateral_coordinate() -> void:
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var found := circuit.find_children("RoadOverlay", "MeshInstance3D", true, false)
+		check_true("%s has a road overlay" % id, not found.is_empty())
+		if found.is_empty():
+			circuit.free()
+			continue
+
+		var mesh: Mesh = (found[0] as MeshInstance3D).mesh
+		var arrays: Array = mesh.surface_get_arrays(0)
+		var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+		var cols: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+		check_true("%s overlay has vertices" % id, uvs.size() > 100)
+		check("%s overlay carries a colour per vertex" % id, cols.size(), uvs.size())
+
+		# The coordinate: along the lap in x, across the road in y, both 0..1.
+		var min_u := INF
+		var max_u := -INF
+		var min_v := INF
+		var max_v := -INF
+		for uv in uvs:
+			min_u = minf(min_u, uv.x)
+			max_u = maxf(max_u, uv.x)
+			min_v = minf(min_v, uv.y)
+			max_v = maxf(max_v, uv.y)
+		check_true("%s runs the length of the lap (%.2f..%.2f)" % [id, min_u, max_u],
+			min_u < 0.02 and max_u > 0.97)
+		check_true("%s spans the road (%.2f..%.2f)" % [id, min_v, max_v],
+			min_v < 0.01 and max_v > 0.99)
+
+		# The rubber. Baked into vertex alpha from the same racing line the lap
+		# estimate uses, so what is dark on the tarmac is the line the game
+		# thinks is quickest -- and it has to actually vary, or it is a flat wash.
+		var min_a := INF
+		var max_a := -INF
+		for c in cols:
+			min_a = minf(min_a, c.a)
+			max_a = maxf(max_a, c.a)
+		check_true("%s has rubber on the line and none off it (%.2f..%.2f)"
+			% [id, min_a, max_a], min_a < 0.2 and max_a > 0.9)
+
+		# Laid on the road, not floating over it or buried in it.
+		check("%s overlay casts no shadow" % id,
+			(found[0] as MeshInstance3D).cast_shadow,
+			GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+		circuit.free()
+
+	# The band follows the racing line rather than the centreline, which is the
+	# whole point: on a circuit with corners the two are not the same.
+	var builder := TrackBuilder.new()
+	builder.measure(_layout_for("monte_carlo"))
+	var line := ParTime.racing_line(builder.centreline)
+	var moved := 0
+	var furthest := 0.0
+	for i in line.size():
+		var d := line[i].distance_to(builder.centreline[i])
+		furthest = maxf(furthest, d)
+		if d > 1.0:
+			moved += 1
+	# It leaves the centreline where it matters and stays on it where it does
+	# not, which is why the count is low and the distance is not: a lap is mostly
+	# straight, and a straight has one best line through it.
+	# Measured, not aspired to: on Monte Carlo the line departs by at most about
+	# two metres of the six it is allowed. Relaxation converges on the
+	# *minimum-curvature* line, and a point is held back by its neighbours staying
+	# put, so it is smoother than a truly optimal line and uses less of the road.
+	# That is a known limit of the model rather than a bug — see the tuning
+	# journal, M10.
+	check_true("the racing line leaves the centreline at the corners (%d points, up to %.1f m)"
+		% [moved, furthest], moved > 10 and furthest > 1.5)
+	# And never off the road, which is what the clamp in `racing_line` is for.
+	check_true("but never off the road (%.1f m, limit %.1f)"
+		% [furthest, ParTime.LINE_HALF_WIDTH],
+		furthest <= ParTime.LINE_HALF_WIDTH + 0.01)
+
 ## Every preset has to be complete. They are dictionaries, so a missing key is a
 ## crash at bake time rather than a compile error, and the one that gets forgotten
 ## is always the one only a later preset needed.
@@ -3330,8 +3414,22 @@ func _grades(line: Array[Vector3], lo: int, hi: int) -> Array[float]:
 ## Every mesh vertex in the track, in the track root's own space. The tiles are
 ## not in the scene tree, so the transform has to be accumulated by hand rather
 ## than read off `global_transform`.
+## Every vertex of the *road*, in world space.
+##
+## Scenery is skipped, and that matters more than it looks. The tests using this
+## take the highest vertex within a few metres of a point and compare it against
+## the centreline, which only means "the tarmac follows the ribbon" while the
+## geometry sampled *is* tarmac. The road overlay is a decal laid on the road
+## with a vertex at every centreline sample, so on a 1-in-11 ramp it legitimately
+## supplies a point five metres uphill and half a metre higher — a true fact about
+## a slope, and nothing to do with whether the tiles sit on the ribbon.
+const NOT_ROAD := ["Scenery", "Horizon", "RoadOverlay", "LightPools", "Tunnel",
+	"Markers", "LightPosts", "Trees", "TreesSmall"]
+
 func _road_vertices(n: Node, so_far: Transform3D, root_node: Node,
 		out: Array[Vector3]) -> void:
+	if NOT_ROAD.has(String(n.name)):
+		return
 	var here := so_far if n == root_node else so_far * (n as Node3D).transform
 	var mi := n as MeshInstance3D
 	if mi != null and mi.mesh != null:
@@ -5064,6 +5162,7 @@ func _physics_process(_delta: float) -> bool:
 		test_the_ground_takes_its_theme_and_its_hour()
 		test_roadside_markers_are_dense_enough_to_read_as_speed()
 		test_weather_changes_the_look_and_not_the_lap()
+		test_the_road_carries_a_lateral_coordinate()
 		test_a_ghost_round_trips_through_bytes()
 		test_a_damaged_ghost_is_refused()
 		test_a_ghost_interpolates_and_then_holds()

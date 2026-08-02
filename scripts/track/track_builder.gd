@@ -72,6 +72,18 @@ const POOL_LIFT := 0.05
 const POOL_STRENGTH := 1.35
 const POOL_COLOR := Color(1.0, 0.86, 0.62)
 
+## The overlay laid on the tarmac: how many strips across the road, how far the
+## rubber spreads either side of the racing line, and how dark it gets.
+##
+## Nine strips is enough for a smooth band across a 14 m road without doubling the
+## triangle count of the circuit.
+const OVERLAY_SHADER := "res://assets/shaders/road_overlay.gdshader"
+const OVERLAY_STRIPS := 9
+const OVERLAY_WIDTH := 2.6
+const OVERLAY_LIFT := 0.02
+const OVERLAY_STRENGTH := 0.5
+const OVERLAY_COLOR := Color(0.05, 0.05, 0.06)
+
 const HORIZON_RADIUS := 1200.0
 const HORIZON_MIN := 40.0
 const HORIZON_MAX := 170.0
@@ -1822,6 +1834,90 @@ func _build_scenery(root_node: Node3D, track_name: String) -> void:
 	_scenery_markers(scenery, road, track_name)
 	_build_tunnels(scenery)
 	_build_horizon(scenery, track_name)
+	_build_road_overlay(scenery)
+
+## The road's own coordinate system, as a ribbon laid over the tarmac.
+##
+## **This is M17's first step, and the reason it comes before anything else.**
+## Both the racing-line rubber and the tyre-track deformation texture need the
+## road to carry two numbers per point — how far along the lap, and how far across
+## the road — and the tiles cannot: they are shared cached meshes, and only the
+## banked and lifted ones are ever rebuilt. A ribbon generated from the centreline
+## has both by construction, because it is built across the road.
+##
+## What it draws today is the rubber. The darkness is **baked into vertex colour**
+## from `ParTime.racing_line` — the same line the lap estimate is computed on — so
+## the dark band on the tarmac is literally the line the game thinks is quickest.
+## No texture, no per-frame work, one draw call.
+func _build_road_overlay(scenery: Node3D) -> void:
+	if centreline.size() < 4 or _sides.size() != centreline.size():
+		return
+	var line := ParTime.racing_line(centreline)
+	if line.size() != centreline.size():
+		return
+
+	# Where the racing line sits across the road at each point, as a signed
+	# offset in metres. Projected onto the road's own across-vector so a banked or
+	# climbing section measures the same as a flat one.
+	var across := PackedFloat32Array()
+	across.resize(centreline.size())
+	for i in centreline.size():
+		var delta := line[i] - centreline[i]
+		var side := _sides[i]
+		side.y = 0.0
+		if side.length() < 0.001:
+			across[i] = 0.0
+			continue
+		across[i] = delta.dot(side.normalized())
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n := centreline.size()
+	for i in n - 1:
+		for j in OVERLAY_STRIPS:
+			# Lateral positions of this strip's two edges, -1 to 1 across the road.
+			var u0 := -1.0 + 2.0 * float(j) / float(OVERLAY_STRIPS)
+			var u1 := -1.0 + 2.0 * float(j + 1) / float(OVERLAY_STRIPS)
+			_overlay_quad(st, i, i + 1, u0, u1, across)
+
+	var mat := ShaderMaterial.new()
+	mat.shader = load(OVERLAY_SHADER)
+	mat.set_shader_parameter("rubber_color", OVERLAY_COLOR.srgb_to_linear())
+	mat.set_shader_parameter("strength", OVERLAY_STRENGTH)
+
+	var mi := MeshInstance3D.new()
+	mi.name = "RoadOverlay"
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, mat)
+	mi.mesh = mesh
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	scenery.add_child(mi)
+
+## One strip of overlay between two centreline points, carrying its lateral
+## coordinate as UV and its rubber as vertex alpha.
+func _overlay_quad(
+	st: SurfaceTool, i: int, j: int, u0: float, u1: float,
+	across: PackedFloat32Array
+) -> void:
+	var pts := [
+		[i, u0], [j, u0], [j, u1],
+		[i, u0], [j, u1], [i, u1],
+	]
+	for pair in pts:
+		var k: int = pair[0]
+		var u: float = pair[1]
+		var lateral := u * ROAD_HALF
+		var p := _ribbon_point(centreline[k], _sides[k], bank[k], lateral)
+		p.y += OVERLAY_LIFT
+		# How far this vertex is from the racing line, in metres, turned into
+		# how much rubber is on it. A Gaussian rather than a hard band: rubber
+		# thins outwards, it does not stop.
+		var d: float = (lateral - across[k]) / OVERLAY_WIDTH
+		st.set_color(Color(1.0, 1.0, 1.0, exp(-d * d)))
+		# The coordinate this whole ribbon exists to carry: how far along the lap,
+		# and how far across the road.
+		st.set_uv(Vector2(float(k) / float(centreline.size()), (u + 1.0) * 0.5))
+		st.add_vertex(p)
 
 ## A ring of distant land, so the world ends in something rather than in nothing.
 ##

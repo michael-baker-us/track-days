@@ -569,6 +569,27 @@ a realism target. `ground_grid.gdshader` stays `unshaded`.
 1. **A lateral coordinate on the ribbon** (`UV2` or vertex colour). Small, and the
    prerequisite for both racing-line rubber and the deformation texture. Worth
    doing on its own, first.
+
+> **Done — but not on the tiles, and that is a correction worth keeping.** The
+> road is Kenney tiles: shared cached meshes, one resource serving every instance
+> of a piece, and `_reshape_tiles` only rebuilds the handful that are banked or
+> lifted. Giving *those* a lateral coordinate would mean inlining every road mesh
+> into every circuit, throwing away the sharing.
+>
+> So the coordinate lives on a **separate overlay ribbon** generated from the
+> centreline, which has "how far along" and "how far across" by construction —
+> and which is the dense visual ribbon step 3 was going to need anyway.
+>
+> **Racing-line rubber came with it**, baked into vertex colour from
+> `ParTime.racing_line` — so the dark band on the tarmac is literally the line the
+> lap estimate is computed on. One draw call, no texture, no per-frame work.
+>
+> One measurement while pinning it: the line departs the centreline by **at most
+> about 2 m of the 6 it is allowed**. Relaxation converges on the
+> *minimum-curvature* line and a point is held back by its neighbours staying put,
+> so it is smoother than a truly optimal line and uses less of the road. A known
+> limit of the model, not a bug — and the reason the racing line only shortened
+> the lap by 1.8%.
 2. **Surfaces per circuit** — snow and dirt as shader variants through the
    `surface_road` hook that already exists, each with its own grip sweep.
 3. **Tyre tracks**, in three steps: trail geometry, then a track-space deformation
