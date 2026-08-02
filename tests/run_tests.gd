@@ -1381,6 +1381,57 @@ func test_the_rim_takes_the_circuits_own_sky() -> void:
 				(rim as Color).is_equal_approx(want))
 	check_true("a rim colour was actually set (%d surfaces)" % checked, checked > 0)
 
+## Braking has to degrade with the surface, and it does not do so by itself.
+##
+## `VehicleBody3D` applies `brake` as a force at the wheel rather than through the
+## friction model, so `wheel_friction_slip` never limits it. M2b measured stopping
+## distance as byte-identical at friction 1.4, 2.5 and 4.0; M17 measured 24.2 m
+## from 100 km/h on dry tarmac, dirt *and* snow. A surface that halves your
+## cornering and leaves your braking alone is exactly the wrong way round, so the
+## controller scales the brakes by grip by hand — and that is the kind of thing
+## that gets refactored away by someone tidying a multiply.
+##
+## Driven through the real `_physics_process` with the real action pressed, on its
+## own car well away from the circuit the rest of the suite is using.
+func test_braking_degrades_with_the_surface() -> void:
+	var was := GameState.selected_surface
+	var braking := {}
+	var handbraking := {}
+	for surface in RoadSurface.ORDER:
+		GameState.selected_surface = surface
+		var car := load("res://scenes/car/race.tscn").instantiate() as VehicleBody3D
+		root.add_child(car)
+		car.global_position = Vector3(0.0, 400.0, 0.0)
+		# Rolling forwards, or the brake pedal is read as a request for reverse.
+		car.linear_velocity = car.global_transform.basis.z * 20.0
+
+		Input.action_press("brake")
+		car._physics_process(1.0 / 60.0)
+		braking[surface] = car.brake
+		Input.action_release("brake")
+
+		Input.action_press("handbrake")
+		car._physics_process(1.0 / 60.0)
+		handbraking[surface] = car.brake
+		Input.action_release("handbrake")
+		car.free()
+	GameState.selected_surface = was
+
+	check_true("dry braking is unchanged (%.1f)" % braking["tarmac"],
+		braking["tarmac"] > 0.0)
+	check_true("dirt stops worse than tarmac (%.1f vs %.1f)"
+		% [braking["dirt"], braking["tarmac"]],
+		braking["dirt"] < braking["tarmac"])
+	check_true("snow stops worse than dirt (%.1f vs %.1f)"
+		% [braking["snow"], braking["dirt"]],
+		braking["snow"] < braking["dirt"])
+	# Exactly grip, not some second table: a surface scales what a tyre can do,
+	# and it cannot do that differently in one direction than another.
+	check_near("braking follows grip exactly",
+		braking["snow"] / braking["tarmac"], RoadSurface.grip_of("snow"), 0.001)
+	check_true("and so does the handbrake",
+		handbraking["snow"] < handbraking["tarmac"])
+
 ## What the tyres leave behind: what shape it is, where it is allowed to be, and
 ## why it never fades.
 ##
@@ -5499,6 +5550,7 @@ func _physics_process(_delta: float) -> bool:
 		test_the_car_carries_its_audio()
 		test_the_car_has_a_shadow_on_whatever_it_stands_on()
 		test_tyre_marks_have_real_depth()
+		test_braking_degrades_with_the_surface()
 		test_surfacing_a_circuit_is_repeatable()
 		test_the_car_is_painted_and_rimmed()
 		test_the_rim_takes_the_circuits_own_sky()

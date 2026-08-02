@@ -662,6 +662,20 @@ a realism target. `ground_grid.gdshader` stays `unshaded`.
    becoming a property of the layout — the surface is a *condition*, which is why
    a lap record is keyed `track|car|surface`.
 
+6. **Braking degrades on loose surfaces**, which it did not before and would
+   never have started doing on its own. `VehicleBody3D` applies `brake` outside
+   the friction model, so a surface that halved cornering left stopping distance
+   *byte-identical*: 24.2 m from 100 km/h on tarmac, dirt and snow alike. The
+   controller now scales the brakes, the handbrake and reverse by exactly the same
+   grip figure the tyres get — 24.2 / 31.3 / 40.4 m — and `ParTime` scales
+   `braking_g` to match, because par has to model the car actually being driven.
+   Measured both ways round in the tuning journal.
+
+   Acceleration was measured at the same time and **deliberately left alone**:
+   406 vs 414 frames to 100 km/h between tarmac and snow. Making drive
+   surface-aware would move every par time and the whole feel of the car, so it
+   wants its own pass rather than riding along with a braking fix.
+
 The ribbon parameterisation is what makes step 3 tractable: a 4096 x 128 texture
 covers a 1500 m lap. The world-space equivalent is unallocatable.
 

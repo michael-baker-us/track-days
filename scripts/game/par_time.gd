@@ -225,9 +225,17 @@ static func ideal_lap(
 	var top := spec.top_speed_kmh / 3.6 if spec != null else TOP_SPEED
 	# The surface scales the car's grip, exactly as it does on the car itself, so
 	# a perfect lap on snow is a slower perfect lap rather than the same one.
-	var lateral := (spec.lateral_g if spec != null else LATERAL_G) \
-		* RoadSurface.grip_of(surface)
-	var braking := spec.braking_g if spec != null else BRAKING_G
+	#
+	# Both directions, and that is a correction rather than a refinement. Braking
+	# used to be taken as a constant here because it *was* one in the car: M17
+	# measured 24.2 m from 100 km/h on all three surfaces, because
+	# `VehicleBody3D` applies `brake` outside the friction model. The car now
+	# scales its brakes by grip like everything else, and par has to model the
+	# car the player is actually driving or every braking zone on snow is
+	# estimated at nearly twice the deceleration available.
+	var grip := RoadSurface.grip_of(surface)
+	var lateral := (spec.lateral_g if spec != null else LATERAL_G) * grip
+	var braking := (spec.braking_g if spec != null else BRAKING_G) * grip
 	var launch := spec.launch_accel if spec != null else LAUNCH_ACCEL
 	var walk := resample(racing_line(centreline), lateral, top)
 	var points: Array[Vector3] = walk[0]

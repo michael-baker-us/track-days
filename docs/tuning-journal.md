@@ -983,15 +983,61 @@ Par follows grip, so a snow lap is judged against a snow target:
 
 | Circuit | Dry | Dirt | Snow |
 |---|---|---|---|
-| Ardennes | 47.75 s | 51.70 s | 56.59 s |
-| Monte Carlo | 38.15 s | 41.43 s | 45.25 s |
-| La Sarthe | 59.01 s | 63.72 s | 69.26 s |
-| Suzuka | 34.43 s | 36.30 s | 38.30 s |
+| Ardennes | 47.75 s | 52.76 s | 59.73 s |
+| Monte Carlo | 38.15 s | 42.40 s | 48.14 s |
+| La Sarthe | 59.01 s | 65.12 s | 73.41 s |
+| Suzuka | 34.43 s | 37.36 s | 41.38 s |
+
+(Dirt and snow rose again once braking became surface-aware; see below.)
+
+### Braking now degrades with the surface — measured
+
+The open item above is closed, and closing it needed a **deliberate model rather
+than a tuning change**, because the physics will not produce this on its own.
+
+`VehicleBody3D` applies `brake` as a force at the wheel instead of putting it
+through the friction model, so `wheel_friction_slip` never limits it. Measured
+from 100 km/h on the bare plane, full brake, before any change:
+
+| Surface | Grip | Stopping distance |
+|---|---|---|
+| Tarmac | 1.00 | 24.17 m |
+| Dirt | 0.72 | 24.24 m |
+| Snow | 0.50 | 24.15 m |
+
+A 0.4% spread across a surface that halves your cornering — which is noise, and
+the wrong way round for anything loose. `car_controller` now scales `brake`, the
+handbrake and reverse by exactly the same grip figure the tyres get:
+
+| Surface | Grip | Stopping distance | vs dry |
+|---|---|---|---|
+| Tarmac | 1.00 | 24.17 m | — |
+| Dirt | 0.72 | 31.25 m | x 1.29 |
+| Snow | 0.50 | 40.44 m | x 1.67 |
+
+Less than the 1/grip the model implies, because aerodynamic drag also slows the
+car and drag does not care what the road is made of. That is the correct
+behaviour, not a shortfall.
+
+**Exactly grip, with no second table**, on purpose: a surface scales what a tyre
+can do, and it should not be able to do that differently in one direction than
+another. `ParTime` scales `braking_g` the same way — par has to model the car
+being driven, or every braking zone on snow is estimated at nearly twice the
+deceleration available. Baked par on dirt and snow moved up accordingly (tarmac
+is unchanged, since its multiplier is 1.0), and the suite's par-vs-model check is
+what caught all sixteen values.
+
+**Acceleration was measured at the same time and deliberately left alone.** Time
+to 100 km/h was 406, 409 and 414 frames on tarmac, dirt and snow — a 2% spread,
+so drive is very nearly as surface-blind as braking was. The rear wheels *are*
+traction-limited enough to spin, but engine force dominates. Changing it would
+move every par time and the whole feel of the car, so it wants its own measured
+pass rather than being folded into a braking fix.
 
 ### Still open, from M17
 
-- **Braking does not degrade with the surface.** See above; it needs its own
-  sweep against the saturation ceiling.
+- **Longitudinal drive does not degrade with the surface**, per the measurement
+  above: 406 vs 414 frames to 100 km/h between tarmac and snow.
 - **No surface has had a handling sweep of its own.** Every figure in this journal
   is a dry-tarmac figure. The grip multipliers are *stated*, and what they produce
   — lateral g, corner speeds, whether the car still recovers from a slide at 0.5

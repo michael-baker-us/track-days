@@ -44,6 +44,22 @@ func _apply_tuning_to_wheels() -> void:
 ## still grippier on snow. Read once per frame rather than cached, because the
 ## surface is chosen on the title screen and a race can be restarted into a
 ## different one without this node being rebuilt.
+##
+## ## It has to be applied to the brakes by hand
+##
+## Setting `wheel_friction_slip` is enough for cornering and not for stopping.
+## `VehicleBody3D` applies `brake` as a force at the wheel rather than through the
+## friction model, so the tyre never limits it: M2b measured stopping distance as
+## byte-identical at friction 1.4, 2.5 and 4.0, and M17 measured 24.2 m from
+## 100 km/h on dry tarmac, dirt *and* snow — a 0.4% spread, which is noise. Snow
+## that halves your cornering and leaves your braking untouched is exactly the
+## wrong way round.
+##
+## So the brakes, the handbrake and reverse are scaled by the same number the
+## tyres are. There is deliberately no second table for it: the surface scales
+## what a tyre can do, and it should not be able to do that differently in one
+## direction than another. Drive is left alone because it already degrades — the
+## rear wheels are traction-limited under power, so they spin instead.
 func _surface_grip() -> float:
 	return RoadSurface.grip_of(GameState.selected_surface)
 
@@ -67,18 +83,19 @@ func _physics_process(delta: float) -> void:
 	# This car model's front faces local +Z, so that's "forward" for braking-vs-reverse.
 	var forward_speed := linear_velocity.dot(global_transform.basis.z)
 
+	var grip := _surface_grip()
 	if handbrake_pressed:
 		engine_force = 0.0
-		brake = tuning.handbrake_force
+		brake = tuning.handbrake_force * grip
 	elif throttle > 0.0:
 		engine_force = tuning.engine_force * throttle
 		brake = 0.0
 	elif braking > 0.0:
 		if forward_speed > 0.5:
 			engine_force = 0.0
-			brake = tuning.brake_force * braking
+			brake = tuning.brake_force * braking * grip
 		else:
-			engine_force = -tuning.reverse_force * braking
+			engine_force = -tuning.reverse_force * braking * grip
 			brake = 0.0
 	else:
 		engine_force = 0.0
@@ -86,7 +103,7 @@ func _physics_process(delta: float) -> void:
 
 	var rear_friction: float = (
 		tuning.handbrake_rear_friction if handbrake_pressed else tuning.friction_rear
-	) * _surface_grip()
+	) * grip
 	for wheel in _rear_wheels:
 		wheel.wheel_friction_slip = rear_friction
 
