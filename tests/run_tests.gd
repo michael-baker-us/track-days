@@ -348,6 +348,51 @@ func test_shipped_circuits_carry_their_own_hour() -> void:
 	check_true("the circuits are raced at different hours (%d)" % used.size(),
 		used.size() >= 3)
 
+## Every circuit ends in something rather than in flat fog, and the ring obeys the
+## rules every other piece of scenery does.
+func test_circuits_have_a_horizon() -> void:
+	var seen_colours := {}
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var found := circuit.find_children("Horizon", "MeshInstance3D", true, false)
+		check_true("%s has a horizon" % id, not found.is_empty())
+		if found.is_empty():
+			circuit.free()
+			continue
+		var ring: MeshInstance3D = found[0]
+		var box := ring.mesh.get_aabb()
+
+		# A ring around the circuit, not a wall on one side of it.
+		check_true("%s's horizon surrounds the circuit (%.0f x %.0f m)"
+			% [id, box.size.x, box.size.z],
+			box.size.x > TrackBuilder.HORIZON_RADIUS * 1.9
+			and box.size.z > TrackBuilder.HORIZON_RADIUS * 1.9)
+		# Tall enough to sit above the skyline, and sunk below the ground so its
+		# base is never a visible seam.
+		check_true("%s's peaks rise above the ground" % id,
+			box.position.y + box.size.y > TrackBuilder.HORIZON_MIN)
+		check_true("%s's base is below the ground plane" % id, box.position.y < 0.0)
+
+		# Casting shadows from a 2.4 km ring would push everything else out of the
+		# shadow atlas, and it is scenery, so it never collides.
+		check("%s's horizon casts no shadow" % id,
+			ring.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+
+		var mat: StandardMaterial3D = ring.mesh.surface_get_material(0)
+		check("%s's horizon is unshaded" % id,
+			mat.shading_mode, BaseMaterial3D.SHADING_MODE_UNSHADED)
+		# Seen from inside the ring, so single-sided faces would be invisible.
+		check("%s's horizon is two-sided" % id,
+			mat.cull_mode, BaseMaterial3D.CULL_DISABLED)
+		check_true("%s's horizon is coloured for its hour" % id,
+			mat.albedo_color.is_equal_approx(SkyPreset.for_track(id)["silhouette"]))
+		seen_colours[mat.albedo_color] = true
+		circuit.free()
+
+	check_true("distance is coloured differently at different hours (%d)"
+		% seen_colours.size(), seen_colours.size() >= 3)
+
 ## Every preset has to be complete. They are dictionaries, so a missing key is a
 ## crash at bake time rather than a compile error, and the one that gets forgotten
 ## is always the one only a later preset needed.
@@ -4625,6 +4670,7 @@ func _physics_process(_delta: float) -> bool:
 		test_the_steering_curve_leaves_full_lock_alone()
 		test_shipped_circuits_carry_their_own_hour()
 		test_every_sky_preset_is_complete()
+		test_circuits_have_a_horizon()
 		test_a_ghost_round_trips_through_bytes()
 		test_a_damaged_ghost_is_refused()
 		test_a_ghost_interpolates_and_then_holds()

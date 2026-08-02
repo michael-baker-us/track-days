@@ -483,10 +483,24 @@ lighting columns to emit light — they are placed and dark. La Sarthe gets dusk
 instead, with ambient lifted to compensate. Finishing night means giving the
 columns real lights and checking what that costs on the Compatibility renderer.
 
-**Also not done:** horizon silhouettes, denser roadside objects, the camera pass,
-the car rim light, the blob shadow, scenery themes and weather. And **nobody has
-looked at any of it** — the suite asserts each circuit carries its own hour and
-that the presets are complete, which is not the same as it looking good.
+**Horizon silhouettes are in.** A ring of distant land at 1.2 km, generated per
+circuit from a seed so each has its own skyline, unshaded and coloured by the
+hour. Deliberately inside the fog rather than beyond it: fog runs to 2.6 km, so
+at that range the ridge comes through about a quarter hazed — present, and
+clearly far away. Past the fog end it would be invisible; much closer it would
+read as scenery the car might reach.
+
+**One trap it cost, worth recording:** a shader uniform set through
+`set_shader_parameter` is used as **linear radiance** and converts nothing, while
+the `ProceduralSkyMaterial` it replaced took the same `Color` and converted sRGB
+internally. Handing it the old numbers rendered the sky at roughly twice its
+intended brightness and washed the whole distance white. Presets stay authored in
+sRGB; `srgb_to_linear()` is applied once at the boundary.
+
+**Also not done:** denser roadside objects, the camera pass, the car rim light,
+the blob shadow, scenery themes and weather. And **the hours have not been looked
+at** — the suite asserts each circuit carries its own and that the presets are
+complete, which is not the same as it looking good.
 
 **Not doing, and the reversal is deliberate:** clearcoat paint, sky reflections,
 road wear, a fully lit ground plane, SSAO. Those are realism tools and this is not

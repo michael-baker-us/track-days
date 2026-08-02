@@ -32,6 +32,7 @@ const PRESETS := {
 	# The look M8 arrived at, kept as the default so nothing that does not ask
 	# for an hour changes.
 	"noon": {
+		"silhouette": Color(0.30, 0.42, 0.55),
 		"sun_angle": Vector3(-50.0, 35.0, 0.0),
 		"sun_color": Color(1.0, 0.96, 0.89),
 		"sun_energy": 1.15,
@@ -52,6 +53,7 @@ const PRESETS := {
 	# the bottom and deep at the top. The lowest sun angle here, because a long
 	# shadow across the road is most of what says "late".
 	"sunset": {
+		"silhouette": Color(0.26, 0.18, 0.34),
 		"sun_angle": Vector3(-14.0, 118.0, 0.0),
 		"sun_color": Color(1.0, 0.72, 0.42),
 		"sun_energy": 1.05,
@@ -71,6 +73,7 @@ const PRESETS := {
 	# Le Mans after the light has gone but before it is dark. As close to night as
 	# this can get while the trackside columns are still unlit.
 	"dusk": {
+		"silhouette": Color(0.10, 0.12, 0.24),
 		"sun_angle": Vector3(-8.0, 205.0, 0.0),
 		"sun_color": Color(0.62, 0.66, 0.95),
 		"sun_energy": 0.75,
@@ -93,6 +96,7 @@ const PRESETS := {
 	# Suzuka in flat morning cloud: no drama, and that is the point of having it —
 	# a circuit that reads as weather rather than as an hour.
 	"overcast": {
+		"silhouette": Color(0.52, 0.58, 0.64),
 		"sun_angle": Vector3(-62.0, 15.0, 0.0),
 		"sun_color": Color(0.92, 0.94, 0.98),
 		"sun_energy": 0.8,

@@ -51,6 +51,16 @@ const TUNNEL_HALF := 0.68 * SCALE
 const TUNNEL_HEIGHT := 6.5
 const TUNNEL_COLOR := Color(0.30, 0.32, 0.35)
 
+## The ring of distant land: how far out, and how tall its peaks are.
+##
+## 1.2 km sits inside the fog rather than beyond it, on purpose. Fog runs to
+## 2.6 km, so at this range the silhouettes come through about a quarter hazed —
+## present, and clearly far away. Put past the fog end they would be invisible;
+## brought much closer they would read as scenery the car might reach.
+const HORIZON_RADIUS := 1200.0
+const HORIZON_MIN := 40.0
+const HORIZON_MAX := 170.0
+
 ## Solid walls that would actually stop the car, still switched off — nothing
 ## physically prevents cutting a corner, which is why the ordered gates are what
 ## make a lap time mean anything. Not to be confused with the *visual* barrier
@@ -1784,6 +1794,75 @@ func _build_scenery(root_node: Node3D, track_name: String) -> void:
 	_scenery_trees(scenery, rng, road)
 	_scenery_paddock(scenery, road)
 	_build_tunnels(scenery)
+	_build_horizon(scenery, track_name)
+
+## A ring of distant land, so the world ends in something rather than in nothing.
+##
+## Everything past the circuit currently fades into flat fog, which is honest —
+## there *is* nothing out there — and reads as a missing backdrop rather than as
+## distance. A band of silhouettes is the cheapest thing that says the circuit is
+## somewhere, and it is a signature of the look this game is aiming at.
+##
+## Deliberately crude: one band of peaks, unshaded, one flat colour from the
+## hour's preset. It is 1.2 km away and about a quarter fogged at that range, so
+## detail would be invisible even if it were there — and being unshaded means it
+## does not care where the sun is, only what colour the preset says distance
+## should be.
+##
+## No collision, like all scenery, and no shadow: a 2.4 km ring inside the
+## shadow-casting range would push everything else out of the shadow atlas.
+func _build_horizon(scenery: Node3D, track_name: String) -> void:
+	var preset := SkyPreset.for_track(track_name)
+	var rng := RandomNumberGenerator.new()
+	# Seeded off the circuit, so each one gets its own skyline and gets the same
+	# one every time it is built.
+	rng.seed = hash("horizon:%s" % track_name)
+
+	var segments := 96
+	# Heights first, so each peak is shared by the two faces either side of it and
+	# the ridge joins up instead of being a row of loose spikes.
+	var heights := PackedFloat32Array()
+	heights.resize(segments)
+	for i in segments:
+		# Two overlapping waves plus noise: enough to read as terrain rather than
+		# as a sawtooth, without pretending to be a landscape.
+		var a := TAU * float(i) / float(segments)
+		var ridge := 0.55 + 0.45 * sin(a * 3.0 + rng.randf() * 0.2)
+		var range_wave := 0.6 + 0.4 * sin(a * 7.0 + 1.3)
+		heights[i] = HORIZON_MIN + (HORIZON_MAX - HORIZON_MIN) * (
+			ridge * range_wave * rng.randf_range(0.7, 1.0)
+		)
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in segments:
+		var j := (i + 1) % segments
+		var a0 := TAU * float(i) / float(segments)
+		var a1 := TAU * float(j) / float(segments)
+		var p0 := Vector3(cos(a0), 0.0, sin(a0)) * HORIZON_RADIUS
+		var p1 := Vector3(cos(a1), 0.0, sin(a1)) * HORIZON_RADIUS
+		# Sunk well below the ground plane so the base is never visible as a seam,
+		# whatever the camera is doing.
+		var base := Vector3(0.0, -60.0, 0.0)
+		_quad(st, p0 + base, p1 + base,
+			p1 + Vector3(0.0, heights[j], 0.0),
+			p0 + Vector3(0.0, heights[i], 0.0))
+
+	var mat := StandardMaterial3D.new()
+	mat.resource_name = "horizon"
+	mat.albedo_color = preset["silhouette"]
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	# Seen from inside the ring, so the faces point away by default.
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+
+	var mi := MeshInstance3D.new()
+	mi.name = "Horizon"
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, mat)
+	mi.mesh = mesh
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	scenery.add_child(mi)
+
 
 ## Sweeps a shell over every stretch of tunnel road: a wall down each side and a
 ## roof across the top.
