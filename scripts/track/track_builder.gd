@@ -88,12 +88,20 @@ const HORIZON_RADIUS := 1200.0
 const HORIZON_MIN := 40.0
 const HORIZON_MAX := 170.0
 
-## Solid walls that would actually stop the car, still switched off — nothing
-## physically prevents cutting a corner, which is why the ordered gates are what
-## make a lap time mean anything. Not to be confused with the *visual* barrier
-## further down (`BARRIER_HEIGHT` and friends), which is scenery, is always
-## built, and has no collision at all.
-const BARRIERS_ENABLED := false
+## Solid walls at the edge of the road, and they are **on**.
+##
+## They were off for as long as grass gripped exactly like tarmac: with no penalty
+## for leaving the road, a wall was the only thing that could have stopped a cut,
+## and the ordered gates already did that job without putting an invisible box
+## where the player can see open field. Off-road grip changes the trade. Running
+## wide now costs you, and a surface with a real penalty needs something to stop
+## the car sliding into four square kilometres of empty field — the two arrive
+## together on purpose.
+##
+## Not to be confused with the *visual* barrier further down (`BARRIER_HEIGHT` and
+## friends), which is scenery, is always built, and has no collision. This builds
+## collision and no geometry; those rails are what you see it as.
+const BARRIERS_ENABLED := true
 const BARRIER_PIECE := "railDouble"
 const BARRIER_LENGTH_AXIS := "z"
 const BARRIER_SCALE := 10.0
@@ -698,7 +706,7 @@ func build(
 		# straight before it and forward into the one after.
 		_reshape_tiles()
 		if BARRIERS_ENABLED:
-			_build_walls(root_node)
+			_build_wall_collision(root_node)
 		_build_road_collision(root_node)
 		_build_checkpoints(root_node)
 		_build_ground(root_node, track_name)
@@ -1380,10 +1388,24 @@ static func _relative_transform(node: Node3D, ancestor: Node3D) -> Transform3D:
 		at = at.get_parent() as Node3D
 	return out
 
-## The group the drivable ribbon's body joins, so anything that needs to know
-## whether a point is on the road can ask the collision world rather than
-## re-deriving it from the centreline.
+## The group the drivable ribbon's body joins, and the collision layer it adds to
+## itself, so anything that needs to know whether a point is on the road can ask
+## the collision world rather than re-deriving it from the centreline.
+##
+## The group is how you *find* the road; the layer is how you *ask about* it. A
+## ray masked to `ROAD_LAYER` can hit nothing else, so the question needs one cast
+## and has one answer.
+##
+## That took two attempts. The obvious version — cast normally and check what came
+## back — cannot work here, because the flat parts of the ribbon and the top face
+## of the ground slab are at exactly y = 0 and which one a ray returns is
+## arbitrary. Walking down through the hits while excluding each collider in turn
+## does not rescue it either: measured across the four shipped circuits, the same
+## `Ground` body came back three times running from a single point, so the walk
+## burned its whole budget and reported road as field on 40% of Suzuka. Masking
+## the ray sidesteps the coincidence rather than trying to survive it.
 const ROAD_GROUP := "road_surface"
+const ROAD_LAYER := 8
 
 ## The driving surface: a ribbon of quads along the centreline, as one concave
 ## shape. Seamless for the raycast wheels, and it follows the elevation changes
@@ -1401,6 +1423,9 @@ func _build_road_collision(root_node: Node3D) -> void:
 	# every runtime-built circuit knew where its road was and every shipped one
 	# did not — marks would simply have stopped appearing on the baked tracks.
 	body.add_to_group(ROAD_GROUP, true)
+	# Layer 1 as well, so everything that collided with the road before still
+	# does; the extra bit is only there to be asked about.
+	body.collision_layer |= ROAD_LAYER
 	root_node.add_child(body)
 
 	var cuts := _ribbon_cuts()
@@ -1473,67 +1498,60 @@ func _build_checkpoints(root_node: Node3D) -> void:
 		col.shape = box
 		area.add_child(col)
 
-func _build_walls(root_node: Node3D) -> void:
+## Something solid at the edge of the road, so running wide has a consequence.
+##
+## **Collision only.** The rails you can see are scenery, built as one
+## `MultiMesh` by `_scenery_barrier`, and this deliberately does not build a
+## second set: an earlier version of this function instanced a `MeshInstance3D`
+## per rail, which is several hundred draw calls a lap on a single-threaded
+## compatibility-renderer web build, and every one of them would have been sitting
+## inside a rail that was already there.
+##
+## One `ConcavePolygonShape3D` for the whole circuit rather than a box per
+## segment, for the same reason the road surface is one shape: the centreline has
+## a point every metre or so, and a `CollisionShape3D` apiece would be well over a
+## thousand nodes in every baked scene.
+##
+## `backface_collision` because the winding differs between the two sides and a
+## wall that only stops the car from one direction is worse than no wall — you
+## would drive through it from the outside and then be trapped behind it.
+func _build_wall_collision(root_node: Node3D) -> void:
 	var walls := StaticBody3D.new()
 	walls.name = "Walls"
 	root_node.add_child(walls)
 
-	var barrier_src: Node3D = load(
-		"res://assets/kenney/racing_kit/%s.glb" % BARRIER_PIECE
-	).instantiate()
-	var barrier_mesh: Mesh = _first_mesh(barrier_src).mesh
-	var barrier_aabb := barrier_mesh.get_aabb()
-	var barrier_centre := barrier_aabb.position + barrier_aabb.size * 0.5
-	barrier_centre.y = barrier_aabb.position.y
-
-	var barrier_root := Node3D.new()
-	barrier_root.name = "Barriers"
-	root_node.add_child(barrier_root)
-
-	var barrier_xforms: Array[Transform3D] = []
-	for side in [-1.0, 1.0]:
-		for p in _resample(_offset_line(side), BARRIER_STEP):
-			var pt: Vector3 = p[0]
-			var tan: Vector2 = p[1]
-			var yaw := (
-				atan2(tan.x, tan.y) if BARRIER_LENGTH_AXIS == "z"
-				else atan2(-tan.y, tan.x)
-			)
-			var basis := Basis(Vector3.UP, yaw).scaled(
-				Vector3(BARRIER_SCALE, BARRIER_SCALE, BARRIER_SCALE)
-			)
-			barrier_xforms.append(Transform3D(basis, pt - basis * barrier_centre))
-
-	for i in barrier_xforms.size():
-		var mi := MeshInstance3D.new()
-		mi.name = "Barrier%03d" % i
-		mi.mesh = barrier_mesh
-		mi.transform = barrier_xforms[i]
-		barrier_root.add_child(mi)
-	barrier_src.free()
-
-	for side in [-1.0, 1.0]:
-		var line := _offset_line(side)
-		for i in line.size() - 1:
-			var a: Vector3 = line[i]
-			var b: Vector3 = line[i + 1]
-			var d := Vector2(b.x - a.x, b.z - a.z)
-			var seg_len := d.length()
-			if seg_len < 0.01:
+	# Built on the **edge of the drivable ribbon**, from the same `_ribbon_point`
+	# the road collision is built from, rather than by offsetting the centreline
+	# by a constant.
+	#
+	# That is a correction, not a preference. `_offset_line` pushes each segment
+	# out perpendicular in plan by a fixed gap, and on a corner tighter than that
+	# gap the inside line folds through the centre and comes out the other side —
+	# a size-1 corner has a 7 m centreline radius against a 9.8 m gap, so the
+	# inside wall landed *on the tarmac*, 6.6 m from the centreline. It also
+	# ignored roll and elevation, so a wall on a banked corner stood in the air.
+	# Standing the wall on the ribbon's own edge makes it the boundary of the
+	# drivable surface by construction, and it inherits banking and height for
+	# free.
+	var faces := PackedVector3Array()
+	for side in [-RIBBON_HALF, RIBBON_HALF]:
+		for i in centreline.size() - 1:
+			var a := _ribbon_point(centreline[i], _sides[i], bank[i], side)
+			var b := _ribbon_point(centreline[i + 1], _sides[i + 1], bank[i + 1], side)
+			if a.distance_to(b) < 0.01:
 				continue
-			var mid := (a + b) * 0.5
-			var angle := atan2(-d.y, d.x)
+			var a_top := a + Vector3.UP * WALL_H
+			var b_top := b + Vector3.UP * WALL_H
+			faces.append_array([a, b, b_top])
+			faces.append_array([a, b_top, a_top])
 
-			var col_xform := Transform3D()
-			col_xform = col_xform.rotated(Vector3.UP, angle - PI * 0.5)
-			col_xform.origin = mid + Vector3(0.0, WALL_H * 0.5, 0.0)
-
-			var col := CollisionShape3D.new()
-			var shape := BoxShape3D.new()
-			shape.size = Vector3(WALL_T, WALL_H, seg_len)
-			col.shape = shape
-			col.transform = col_xform
-			walls.add_child(col)
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(faces)
+	shape.backface_collision = true
+	var col := CollisionShape3D.new()
+	col.name = "WallCollision"
+	col.shape = shape
+	walls.add_child(col)
 
 func _first_mesh(n: Node) -> MeshInstance3D:
 	if n is MeshInstance3D:

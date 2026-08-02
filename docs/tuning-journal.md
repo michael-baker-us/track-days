@@ -1083,8 +1083,10 @@ no, the car does not become uncatchable.
 
 - **Longitudinal drive does not degrade with the surface**, per the measurement
   above: 406 vs 414 frames to 100 km/h between tarmac and snow.
-- Grass still grips like tarmac, so leaving the road on snow is *more* grip, not
-  less. That is now visibly wrong rather than merely convenient.
+- ~~Grass still grips like tarmac~~ — fixed. Off the ribbon the car keeps 0.55 of
+  whatever the surface gives it, and the barriers became solid in the same change,
+  because a penalty for leaving the road with nothing to stop you leaving it is a
+  car sliding into four square kilometres of empty field.
 
 ### Still open
 
@@ -1094,9 +1096,8 @@ no, the car does not become uncatchable.
   worked on paper and was rejected on feel, so the next attempt wants a different
   approach rather than a retune of that one.
 - Steering is still linear with a speed-based falloff; no countersteer assist.
-- Grass has the same friction as tarmac — going off-track costs nothing but
-  time, since collision is one flat plane under both. With guardrails off there
-  is nothing at all keeping the car on the circuit.
+- ~~Grass has the same friction as tarmac~~ and ~~guardrails are off~~ — both
+  fixed together; see the M17 entry.
 - Suspension squat/roll under load is not yet visible enough to read as weight
   transfer.
 - Rear wheels sit at skid 0.66 under full throttle at 100 km/h — the car is

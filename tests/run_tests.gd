@@ -2783,6 +2783,7 @@ func test_all_tracks_usable() -> void:
 		var inst: Node3D = packed.instantiate()
 		check_true("track %s has a spawn point" % id, inst.has_node("SpawnPoint"))
 		check_true("track %s has a road surface" % id, inst.has_node("RoadSurface"))
+		_check_walls(inst, "track %s" % id)
 		var gate_count := 0
 		for cp in inst.get_node("Checkpoints").get_children():
 			gate_count += 1
@@ -4257,18 +4258,97 @@ func _raised_sample_layout() -> Array:
 	layout.elevation[first.runs[1].cells[0]] = 2
 	return layout.compile().segments
 
+## Something solid at the edge of the road, and it has to be on every circuit —
+## shipped or painted — because it is now load-bearing rather than decorative.
+##
+## Grass no longer grips like tarmac, so running wide costs you. Without a wall
+## the same change would let a car slide off into four square kilometres of empty
+## field with no grip to turn around on, which is why the two shipped together.
+##
+## Collision only. The rails you *see* are one `MultiMesh` of scenery, and a
+## second set of meshes here would be several hundred draw calls a lap sitting
+## inside rails that were already there.
+func _check_walls(track: Node3D, what: String) -> void:
+	var walls := track.get_node_or_null("Walls") as StaticBody3D
+	check_true("%s has walls" % what, walls != null)
+	if walls == null:
+		return
+	# One shape for the whole circuit, not a box per centreline segment: at a
+	# point every metre that would be well over a thousand nodes per scene.
+	check("%s walls are one shape" % what, walls.get_child_count(), 1)
+	var shape := (walls.get_child(0) as CollisionShape3D).shape as ConcavePolygonShape3D
+	check_true("%s walls have faces" % what,
+		shape != null and shape.get_faces().size() > 100)
+	if shape == null:
+		return
+	# Both sides, or the car is stopped leaving one way and not the other.
+	check_true("%s walls stop the car from either side" % what,
+		shape.backface_collision)
+
+	var road := track.get_node_or_null("RoadSurface/RoadCollision") as CollisionShape3D
+	if road == null:
+		return
+	var edge := {}
+	for v: Vector3 in (road.shape as ConcavePolygonShape3D).get_faces():
+		edge[v.snapped(Vector3(0.01, 0.01, 0.01))] = true
+
+	# **The wall stands exactly on the edge of the drivable surface**, because it
+	# is built from the same `_ribbon_point` the road collision is built from.
+	#
+	# This is the check that matters, and it replaced a much weaker one that
+	# measured how close a wall came to the start line. The walls used to be
+	# offset from the centreline by a fixed 9.8 m in plan, which folds through
+	# itself on any corner tighter than that — a size-1 corner has a 7 m radius —
+	# and put the inside wall *on the tarmac*. Distance-to-the-grid could not tell
+	# that apart from a circuit that simply curves back on itself, and on Suzuka,
+	# which crosses over its own start line, it could not tell either from a wall
+	# 7 m overhead.
+	var wall_faces: PackedVector3Array = shape.get_faces()
+	var grounded := 0
+	for v: Vector3 in wall_faces:
+		var at_base := v.snapped(Vector3(0.01, 0.01, 0.01))
+		var at_top := (v - Vector3.UP * TrackBuilder.WALL_H).snapped(
+			Vector3(0.01, 0.01, 0.01)
+		)
+		if edge.has(at_base) or edge.has(at_top):
+			grounded += 1
+	check_true("%s walls stand on the road's own edge (%d/%d)"
+		% [what, grounded, wall_faces.size()],
+		grounded == wall_faces.size())
+
 ## The anti-roll bar has to measure the car against the road, not against the
 ## world, or it spends every banked corner trying to level the car out of the
 ## banking. On flat ground the two answers are the same, which is exactly why
 ## this went unnoticed until there was banking to notice it with.
+##
+## The same probe now also answers whether the car is on the road, which decides
+## how much grip it has. Both halves are checked here because they come off one
+## ray: a probe that stopped finding the surface would take the grip with it.
 func test_antiroll_reads_the_road() -> void:
 	var car: Node = get_first_node_in_group("player_car")
 	check_true("car exists for the anti-roll check", car != null)
 	if car == null:
 		return
-	var up: Vector3 = car._surface_up()
+	car._probe_surface()
+	var up: Vector3 = car._road_up
 	check_true("finds a surface under the car on the grid", up.dot(Vector3.UP) > 0.9)
 	check_near("and it is a unit vector", up.length(), 1.0, 0.001)
+	check_true("and knows the car is on the road", car._on_road)
+	check_near("so it has the surface's full grip", car._surface_grip(),
+		RoadSurface.grip_of(GameState.selected_surface), 0.001)
+
+	# Off the circuit entirely: the ground plane is 4 km across, so there is
+	# something under the car, and it is not road.
+	var was: Vector3 = car.global_position
+	car.global_position = Vector3(was.x + 500.0, 0.6, was.z + 500.0)
+	car.force_update_transform()
+	car._probe_surface()
+	check_true("half a kilometre out is not the road", not car._on_road)
+	check_near("and grass costs most of the grip",
+		car._surface_grip(),
+		RoadSurface.grip_of(GameState.selected_surface) * car.OFF_ROAD_GRIP, 0.001)
+	car.global_position = was
+	car.force_update_transform()
 
 ## Split in two because the raycasts need the bodies to have had a physics step:
 ## `await` cannot be used here, since it would turn the staged `_physics_process`
@@ -5384,6 +5464,7 @@ func test_custom_track_is_complete() -> void:
 	check_true("custom track built", custom_track != null)
 	check_true("has a spawn point", custom_track.has_node("SpawnPoint"))
 	check_true("has a road surface", custom_track.has_node("RoadSurface"))
+	_check_walls(custom_track, "custom track")
 	check("gate count", custom_track.get_node("Checkpoints").get_child_count(), 16)
 	var visuals: Node = custom_track.get_node("RoadVisuals")
 	check("one mesh per piece",

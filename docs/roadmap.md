@@ -694,10 +694,25 @@ covers a 1500 m lap. The world-space equivalent is unallocatable.
    snow does deliver is slower recovery and half the cornering force, which is
    what a player actually feels. Figures in the tuning journal.
 
-**Next here, and it needs a partner:** grass still grips like tarmac. The
-mechanism to fix it now exists — `TyreMarks.on_road` already asks the collision
-world whether a point is on the drivable ribbon, and the car can ask the same
-question — but the answer should not ship alone. See below.
+8. **Grass stops gripping like tarmac, and the barriers become solid.** These are
+   one change, not two. Off the ribbon the car keeps `OFF_ROAD_GRIP` (0.55) of
+   whatever the surface gives it — dry grass is 0.55 of dry tarmac, grass under
+   snow is 0.55 of snow — and a penalty for leaving the road with nothing to stop
+   you leaving it would just be a car sliding into four square kilometres of empty
+   field. The barriers were switched off for exactly as long as leaving the road
+   was free.
+
+   The walls are **collision only** (the rails you see are already a `MultiMesh`
+   of scenery) and are built on the **ribbon's own edge** from the same
+   `_ribbon_point` the road collision uses. The old constant-offset version folded
+   through itself on any corner tighter than its 9.8 m gap — a size-1 corner has a
+   7 m radius — and put the inside wall on the tarmac.
+
+   The road body now carries a collision layer of its own, and both the car and
+   the tyre marks ask about it with a **masked ray**. Inspecting what an unmasked
+   ray hit cannot work: the ribbon and the ground slab are both at exactly y = 0,
+   and walking down through the hits reported road as field on 40 % of Suzuka
+   because the same `Ground` body came back three times running.
 
 **What this breaks, and it is real:** grass currently grips like tarmac, which is
 what makes corner-cutting only *discouraged* by the ordered gates. Low-grip

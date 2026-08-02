@@ -1110,6 +1110,55 @@ Carving real depth still needs the drivable surface to *be* a dense generated
 ribbon that can be displaced in a vertex shader. The ribbon's coordinate system
 exists; the road being made of it does not.
 
+### Off the road, and the wall that had to come with it
+
+Grass gripped exactly like tarmac for the whole of the project's life. That was
+convenient — the ordered gates were the only thing discouraging a cut — and once
+surfaces arrived it became actively backwards, because running wide on snow put
+the car on the one part of the world with *full* grip.
+
+`OFF_ROAD_GRIP` is 0.55, composing with the surface exactly as everything else
+does: dry grass is 0.55 of dry tarmac, grass under snow is 0.55 of snow. There is
+no table of off-road surfaces and no verge-versus-field distinction, because the
+world outside the ribbon is one flat plane and claiming to know more about it than
+"not road" would be inventing detail the geometry does not have.
+
+**The walls came on in the same change, and that pairing is not optional.** A
+penalty for leaving the road with nothing to stop you leaving it means a car that
+slides off into four square kilometres of empty field with no grip to turn around
+on. They were switched off for exactly as long as leaving the road was free.
+
+Two things about how they are built:
+
+- **Collision only.** The rails you see are scenery, one `MultiMesh` built by
+  `_scenery_barrier`. An earlier version of `_build_walls` instanced a
+  `MeshInstance3D` per rail — several hundred draw calls a lap on a
+  single-threaded compatibility-renderer web build, every one of them inside a
+  rail that was already there.
+- **Built on the ribbon's own edge**, from the same `_ribbon_point` the road
+  collision uses, rather than by offsetting the centreline by a constant.
+  `_offset_line` pushes each segment out perpendicular in plan by a fixed 9.8 m,
+  and a size-1 corner has a 7 m centreline radius — so the inside line folded
+  through the centre and put the wall **on the tarmac**, 6.6 m from the
+  centreline. It also ignored roll and elevation. Standing the wall on the ribbon
+  edge makes it the boundary of the drivable surface by construction, and it
+  inherits banking and height for free.
+
+> **Ask the collision world with a masked ray, never by inspecting what came
+> back.** The flat parts of the ribbon and the top face of the ground slab are at
+> exactly y = 0 — not nearly — so which one an unmasked ray returns is arbitrary.
+> Walking down through the hits and excluding each collider in turn does not
+> rescue it: measured across the shipped circuits, the same `Ground` body came
+> back **three times running** from a single point, which exhausted the walk and
+> reported road as field on 40% of Suzuka. That is half the grip vanishing at
+> random over a third of a lap with nothing on screen to explain it.
+>
+> So the road body adds `TrackBuilder.ROAD_LAYER` to its collision layer, and a
+> ray masked to it can hit nothing else — one cast, one answer. The group is how
+> you *find* the road; the layer is how you *ask about* it. `car_controller` and
+> `TyreMarks` both use it, so the tyres and the marks they leave can never
+> disagree about where the circuit is.
+
 ### Surfaces have to be made of something
 
 Grip is what makes snow *be* snow, but colour alone is not what makes it *look*

@@ -61,9 +61,29 @@ func _apply_tuning_to_wheels() -> void:
 ## direction than another. Drive is left alone because it already degrades — the
 ## rear wheels are traction-limited under power, so they spin instead.
 func _surface_grip() -> float:
-	return RoadSurface.grip_of(GameState.selected_surface)
+	var road := RoadSurface.grip_of(GameState.selected_surface)
+	return road if _on_road else road * OFF_ROAD_GRIP
+
+## What is left of the tyres once the car is off the tarmac.
+##
+## Grass gripped exactly like the road for the whole of the project's life, which
+## made leaving the circuit cost nothing but distance — and once surfaces arrived
+## it became actively backwards, because running wide on snow put the car on the
+## one part of the world with *full* grip. Cutting a corner was only ever
+## discouraged by the ordered gates.
+##
+## It composes rather than replacing, like every other grip term here: dry grass
+## is 0.55 of dry tarmac, and grass under snow is 0.55 of snow. There is no
+## separate table of off-road surfaces, and no attempt to model a verge as
+## distinct from a field — the world outside the ribbon is one flat plane, so
+## claiming to know more about it than "not road" would be inventing detail the
+## geometry does not have.
+const OFF_ROAD_GRIP := 0.55
 
 func _physics_process(delta: float) -> void:
+	# One probe a frame, read by both the anti-roll bar and the tyres. It has to
+	# come first: everything below it asks how much grip there is.
+	_probe_surface()
 	var steer_input := _curve(Input.get_axis("steer_left", "steer_right"))
 	var throttle := _pedal(&"accelerate")
 	var braking := _pedal(&"brake")
@@ -154,9 +174,13 @@ func _apply_drag() -> void:
 const GROUND_PROBE := 3.0
 const GROUND_MAX_LEAN := 0.5
 
+## Filled by `_probe_surface` once a frame.
+var _road_up := Vector3.UP
+var _on_road := true
+
 func _apply_antiroll() -> void:
 	var basis := global_transform.basis
-	var up := _surface_up()
+	var up := _road_up
 	# basis.x . up is always 0 for an orthonormal basis measured against its own
 	# y; against the road's up it is the actual signed roll (sin of the angle)
 	# of the car relative to the surface it is standing on.
@@ -166,34 +190,57 @@ func _apply_antiroll() -> void:
 		-basis.z * (tilt * tuning.antiroll_stiffness + roll_rate * tuning.antiroll_damping) * mass
 	)
 
-## Which way is up as far as the suspension is concerned: the road's normal.
+## Which way is up as far as the suspension is concerned, and whether the car is
+## on the road at all.
 ##
-## This used to be world up, which is the same thing on a flat circuit and
+## **Up** used to be world up, which is the same thing on a flat circuit and
 ## quietly wrong on a banked one. The anti-roll bar reads the angle between the
 ## car and "up" as body roll to be resisted, so on a 10 degree banking it saw a
 ## permanently rolled car and spent the whole corner trying to level it against
 ## the road — the car fought the banking instead of settling into it, which is
-## exactly the opposite of what banking is for.
+## exactly the opposite of what banking is for. Airborne, or over something too
+## steep to be road, it falls back to world up; that is the right answer there
+## too, since levelling out is what a car in the air should do.
 ##
-## Airborne, or over something too steep to be road, it falls back to world up.
-## That is the right answer there too: with no surface to align to, levelling out
-## is what a car in the air should do.
-func _surface_up() -> Vector3:
+## **On the road** is a second ray, masked to `TrackBuilder.ROAD_LAYER`, so a hit
+## is the answer and there is nothing to interpret. It cannot be folded into the
+## first: that one has to hit whatever is actually under the car, including the
+## field, to know which way up it is.
+##
+## > Asking one unmasked ray both questions was tried and does not work. The flat
+## > parts of the ribbon and the top of the ground slab sit at exactly y = 0, so
+## > which one comes back is arbitrary, and walking down through the hits while
+## > excluding each collider does not rescue it — the same `Ground` body was
+## > measured coming back three times running from a single point, which reported
+## > road as field across 40% of Suzuka. Half the grip, disappearing at random on
+## > a third of the lap, and nothing on screen to explain it.
+func _probe_surface() -> void:
+	_road_up = Vector3.UP
+	_on_road = false
 	var space := get_world_3d().direct_space_state
+	if space == null:
+		return
 	var from := global_transform.origin
-	var query := PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * GROUND_PROBE)
-	query.exclude = [get_rid()]
-	var hit := space.intersect_ray(query)
-	if hit.is_empty():
-		return Vector3.UP
-	var normal: Vector3 = hit["normal"]
-	# The collision ribbon is two-sided, so a hit from underneath reports an
-	# inverted normal; and a near-vertical one is scenery, not road.
-	if normal.dot(Vector3.UP) < 0.0:
-		normal = -normal
-	if normal.dot(Vector3.UP) < GROUND_MAX_LEAN:
-		return Vector3.UP
-	return normal
+	var to := from + Vector3.DOWN * GROUND_PROBE
+	var mine := [get_rid()]
+
+	var up_query := PhysicsRayQueryParameters3D.create(from, to)
+	up_query.exclude = mine
+	var hit := space.intersect_ray(up_query)
+	if not hit.is_empty():
+		var normal: Vector3 = hit["normal"]
+		# The collision ribbon is two-sided, so a hit from underneath reports an
+		# inverted normal; and a near-vertical one is a wall, not road.
+		if normal.dot(Vector3.UP) < 0.0:
+			normal = -normal
+		if normal.dot(Vector3.UP) >= GROUND_MAX_LEAN:
+			_road_up = normal
+
+	var road_query := PhysicsRayQueryParameters3D.create(
+		from, to, TrackBuilder.ROAD_LAYER
+	)
+	road_query.exclude = mine
+	_on_road = not space.intersect_ray(road_query).is_empty()
 
 func _reset() -> void:
 	global_transform.basis = Basis()

@@ -102,13 +102,8 @@ const LIFT := 0.008
 ## and falls as the tyre slides, so this is measured on `1 - skidinfo`.
 const SLIP_FLOOR := 0.12
 
-## The group `TrackBuilder` puts the drivable ribbon's body in, and how far either
-## side of a contact point to look for it.
-const ROAD_GROUP := "road_surface"
+## How far either side of a contact point to look for the road.
 const ROAD_PROBE := 0.4
-## How many coincident surfaces the probe will look through before giving up. See
-## `on_road`: the ribbon and the ground slab are both exactly at y = 0.
-const PROBE_LAYERS := 3
 
 var _wheels: Array[VehicleWheel3D] = []
 var _last: Array[Vector3] = []
@@ -305,20 +300,21 @@ func _physics_process(_delta: float) -> void:
 ## Only the road is made of anything a tyre could mark.
 ##
 ## Asked by raycast rather than by distance from the centreline. The ribbon is one
-## `StaticBody3D` in a known group, so the collision world already holds the
-## answer exactly, including on the sections carried over a crossing — while
-## "within half a road width of the centreline" would be an approximation that has
-## to be maintained alongside the real one, and would put marks on the bridge deck
-## and on the road beneath it at once. This costs one ray per mark rather than one
-## per frame: it is asked only once a wheel has covered `SPACING`.
+## `StaticBody3D` on a collision layer of its own, so the collision world already
+## holds the answer exactly, including on the sections carried over a crossing —
+## while "within half a road width of the centreline" would be an approximation
+## that has to be maintained alongside the real one, and would put marks on the
+## bridge deck and on the road beneath it at once.
 ##
-## > **It walks down through what it hits rather than trusting the first result.**
-## > The flat sections of the ribbon and the top face of the ground slab are both
-## > at y = 0 — exactly, not nearly — so which of the two a ray returns first is
-## > arbitrary. On the circuit used by the suite it returned `Ground` from a point
-## > the car was standing on, which would have suppressed marks on every flat part
-## > of every track. Two passes settle it in practice; the cap is there so a
-## > pathological stack cannot spin.
+## **Masked to the road, so a hit *is* the answer.** Asking an unmasked ray what
+## it hit does not work: the flat ribbon and the top of the ground slab are both
+## at exactly y = 0, so which comes back is arbitrary. Nor does walking down
+## through the hits — the same `Ground` body was measured coming back three times
+## in a row from one point, which exhausted the walk and reported road as field
+## across 40% of Suzuka.
+##
+## One ray per *mark*, not per frame: it is asked only once a wheel has covered
+## `SPACING`.
 func on_road(point: Vector3) -> bool:
 	var world := get_world_3d()
 	if world == null:
@@ -327,19 +323,11 @@ func on_road(point: Vector3) -> bool:
 	if space == null:
 		return false
 	var query := PhysicsRayQueryParameters3D.create(
-		point + Vector3.UP * ROAD_PROBE, point + Vector3.DOWN * ROAD_PROBE
+		point + Vector3.UP * ROAD_PROBE, point + Vector3.DOWN * ROAD_PROBE,
+		TrackBuilder.ROAD_LAYER
 	)
-	var skip := _exclude.duplicate()
-	for _pass in PROBE_LAYERS:
-		query.exclude = skip
-		var hit := space.intersect_ray(query)
-		if hit.is_empty():
-			return false
-		var body := hit.get("collider") as Node
-		if body != null and body.is_in_group(ROAD_GROUP):
-			return true
-		skip.append(hit["rid"])
-	return false
+	query.exclude = _exclude
+	return not space.intersect_ray(query).is_empty()
 
 ## Lays a mark on the patch of ground under `point`, or deepens the one already
 ## there.

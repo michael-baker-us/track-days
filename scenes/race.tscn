@@ -9,14 +9,14 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/debug_overlay.tscn" id="7_el7e3"]
 [ext_resource type="Script" path="res://scripts/ui/debug_overlay.gd" id="8_kidlu"]
 
-[node name="Race" type="Node3D" unique_id=1567467448]
+[node name="Race" type="Node3D" unique_id=253644533]
 script = ExtResource("1_3kd5h")
 
 [node name="ChaseCamera" type="Camera3D" parent="." unique_id=2122466852 instance=ExtResource("2_l0hv7")]
 current = true
 script = ExtResource("3_r6hvi")
 
-[node name="LapTracker" type="Node" parent="." unique_id=1616165495]
+[node name="LapTracker" type="Node" parent="." unique_id=870811711]
 script = ExtResource("4_cd6ng")
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=1769366452 instance=ExtResource("5_h861m")]
