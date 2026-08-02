@@ -57,6 +57,15 @@ const TUNNEL_COLOR := Color(0.30, 0.32, 0.35)
 ## 2.6 km, so at this range the silhouettes come through about a quarter hazed —
 ## present, and clearly far away. Put past the fog end they would be invisible;
 ## brought much closer they would read as scenery the car might reach.
+## The pool of light under a trackside column: how wide, how bright, how far off
+## the road, and what colour. Columns sit 70 m apart, so a 24 m radius leaves dark
+## between them — which is the point. A continuous wash would be daylight.
+const POOL_SHADER := "res://assets/shaders/light_pool.gdshader"
+const POOL_RADIUS := 24.0
+const POOL_LIFT := 0.05
+const POOL_STRENGTH := 1.35
+const POOL_COLOR := Color(1.0, 0.86, 0.62)
+
 const HORIZON_RADIUS := 1200.0
 const HORIZON_MIN := 40.0
 const HORIZON_MAX := 170.0
@@ -1790,7 +1799,7 @@ func _build_scenery(root_node: Node3D, track_name: String) -> void:
 	var road := _road_index()
 
 	_scenery_barrier(scenery, road)
-	_scenery_posts(scenery, road)
+	_scenery_posts(scenery, road, track_name)
 	_scenery_trees(scenery, rng, road)
 	_scenery_paddock(scenery, road)
 	_build_tunnels(scenery)
@@ -2031,9 +2040,10 @@ static func _barrier_quad(
 
 ## Lighting columns, on the driver's left only — a full avenue down both sides
 ## of a 14 m road turns every straight into a tunnel.
-func _scenery_posts(scenery: Node3D, road: Dictionary) -> void:
+func _scenery_posts(scenery: Node3D, road: Dictionary, track_name: String) -> void:
 	var post := _prop("lightPostLarge")
 	var xforms: Array[Transform3D] = []
+	var lit: Array[Vector3] = []
 	for p in _resample(_offset_line(-1.0, POST_GAP * SCALE), POST_STEP):
 		var pt: Vector3 = p[0]
 		# Standing on the ground rather than on the road, so a column beside a
@@ -2042,7 +2052,64 @@ func _scenery_posts(scenery: Node3D, road: Dictionary) -> void:
 		if not _clear_of_road(road, pt, POST_CLEARANCE * SCALE):
 			continue
 		xforms.append(_prop_xform(pt, _yaw_along(p[1]), POST_SCALE, post["offset"]))
+		# The road beside the column, not the column's own foot: the lamp hangs
+		# over the track and the pool belongs under the lamp.
+		lit.append(p[0] + Vector3(0.0, 0.0, 0.0))
 	_multimesh(scenery, "LightPosts", post, xforms)
+	_light_pools(scenery, track_name, lit)
+
+## The pools of light the columns throw, at the hours that say they are lit.
+##
+## This is what `night` was waiting for. The columns have been placed trackside
+## since M3 and have never emitted anything, so a genuinely dark circuit was
+## unplayable rather than atmospheric — which is why the preset carries a `lit`
+## flag and why night and lit columns had to arrive together.
+##
+## Flat additive discs rather than `OmniLight3D`s. Twenty-odd point lights is a
+## great deal to ask of the Compatibility renderer the web build is stuck with,
+## and a real light produces exactly the smooth falloff gradient this look avoids
+## everywhere else — the ground plane is unshaded, the sky is banded, the car is
+## flat. See assets/shaders/light_pool.gdshader.
+func _light_pools(
+	scenery: Node3D, track_name: String, at: Array[Vector3]
+) -> void:
+	if at.is_empty() or not SkyPreset.for_track(track_name).get("lit", false):
+		return
+
+	var mat := ShaderMaterial.new()
+	mat.shader = load(POOL_SHADER)
+	mat.set_shader_parameter("pool_color", POOL_COLOR.srgb_to_linear())
+	mat.set_shader_parameter("strength", POOL_STRENGTH)
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for centre in at:
+		var c := centre
+		# Just clear of the road surface, and never below it. The shader also
+		# refuses to write depth, which is what actually settles the fight.
+		c.y += POOL_LIFT
+		var r := POOL_RADIUS
+		st.set_uv(Vector2(0.0, 0.0))
+		st.add_vertex(c + Vector3(-r, 0.0, -r))
+		st.set_uv(Vector2(1.0, 0.0))
+		st.add_vertex(c + Vector3(r, 0.0, -r))
+		st.set_uv(Vector2(1.0, 1.0))
+		st.add_vertex(c + Vector3(r, 0.0, r))
+
+		st.set_uv(Vector2(0.0, 0.0))
+		st.add_vertex(c + Vector3(-r, 0.0, -r))
+		st.set_uv(Vector2(1.0, 1.0))
+		st.add_vertex(c + Vector3(r, 0.0, r))
+		st.set_uv(Vector2(0.0, 1.0))
+		st.add_vertex(c + Vector3(-r, 0.0, r))
+
+	var mi := MeshInstance3D.new()
+	mi.name = "LightPools"
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, mat)
+	mi.mesh = mesh
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	scenery.add_child(mi)
 
 ## Trees on the outfield, at a random distance out and skipping the paddock, so
 ## the horizon has something in it without walling the circuit in.

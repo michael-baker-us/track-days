@@ -393,6 +393,57 @@ func test_circuits_have_a_horizon() -> void:
 	check_true("distance is coloured differently at different hours (%d)"
 		% seen_colours.size(), seen_colours.size() >= 3)
 
+## Night, and the thing it was waiting for.
+##
+## The trackside columns have been placed since M3 and have never emitted
+## anything, so a genuinely dark circuit was unplayable rather than atmospheric.
+## `night` therefore ships with lit columns or not at all — which makes the pools
+## and the `lit` flag one feature, and worth checking as one.
+func test_night_lights_the_columns_it_needs() -> void:
+	var lit := []
+	for name in SkyPreset.PRESETS:
+		if SkyPreset.PRESETS[name].get("lit", false):
+			lit.append(name)
+	check_true("some hour lights the columns (%s)" % lit, lit.size() > 0)
+
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var wants_light: bool = SkyPreset.for_track(id).get("lit", false)
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var pools := circuit.find_children("LightPools", "MeshInstance3D", true, false)
+		check("%s has pools exactly when its hour is lit" % id,
+			not pools.is_empty(), wants_light)
+
+		if not pools.is_empty():
+			var mesh: MeshInstance3D = pools[0]
+			# One pool per column, and the columns are 70 m apart, so a circuit
+			# of this size should carry a good handful.
+			var posts := circuit.find_children("LightPosts", "MultiMeshInstance3D", true, false)
+			check_true("%s pools every column it placed" % id,
+				not posts.is_empty()
+				and mesh.mesh.get_aabb().size.x > 100.0)
+			# A pool that cast a shadow would be a contradiction, and one that
+			# wrote depth would fight the road it lies on.
+			check("%s pools cast no shadow" % id,
+				mesh.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+			var mat := mesh.mesh.surface_get_material(0) as ShaderMaterial
+			check_true("%s pools use the pool shader" % id, mat != null)
+			if mat != null:
+				# Linear on the way in, like every other colour handed to a
+				# shader. This is the trap that turned the sky white.
+				check_true("%s pool colour is linear" % id,
+					(mat.get_shader_parameter("pool_color") as Color)
+						.is_equal_approx(TrackBuilder.POOL_COLOR.srgb_to_linear()))
+		circuit.free()
+
+	# And a lit hour has to be dark enough to need them, or the pools are
+	# decoration on a bright circuit.
+	for name in lit:
+		var preset: Dictionary = SkyPreset.PRESETS[name]
+		check_true("%s is actually dark (ambient %.2f, sun %.2f)"
+			% [name, preset["ambient_energy"], preset["sun_energy"]],
+			preset["ambient_energy"] < 0.6 and preset["sun_energy"] < 0.4)
+
 ## Every preset has to be complete. They are dictionaries, so a missing key is a
 ## crash at bake time rather than a compile error, and the one that gets forgotten
 ## is always the one only a later preset needed.
@@ -4781,6 +4832,7 @@ func _physics_process(_delta: float) -> bool:
 		test_shipped_circuits_carry_their_own_hour()
 		test_every_sky_preset_is_complete()
 		test_circuits_have_a_horizon()
+		test_night_lights_the_columns_it_needs()
 		test_a_ghost_round_trips_through_bytes()
 		test_a_damaged_ghost_is_refused()
 		test_a_ghost_interpolates_and_then_holds()

@@ -566,408 +566,408 @@ _surfaces = [{
 "vertex_data": PackedByteArray("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AADopwZdE7gAAOinBl0TuAAA6KcGXRO4AADopwZdE7gAAOinBl0TuAAA6KcGXRO4AACVrGla87UAAJWsaVrztQAAlaxpWvO1AACVrGla87UAAJWsaVrztQAAlaxpWvO1AAATsV5YrbMAABOxXlitswAAE7FeWK2zAAATsV5YrbMAABOxXlitswAAE7FeWK2zAAButd5WQrEAAG613lZCsQAAbrXeVkKxAAButd5WQrEAAG613lZCsQAAbrXeVkKxAACxueFVt64AALG54VW3rgAAsbnhVbeuAACxueFVt64AALG54VW3rgAAsbnhVbeuAADmvWRVC6wAAOa9ZFULrAAA5r1kVQusAADmvWRVC6wAAOa9ZFULrAAA5r1kVQusAAAXwmRVQKkAABfCZFVAqQAAF8JkVUCpAAAXwmRVQKkAABfCZFVAqQAAF8JkVUCpAABMxuFVVqYAAEzG4VVWpgAATMbhVVamAABMxuFVVqYAAEzG4VVWpgAATMbhVVamAACQyt5WTKMAAJDK3lZMowAAkMreVkyjAACQyt5WTKMAAJDK3lZMowAAkMreVkyjAADrzl5YIqAAAOvOXlgioAAA685eWCKgAADrzl5YIqAAAOvOXlgioAAA685eWCKgAABp02la1pwAAGnTaVrWnAAAadNpWtacAABp02la1pwAAGnTaVrWnAAAadNpWtacAAAV2AZdZ5kAABXYBl1nmQAAFdgGXWeZAAAV2AZdZ5kAABXYBl1nmQAAFdgGXWeZAAD+3ENg1pUAAP7cQ2DWlQAA/txDYNaVAAD+3ENg1pUAAP7cQ2DWlQAA/txDYNaVAAA04itkIZIAADTiK2QhkgAANOIrZCGSAAA04itkIZIAADTiK2QhkgAANOIrZCGSAADL59FoSo4AAMvn0WhKjgAAy+fRaEqOAADL59FoSo4AAMvn0WhKjgAAy+fRaEqOAADb7UZuUooAANvtRm5SigAA2+1GblKKAADb7UZuUooAANvtRm5SigAA2+1GblKKAACF9J90P4YAAIX0n3Q/hgAAhfSfdD+GAACF9J90P4YAAIX0n3Q/hgAAhfSfdD+GAADw+/F7F4IAAPD78XsXggAA8PvxexeCAADw+/F7F4IAAPD78XsXggAA8PvxexeC///w+w2EF4L///D7DYQXgv//8PsNhBeC///w+w2EF4L///D7DYQXgv//8PsNhBeC//+F9F+LP4b//4X0X4s/hv//hfRfiz+G//+F9F+LP4b//4X0X4s/hv//hfRfiz+G///b7biRUor//9vtuJFSiv//2+24kVKK///b7biRUor//9vtuJFSiv//2+24kVKK///L5y2XSo7//8vnLZdKjv//y+ctl0qO///L5y2XSo7//8vnLZdKjv//y+ctl0qO//804tObIZL//zTi05shkv//NOLTmyGS//804tObIZL//zTi05shkv//NOLTmyGS///+3Luf1pX///7cu5/Wlf///ty7n9aV///+3Luf1pX///7cu5/Wlf///ty7n9aV//8V2PiiZ5n//xXY+KJnmf//Fdj4omeZ//8V2PiiZ5n//xXY+KJnmf//Fdj4omeZ//9p05Wl1pz//2nTlaXWnP//adOVpdac//9p05Wl1pz//2nTlaXWnP//adOVpdac///rzqCnIqD//+vOoKcioP//686gpyKg///rzqCnIqD//+vOoKcioP//686gpyKg//+QyiCpTKP//5DKIKlMo///kMogqUyj//+QyiCpTKP//5DKIKlMo///kMogqUyj//9Mxh2qVqb//0zGHapWpv//TMYdqlam//9Mxh2qVqb//0zGHapWpv//TMYdqlam//8XwpqqQKn//xfCmqpAqf//F8KaqkCp//8XwpqqQKn//xfCmqpAqf//F8KaqkCp///mvZqqC6z//+a9mqoLrP//5r2aqgus///mvZqqC6z//+a9mqoLrP//5r2aqgus//+xuR2qt67//7G5Haq3rv//sbkdqreu//+xuR2qt67//7G5Haq3rv//sbkdqreu//9utSCpQrH//261IKlCsf//brUgqUKx//9utSCpQrH//261IKlCsf//brUgqUKx//8TsaCnrbP//xOxoKets///E7Ggp62z//8TsaCnrbP//xOxoKets///E7Ggp62z//+VrJWl87X//5WslaXztf//layVpfO1//+VrJWl87X//5WslaXztf//layVpfO1///op/iiE7j//+in+KITuP//6Kf4ohO4///op/iiE7j//+in+KITuP//6Kf4ohO4////orufBrr///+iu58Guv///6K7nwa6////orufBrr///+iu58Guv///6K7nwa6///JndObxrv//8md05vGu///yZ3Tm8a7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")
 }]
 
-[node name="Track_suzuka" type="Node3D" unique_id=207838842]
+[node name="Track_suzuka" type="Node3D" unique_id=1067837609]
 
-[node name="RoadVisuals" type="Node3D" parent="." unique_id=1580086676]
+[node name="RoadVisuals" type="Node3D" parent="." unique_id=312766393]
 transform = Transform3D(14, 0, 0, 0, 7, 0, 0, 0, 14, 0, 0, 0)
 
-[node name="@Node3D@273" type="Node3D" parent="RoadVisuals" unique_id=929079247]
+[node name="@Node3D@273" type="Node3D" parent="RoadVisuals" unique_id=1243676837]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.5, 0, 2)
 
 [node name="roadStartPositions" type="Node3D" parent="RoadVisuals/@Node3D@273" unique_id=423462491 instance=ExtResource("1_t1q0h")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@274" type="Node3D" parent="RoadVisuals" unique_id=727061066]
+[node name="@Node3D@274" type="Node3D" parent="RoadVisuals" unique_id=1294079431]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.63, 0, 4)
 
 [node name="roadStart" type="Node3D" parent="RoadVisuals/@Node3D@274" unique_id=311774981 instance=ExtResource("2_bbl4t")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@275" type="Node3D" parent="RoadVisuals" unique_id=1584656242]
+[node name="@Node3D@275" type="Node3D" parent="RoadVisuals" unique_id=613032105]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 4)
 
 [node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@275" unique_id=316980241 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@276" type="Node3D" parent="RoadVisuals" unique_id=112777449]
+[node name="@Node3D@276" type="Node3D" parent="RoadVisuals" unique_id=162959156]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 6)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@276" unique_id=44015033 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@276" unique_id=915009020 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@277" type="Node3D" parent="RoadVisuals" unique_id=1274377994]
+[node name="@Node3D@277" type="Node3D" parent="RoadVisuals" unique_id=1283801026]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 8)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@277" unique_id=1184897049 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@277" unique_id=86347392 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@278" type="Node3D" parent="RoadVisuals" unique_id=1066909956]
+[node name="@Node3D@278" type="Node3D" parent="RoadVisuals" unique_id=1042700674]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 10)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@278" unique_id=1099710587 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@278" unique_id=488290139 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@279" type="Node3D" parent="RoadVisuals" unique_id=1287892305]
+[node name="@Node3D@279" type="Node3D" parent="RoadVisuals" unique_id=1782792490]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 12)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@279" unique_id=2038433143 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@279" unique_id=455329369 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@280" type="Node3D" parent="RoadVisuals" unique_id=1473771385]
+[node name="@Node3D@280" type="Node3D" parent="RoadVisuals" unique_id=605249793]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 14)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@280" unique_id=98317209 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@280" unique_id=1895234780 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@281" type="Node3D" parent="RoadVisuals" unique_id=1253174200]
+[node name="@Node3D@281" type="Node3D" parent="RoadVisuals" unique_id=1652435178]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 16)
 
 [node name="roadStraight" type="Node3D" parent="RoadVisuals/@Node3D@281" unique_id=1070377846 instance=ExtResource("4_x747f")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="@Node3D@282" type="Node3D" parent="RoadVisuals" unique_id=75103703]
+[node name="@Node3D@282" type="Node3D" parent="RoadVisuals" unique_id=2044950270]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -0.5, 0, 18)
 
 [node name="roadCornerSmall" type="Node3D" parent="RoadVisuals/@Node3D@282" unique_id=347253410 instance=ExtResource("5_wltjw")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="@Node3D@283" type="Node3D" parent="RoadVisuals" unique_id=1821507025]
+[node name="@Node3D@283" type="Node3D" parent="RoadVisuals" unique_id=359665931]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.5, 0, 18)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@283" unique_id=840552286 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@283" unique_id=1560671358 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@284" type="Node3D" parent="RoadVisuals" unique_id=851847702]
+[node name="@Node3D@284" type="Node3D" parent="RoadVisuals" unique_id=1844075948]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.5, 0, 18)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@284" unique_id=697192897 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@284" unique_id=771345080 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@285" type="Node3D" parent="RoadVisuals" unique_id=465931097]
+[node name="@Node3D@285" type="Node3D" parent="RoadVisuals" unique_id=46498042]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 4.5, 0, 18)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@285" unique_id=1892067030 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@285" unique_id=247368995 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@286" type="Node3D" parent="RoadVisuals" unique_id=1623877939]
+[node name="@Node3D@286" type="Node3D" parent="RoadVisuals" unique_id=1249481787]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 6.5, 0, 18)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@286" unique_id=1339839326 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@286" unique_id=731840844 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@287" type="Node3D" parent="RoadVisuals" unique_id=1211246008]
+[node name="@Node3D@287" type="Node3D" parent="RoadVisuals" unique_id=931357077]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 9.5, 0, 18)
 
-[node name="roadCornerSmall" type="Node3D" parent="RoadVisuals/@Node3D@287" unique_id=1622994284 instance=ExtResource("5_wltjw")]
+[node name="roadCornerSmall" type="Node3D" parent="RoadVisuals/@Node3D@287" unique_id=992086613 instance=ExtResource("5_wltjw")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="@Node3D@288" type="Node3D" parent="RoadVisuals" unique_id=2077685314]
+[node name="@Node3D@288" type="Node3D" parent="RoadVisuals" unique_id=198166502]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 0, 15)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@288" unique_id=600888525 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@288" unique_id=2090386318 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@289" type="Node3D" parent="RoadVisuals" unique_id=926045466]
+[node name="@Node3D@289" type="Node3D" parent="RoadVisuals" unique_id=235872722]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 0, 13)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@289" unique_id=299018411 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@289" unique_id=1572320382 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@290" type="Node3D" parent="RoadVisuals" unique_id=1162269696]
+[node name="@Node3D@290" type="Node3D" parent="RoadVisuals" unique_id=195774620]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 0, 11)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@290" unique_id=742337594 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@290" unique_id=1828077587 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@291" type="Node3D" parent="RoadVisuals" unique_id=610243371]
+[node name="@Node3D@291" type="Node3D" parent="RoadVisuals" unique_id=643528872]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 0, 9)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@291" unique_id=948158732 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@291" unique_id=1103779328 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@292" type="Node3D" parent="RoadVisuals" unique_id=1211173318]
+[node name="@Node3D@292" type="Node3D" parent="RoadVisuals" unique_id=133574932]
 transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 9.5, 0, 8)
 
-[node name="roadCornerSmall" type="Node3D" parent="RoadVisuals/@Node3D@292" unique_id=1614053325 instance=ExtResource("5_wltjw")]
+[node name="roadCornerSmall" type="Node3D" parent="RoadVisuals/@Node3D@292" unique_id=1596804841 instance=ExtResource("5_wltjw")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="@Node3D@293" type="Node3D" parent="RoadVisuals" unique_id=896280592]
+[node name="@Node3D@293" type="Node3D" parent="RoadVisuals" unique_id=1127340677]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 6.5, 0, 9)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@293" unique_id=629460975 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@293" unique_id=1640466072 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@294" type="Node3D" parent="RoadVisuals" unique_id=1079646780]
+[node name="@Node3D@294" type="Node3D" parent="RoadVisuals" unique_id=1684466920]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 5.5, 0, 9)
 
-[node name="roadStraight" type="Node3D" parent="RoadVisuals/@Node3D@294" unique_id=564799802 instance=ExtResource("4_x747f")]
+[node name="roadStraight" type="Node3D" parent="RoadVisuals/@Node3D@294" unique_id=1812990362 instance=ExtResource("4_x747f")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="@Node3D@295" type="Node3D" parent="RoadVisuals" unique_id=1223961632]
+[node name="@Node3D@295" type="Node3D" parent="RoadVisuals" unique_id=62194436]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 3.5, 0, 9)
 
-[node name="@MeshInstance3D@315" type="MeshInstance3D" parent="RoadVisuals/@Node3D@295" unique_id=2044405835]
+[node name="@MeshInstance3D@315" type="MeshInstance3D" parent="RoadVisuals/@Node3D@295" unique_id=1518670555]
 mesh = SubResource("ArrayMesh_vyaoh")
 
-[node name="@Node3D@296" type="Node3D" parent="RoadVisuals" unique_id=366309373]
+[node name="@Node3D@296" type="Node3D" parent="RoadVisuals" unique_id=1594153319]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.5, 0.5, 9)
 
-[node name="@MeshInstance3D@316" type="MeshInstance3D" parent="RoadVisuals/@Node3D@296" unique_id=1025768640]
+[node name="@MeshInstance3D@316" type="MeshInstance3D" parent="RoadVisuals/@Node3D@296" unique_id=73655625]
 mesh = SubResource("ArrayMesh_x44rj")
 
-[node name="@Node3D@297" type="Node3D" parent="RoadVisuals" unique_id=260383190]
+[node name="@Node3D@297" type="Node3D" parent="RoadVisuals" unique_id=1842332065]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.5, 0.5, 9)
 
 [node name="roadStraightBridge" type="Node3D" parent="RoadVisuals/@Node3D@297" unique_id=1502560761 instance=ExtResource("6_3x6bc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="@Node3D@298" type="Node3D" parent="RoadVisuals" unique_id=566312480]
+[node name="@Node3D@298" type="Node3D" parent="RoadVisuals" unique_id=1979411087]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -0.5, 0.5, 9)
 
-[node name="roadStraightBridge" type="Node3D" parent="RoadVisuals/@Node3D@298" unique_id=451675330 instance=ExtResource("6_3x6bc")]
+[node name="roadStraightBridge" type="Node3D" parent="RoadVisuals/@Node3D@298" unique_id=828756077 instance=ExtResource("6_3x6bc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="@Node3D@299" type="Node3D" parent="RoadVisuals" unique_id=1689663492]
+[node name="@Node3D@299" type="Node3D" parent="RoadVisuals" unique_id=465025944]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -1.5, 0.5, 9)
 
-[node name="roadStraightBridge" type="Node3D" parent="RoadVisuals/@Node3D@299" unique_id=1502312394 instance=ExtResource("6_3x6bc")]
+[node name="roadStraightBridge" type="Node3D" parent="RoadVisuals/@Node3D@299" unique_id=184917025 instance=ExtResource("6_3x6bc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="@Node3D@300" type="Node3D" parent="RoadVisuals" unique_id=73034248]
+[node name="@Node3D@300" type="Node3D" parent="RoadVisuals" unique_id=1395257567]
 transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, -1.5, 0.5, 8)
 
-[node name="@MeshInstance3D@317" type="MeshInstance3D" parent="RoadVisuals/@Node3D@300" unique_id=1789611401]
+[node name="@MeshInstance3D@317" type="MeshInstance3D" parent="RoadVisuals/@Node3D@300" unique_id=212966195]
 mesh = SubResource("ArrayMesh_sxjkq")
 
-[node name="@Node3D@301" type="Node3D" parent="RoadVisuals" unique_id=841399245]
+[node name="@Node3D@301" type="Node3D" parent="RoadVisuals" unique_id=140102174]
 transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, -3.5, 0, 8)
 
-[node name="@MeshInstance3D@318" type="MeshInstance3D" parent="RoadVisuals/@Node3D@301" unique_id=1004543887]
+[node name="@MeshInstance3D@318" type="MeshInstance3D" parent="RoadVisuals/@Node3D@301" unique_id=101261105]
 mesh = SubResource("ArrayMesh_bja4o")
 
-[node name="@Node3D@302" type="Node3D" parent="RoadVisuals" unique_id=1183488088]
+[node name="@Node3D@302" type="Node3D" parent="RoadVisuals" unique_id=1082034920]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -7.5, 0, 9)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@302" unique_id=50012799 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@302" unique_id=1824820305 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@303" type="Node3D" parent="RoadVisuals" unique_id=1565908185]
+[node name="@Node3D@303" type="Node3D" parent="RoadVisuals" unique_id=537362735]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -8.5, 0, 9)
 
-[node name="roadStraight" type="Node3D" parent="RoadVisuals/@Node3D@303" unique_id=1443572842 instance=ExtResource("4_x747f")]
+[node name="roadStraight" type="Node3D" parent="RoadVisuals/@Node3D@303" unique_id=977502981 instance=ExtResource("4_x747f")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="@Node3D@304" type="Node3D" parent="RoadVisuals" unique_id=617336306]
+[node name="@Node3D@304" type="Node3D" parent="RoadVisuals" unique_id=1483319667]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -9.5, 0, 9)
 
-[node name="roadCornerSmall" type="Node3D" parent="RoadVisuals/@Node3D@304" unique_id=721545701 instance=ExtResource("5_wltjw")]
+[node name="roadCornerSmall" type="Node3D" parent="RoadVisuals/@Node3D@304" unique_id=2077919526 instance=ExtResource("5_wltjw")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="@Node3D@305" type="Node3D" parent="RoadVisuals" unique_id=2131373820]
+[node name="@Node3D@305" type="Node3D" parent="RoadVisuals" unique_id=18139462]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 0, 6)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@305" unique_id=397497597 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@305" unique_id=983565236 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@306" type="Node3D" parent="RoadVisuals" unique_id=1807765730]
+[node name="@Node3D@306" type="Node3D" parent="RoadVisuals" unique_id=468912586]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 0, 4)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@306" unique_id=120532098 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@306" unique_id=2100822763 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@307" type="Node3D" parent="RoadVisuals" unique_id=798816594]
+[node name="@Node3D@307" type="Node3D" parent="RoadVisuals" unique_id=578684741]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 0, 2)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@307" unique_id=546210599 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@307" unique_id=426083706 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@308" type="Node3D" parent="RoadVisuals" unique_id=1844991218]
+[node name="@Node3D@308" type="Node3D" parent="RoadVisuals" unique_id=732657055]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 0, 0)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@308" unique_id=2123477986 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@308" unique_id=526914946 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@309" type="Node3D" parent="RoadVisuals" unique_id=1160438562]
+[node name="@Node3D@309" type="Node3D" parent="RoadVisuals" unique_id=1472463427]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 0, -1)
 
-[node name="roadCornerSmall" type="Node3D" parent="RoadVisuals/@Node3D@309" unique_id=2004427776 instance=ExtResource("5_wltjw")]
+[node name="roadCornerSmall" type="Node3D" parent="RoadVisuals/@Node3D@309" unique_id=1272573076 instance=ExtResource("5_wltjw")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="@Node3D@310" type="Node3D" parent="RoadVisuals" unique_id=1990362844]
+[node name="@Node3D@310" type="Node3D" parent="RoadVisuals" unique_id=956475816]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -8.5, 0, 0)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@310" unique_id=1322594500 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@310" unique_id=1324475063 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@311" type="Node3D" parent="RoadVisuals" unique_id=450895192]
+[node name="@Node3D@311" type="Node3D" parent="RoadVisuals" unique_id=830195969]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6.5, 0, 0)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@311" unique_id=2139330009 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@311" unique_id=838073960 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@312" type="Node3D" parent="RoadVisuals" unique_id=303637205]
+[node name="@Node3D@312" type="Node3D" parent="RoadVisuals" unique_id=440006658]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -4.5, 0, 0)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@312" unique_id=547678558 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@312" unique_id=796637002 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@313" type="Node3D" parent="RoadVisuals" unique_id=449409006]
+[node name="@Node3D@313" type="Node3D" parent="RoadVisuals" unique_id=2034806897]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -2.5, 0, 0)
 
-[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@313" unique_id=1699614150 instance=ExtResource("3_8sgda")]
+[node name="roadStraightLong" type="Node3D" parent="RoadVisuals/@Node3D@313" unique_id=21566456 instance=ExtResource("3_8sgda")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 2.65)
 
-[node name="@Node3D@314" type="Node3D" parent="RoadVisuals" unique_id=1252737496]
+[node name="@Node3D@314" type="Node3D" parent="RoadVisuals" unique_id=2069942008]
 transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 0.5, 0, -1)
 
-[node name="roadCornerSmall" type="Node3D" parent="RoadVisuals/@Node3D@314" unique_id=1405697560 instance=ExtResource("5_wltjw")]
+[node name="roadCornerSmall" type="Node3D" parent="RoadVisuals/@Node3D@314" unique_id=613492445 instance=ExtResource("5_wltjw")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0, 1.65)
 
-[node name="RoadSurface" type="StaticBody3D" parent="." unique_id=1985768370]
+[node name="RoadSurface" type="StaticBody3D" parent="." unique_id=1570976089]
 
-[node name="RoadCollision" type="CollisionShape3D" parent="RoadSurface" unique_id=815124069]
+[node name="RoadCollision" type="CollisionShape3D" parent="RoadSurface" unique_id=2038888754]
 shape = SubResource("ConcavePolygonShape3D_msxp5")
 
-[node name="Checkpoints" type="Node3D" parent="." unique_id=1386203270]
+[node name="Checkpoints" type="Node3D" parent="." unique_id=1876108955]
 
-[node name="Checkpoint00" type="Area3D" parent="Checkpoints" unique_id=1568221080]
+[node name="Checkpoint00" type="Area3D" parent="Checkpoints" unique_id=576479138]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 44.56)
 script = ExtResource("7_vmb0w")
 
-[node name="@CollisionShape3D@319" type="CollisionShape3D" parent="Checkpoints/Checkpoint00" unique_id=13535483]
+[node name="@CollisionShape3D@319" type="CollisionShape3D" parent="Checkpoints/Checkpoint00" unique_id=1549144642]
 shape = SubResource("BoxShape3D_qhnbs")
 
-[node name="Checkpoint01" type="Area3D" parent="Checkpoints" unique_id=1547245273]
+[node name="Checkpoint01" type="Area3D" parent="Checkpoints" unique_id=870177792]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 106.504)
 script = ExtResource("7_vmb0w")
 index = 1
 
-[node name="@CollisionShape3D@320" type="CollisionShape3D" parent="Checkpoints/Checkpoint01" unique_id=838603387]
+[node name="@CollisionShape3D@320" type="CollisionShape3D" parent="Checkpoints/Checkpoint01" unique_id=386742947]
 shape = SubResource("BoxShape3D_dhhdn")
 
-[node name="Checkpoint02" type="Area3D" parent="Checkpoints" unique_id=1453122575]
+[node name="Checkpoint02" type="Area3D" parent="Checkpoints" unique_id=1234237071]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 168.448)
 script = ExtResource("7_vmb0w")
 index = 2
 
-[node name="@CollisionShape3D@321" type="CollisionShape3D" parent="Checkpoints/Checkpoint02" unique_id=1971098348]
+[node name="@CollisionShape3D@321" type="CollisionShape3D" parent="Checkpoints/Checkpoint02" unique_id=1800311652]
 shape = SubResource("BoxShape3D_u7kbp")
 
-[node name="Checkpoint03" type="Area3D" parent="Checkpoints" unique_id=708197884]
+[node name="Checkpoint03" type="Area3D" parent="Checkpoints" unique_id=579934781]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 230.392)
 script = ExtResource("7_vmb0w")
 index = 3
 
-[node name="@CollisionShape3D@322" type="CollisionShape3D" parent="Checkpoints/Checkpoint03" unique_id=72224772]
+[node name="@CollisionShape3D@322" type="CollisionShape3D" parent="Checkpoints/Checkpoint03" unique_id=227352066]
 shape = SubResource("BoxShape3D_evst3")
 
-[node name="Checkpoint04" type="Area3D" parent="Checkpoints" unique_id=1813498473]
+[node name="Checkpoint04" type="Area3D" parent="Checkpoints" unique_id=786534004]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 50.358074, 6, 245)
 script = ExtResource("7_vmb0w")
 index = 4
 
-[node name="@CollisionShape3D@323" type="CollisionShape3D" parent="Checkpoints/Checkpoint04" unique_id=1429360961]
+[node name="@CollisionShape3D@323" type="CollisionShape3D" parent="Checkpoints/Checkpoint04" unique_id=1173086666]
 shape = SubResource("BoxShape3D_tye0v")
 
-[node name="Checkpoint05" type="Area3D" parent="Checkpoints" unique_id=2069598914]
+[node name="Checkpoint05" type="Area3D" parent="Checkpoints" unique_id=1139080356]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 112.30207, 6, 245)
 script = ExtResource("7_vmb0w")
 index = 5
 
-[node name="@CollisionShape3D@324" type="CollisionShape3D" parent="Checkpoints/Checkpoint05" unique_id=952185904]
+[node name="@CollisionShape3D@324" type="CollisionShape3D" parent="Checkpoints/Checkpoint05" unique_id=11720922]
 shape = SubResource("BoxShape3D_6yqco")
 
-[node name="Checkpoint06" type="Area3D" parent="Checkpoints" unique_id=541484990]
+[node name="Checkpoint06" type="Area3D" parent="Checkpoints" unique_id=2039223162]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 126, 6, 193.73186)
 script = ExtResource("7_vmb0w")
 index = 6
 
-[node name="@CollisionShape3D@325" type="CollisionShape3D" parent="Checkpoints/Checkpoint06" unique_id=800066160]
+[node name="@CollisionShape3D@325" type="CollisionShape3D" parent="Checkpoints/Checkpoint06" unique_id=2121433130]
 shape = SubResource("BoxShape3D_c2q2d")
 
-[node name="Checkpoint07" type="Area3D" parent="Checkpoints" unique_id=111908443]
+[node name="Checkpoint07" type="Area3D" parent="Checkpoints" unique_id=414313345]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 126, 6, 131.78786)
 script = ExtResource("7_vmb0w")
 index = 7
 
-[node name="@CollisionShape3D@326" type="CollisionShape3D" parent="Checkpoints/Checkpoint07" unique_id=1629001555]
+[node name="@CollisionShape3D@326" type="CollisionShape3D" parent="Checkpoints/Checkpoint07" unique_id=1256986879]
 shape = SubResource("BoxShape3D_vt811")
 
-[node name="Checkpoint08" type="Area3D" parent="Checkpoints" unique_id=837455994]
+[node name="Checkpoint08" type="Area3D" parent="Checkpoints" unique_id=244145120]
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 73.82182, 6.0130467, 119)
 script = ExtResource("7_vmb0w")
 index = 8
 
-[node name="@CollisionShape3D@327" type="CollisionShape3D" parent="Checkpoints/Checkpoint08" unique_id=1668854871]
+[node name="@CollisionShape3D@327" type="CollisionShape3D" parent="Checkpoints/Checkpoint08" unique_id=288127089]
 shape = SubResource("BoxShape3D_cpau5")
 
-[node name="Checkpoint09" type="Area3D" parent="Checkpoints" unique_id=1429380200]
+[node name="Checkpoint09" type="Area3D" parent="Checkpoints" unique_id=1481005998]
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 12.496, 13, 119)
 script = ExtResource("7_vmb0w")
 index = 9
 
-[node name="@CollisionShape3D@328" type="CollisionShape3D" parent="Checkpoints/Checkpoint09" unique_id=1000334471]
+[node name="@CollisionShape3D@328" type="CollisionShape3D" parent="Checkpoints/Checkpoint09" unique_id=1706320352]
 shape = SubResource("BoxShape3D_5vlpa")
 
-[node name="Checkpoint10" type="Area3D" parent="Checkpoints" unique_id=822967556]
+[node name="Checkpoint10" type="Area3D" parent="Checkpoints" unique_id=1167274292]
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -49.135242, 9.468385, 119)
 script = ExtResource("7_vmb0w")
 index = 10
 
-[node name="@CollisionShape3D@329" type="CollisionShape3D" parent="Checkpoints/Checkpoint10" unique_id=595152157]
+[node name="@CollisionShape3D@329" type="CollisionShape3D" parent="Checkpoints/Checkpoint10" unique_id=342407505]
 shape = SubResource("BoxShape3D_sxfjr")
 
-[node name="Checkpoint11" type="Area3D" parent="Checkpoints" unique_id=412339120]
+[node name="Checkpoint11" type="Area3D" parent="Checkpoints" unique_id=375647797]
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -110.77377, 6, 119)
 script = ExtResource("7_vmb0w")
 index = 11
 
-[node name="@CollisionShape3D@330" type="CollisionShape3D" parent="Checkpoints/Checkpoint11" unique_id=1110597297]
+[node name="@CollisionShape3D@330" type="CollisionShape3D" parent="Checkpoints/Checkpoint11" unique_id=1276971882]
 shape = SubResource("BoxShape3D_8hl73")
 
-[node name="Checkpoint12" type="Area3D" parent="Checkpoints" unique_id=2014531544]
+[node name="Checkpoint12" type="Area3D" parent="Checkpoints" unique_id=433085051]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -126, 6, 69.26015)
 script = ExtResource("7_vmb0w")
 index = 12
 
-[node name="@CollisionShape3D@331" type="CollisionShape3D" parent="Checkpoints/Checkpoint12" unique_id=184745591]
+[node name="@CollisionShape3D@331" type="CollisionShape3D" parent="Checkpoints/Checkpoint12" unique_id=695222492]
 shape = SubResource("BoxShape3D_6lcjf")
 
-[node name="Checkpoint13" type="Area3D" parent="Checkpoints" unique_id=2034155714]
+[node name="Checkpoint13" type="Area3D" parent="Checkpoints" unique_id=1716291007]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -126, 6, 7.3161516)
 script = ExtResource("7_vmb0w")
 index = 13
 
-[node name="@CollisionShape3D@332" type="CollisionShape3D" parent="Checkpoints/Checkpoint13" unique_id=314137387]
+[node name="@CollisionShape3D@332" type="CollisionShape3D" parent="Checkpoints/Checkpoint13" unique_id=237953848]
 shape = SubResource("BoxShape3D_h8vyj")
 
-[node name="Checkpoint14" type="Area3D" parent="Checkpoints" unique_id=679407273]
+[node name="Checkpoint14" type="Area3D" parent="Checkpoints" unique_id=1580866989]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -75.350075, 6, -7)
 script = ExtResource("7_vmb0w")
 index = 14
 
-[node name="@CollisionShape3D@333" type="CollisionShape3D" parent="Checkpoints/Checkpoint14" unique_id=731507886]
+[node name="@CollisionShape3D@333" type="CollisionShape3D" parent="Checkpoints/Checkpoint14" unique_id=1221920196]
 shape = SubResource("BoxShape3D_3pllq")
 
-[node name="Checkpoint15" type="Area3D" parent="Checkpoints" unique_id=1565971571]
+[node name="Checkpoint15" type="Area3D" parent="Checkpoints" unique_id=1741308712]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -13.406077, 6, -7)
 script = ExtResource("7_vmb0w")
 index = 15
 
-[node name="@CollisionShape3D@334" type="CollisionShape3D" parent="Checkpoints/Checkpoint15" unique_id=118674438]
+[node name="@CollisionShape3D@334" type="CollisionShape3D" parent="Checkpoints/Checkpoint15" unique_id=723236599]
 shape = SubResource("BoxShape3D_oc2iv")
 
-[node name="Ground" type="StaticBody3D" parent="." unique_id=1851196771]
+[node name="Ground" type="StaticBody3D" parent="." unique_id=842678356]
 
-[node name="GroundMesh" type="MeshInstance3D" parent="Ground" unique_id=1799562870]
+[node name="GroundMesh" type="MeshInstance3D" parent="Ground" unique_id=808539155]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.02, 0)
 mesh = SubResource("PlaneMesh_fgqvv")
 
-[node name="@CollisionShape3D@335" type="CollisionShape3D" parent="Ground" unique_id=1481291619]
+[node name="@CollisionShape3D@335" type="CollisionShape3D" parent="Ground" unique_id=1256273006]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 shape = SubResource("BoxShape3D_dm1l2")
 
-[node name="Sun" type="DirectionalLight3D" parent="." unique_id=314772871]
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=144650985]
 transform = Transform3D(0.9659258, -0.22852364, 0.12150819, 0, 0.4694716, 0.88294756, -0.25881904, -0.8528618, 0.45347473, 0, 0, 0)
 light_color = Color(0.92, 0.94, 0.98, 1)
 light_energy = 0.8
@@ -975,77 +975,77 @@ shadow_enabled = true
 shadow_normal_bias = 0.5
 directional_shadow_max_distance = 320.0
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=880275832]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=534423631]
 environment = SubResource("Environment_akj4o")
 
-[node name="Scenery" type="Node3D" parent="." unique_id=1425055172]
+[node name="Scenery" type="Node3D" parent="." unique_id=854484589]
 
-[node name="BarrierLeft" type="MeshInstance3D" parent="Scenery" unique_id=39146195]
+[node name="BarrierLeft" type="MeshInstance3D" parent="Scenery" unique_id=2129335981]
 mesh = SubResource("ArrayMesh_ed56k")
 
-[node name="BarrierRight" type="MeshInstance3D" parent="Scenery" unique_id=279113320]
+[node name="BarrierRight" type="MeshInstance3D" parent="Scenery" unique_id=551237555]
 mesh = SubResource("ArrayMesh_wh630")
 
-[node name="LightPosts" type="MultiMeshInstance3D" parent="Scenery" unique_id=1198078084]
+[node name="LightPosts" type="MultiMeshInstance3D" parent="Scenery" unique_id=169811588]
 multimesh = SubResource("MultiMesh_syrp2")
 
-[node name="TreesLarge" type="MultiMeshInstance3D" parent="Scenery" unique_id=307983142]
+[node name="TreesLarge" type="MultiMeshInstance3D" parent="Scenery" unique_id=2012527604]
 multimesh = SubResource("MultiMesh_di2g0")
 
-[node name="TreesSmall" type="MultiMeshInstance3D" parent="Scenery" unique_id=477975751]
+[node name="TreesSmall" type="MultiMeshInstance3D" parent="Scenery" unique_id=1977192034]
 multimesh = SubResource("MultiMesh_f6rnc")
 
-[node name="Paddock" type="Node3D" parent="Scenery" unique_id=1791218092]
+[node name="Paddock" type="Node3D" parent="Scenery" unique_id=1398409995]
 
 [node name="grandStandCovered0" type="Node3D" parent="Scenery/Paddock" unique_id=1730970062 instance=ExtResource("10_effu3")]
 transform = Transform3D(14, 0, 0, 0, 14, 0, 0, 0, 14, -11.56208, 0.14, -12.740001)
 
-[node name="grandStandCovered1" type="Node3D" parent="Scenery/Paddock" unique_id=1957428615 instance=ExtResource("10_effu3")]
+[node name="grandStandCovered1" type="Node3D" parent="Scenery/Paddock" unique_id=562329580 instance=ExtResource("10_effu3")]
 transform = Transform3D(-6.119594e-07, 0, -14, 0, 14, 0, 14, 0, -6.119594e-07, 5.7400007, 0.14, -1.5400009)
 
 [node name="grandStand2" type="Node3D" parent="Scenery/Paddock" unique_id=216582162 instance=ExtResource("11_210hk")]
 transform = Transform3D(-6.119594e-07, 0, -14, 0, 14, 0, 14, 0, -6.119594e-07, 5.6000004, 0.14, 12.459999)
 
-[node name="grandStand3" type="Node3D" parent="Scenery/Paddock" unique_id=1427470328 instance=ExtResource("11_210hk")]
+[node name="grandStand3" type="Node3D" parent="Scenery/Paddock" unique_id=1763525748 instance=ExtResource("11_210hk")]
 transform = Transform3D(-6.119594e-07, 0, -14, 0, 14, 0, 14, 0, -6.119594e-07, 5.6000004, 0.14, 26.46)
 
-[node name="grandStand4" type="Node3D" parent="Scenery/Paddock" unique_id=1527195761 instance=ExtResource("11_210hk")]
+[node name="grandStand4" type="Node3D" parent="Scenery/Paddock" unique_id=982920924 instance=ExtResource("11_210hk")]
 transform = Transform3D(-6.119594e-07, 0, -14, 0, 14, 0, 14, 0, -6.119594e-07, 5.6000004, 0.14, 40.46)
 
-[node name="grandStandCovered5" type="Node3D" parent="Scenery/Paddock" unique_id=1688234725 instance=ExtResource("10_effu3")]
+[node name="grandStandCovered5" type="Node3D" parent="Scenery/Paddock" unique_id=859100363 instance=ExtResource("10_effu3")]
 transform = Transform3D(-6.119594e-07, 0, -14, 0, 14, 0, 14, 0, -6.119594e-07, 5.7400007, 0.14, 54.46)
 
-[node name="grandStand6" type="Node3D" parent="Scenery/Paddock" unique_id=873676524 instance=ExtResource("11_210hk")]
+[node name="grandStand6" type="Node3D" parent="Scenery/Paddock" unique_id=1376735146 instance=ExtResource("11_210hk")]
 transform = Transform3D(-6.119594e-07, 0, -14, 0, 14, 0, 14, 0, -6.119594e-07, 5.6000004, 0.14, 68.46)
 
-[node name="grandStand7" type="Node3D" parent="Scenery/Paddock" unique_id=527832377 instance=ExtResource("11_210hk")]
+[node name="grandStand7" type="Node3D" parent="Scenery/Paddock" unique_id=684661419 instance=ExtResource("11_210hk")]
 transform = Transform3D(-6.119594e-07, 0, -14, 0, 14, 0, 14, 0, -6.119594e-07, 5.6000004, 0.14, 82.46)
 
-[node name="grandStand8" type="Node3D" parent="Scenery/Paddock" unique_id=186681573 instance=ExtResource("11_210hk")]
+[node name="grandStand8" type="Node3D" parent="Scenery/Paddock" unique_id=1824395002 instance=ExtResource("11_210hk")]
 transform = Transform3D(-6.119594e-07, 0, -14, 0, 14, 0, 14, 0, -6.119594e-07, 5.6000004, 0.14, 96.46)
 
-[node name="grandStandCovered9" type="Node3D" parent="Scenery/Paddock" unique_id=481818596 instance=ExtResource("10_effu3")]
+[node name="grandStandCovered9" type="Node3D" parent="Scenery/Paddock" unique_id=1844002544 instance=ExtResource("10_effu3")]
 transform = Transform3D(-6.119594e-07, 0, -14, 0, 14, 0, 14, 0, -6.119594e-07, 5.7400007, 0.14, 138.45999)
 
 [node name="pitsGarage10" type="Node3D" parent="Scenery/Paddock" unique_id=1980632692 instance=ExtResource("12_wp2pg")]
 transform = Transform3D(-6.119594e-07, 0, 14, 0, 14, 0, -14, 0, -6.119594e-07, -6.23007, 0.14, 16.66)
 
-[node name="pitsGarage11" type="Node3D" parent="Scenery/Paddock" unique_id=1924096798 instance=ExtResource("12_wp2pg")]
+[node name="pitsGarage11" type="Node3D" parent="Scenery/Paddock" unique_id=378113788 instance=ExtResource("12_wp2pg")]
 transform = Transform3D(-6.119594e-07, 0, 14, 0, 14, 0, -14, 0, -6.119594e-07, -6.23007, 0.14, 30.66)
 
-[node name="pitsGarage12" type="Node3D" parent="Scenery/Paddock" unique_id=474508911 instance=ExtResource("12_wp2pg")]
+[node name="pitsGarage12" type="Node3D" parent="Scenery/Paddock" unique_id=1523050487 instance=ExtResource("12_wp2pg")]
 transform = Transform3D(-6.119594e-07, 0, 14, 0, 14, 0, -14, 0, -6.119594e-07, -6.23007, 0.14, 44.66)
 
-[node name="pitsGarage13" type="Node3D" parent="Scenery/Paddock" unique_id=1032672056 instance=ExtResource("12_wp2pg")]
+[node name="pitsGarage13" type="Node3D" parent="Scenery/Paddock" unique_id=475485036 instance=ExtResource("12_wp2pg")]
 transform = Transform3D(-6.119594e-07, 0, 14, 0, 14, 0, -14, 0, -6.119594e-07, -6.23007, 0.14, 58.66)
 
-[node name="pitsGarage14" type="Node3D" parent="Scenery/Paddock" unique_id=61199705 instance=ExtResource("12_wp2pg")]
+[node name="pitsGarage14" type="Node3D" parent="Scenery/Paddock" unique_id=927259782 instance=ExtResource("12_wp2pg")]
 transform = Transform3D(-6.119594e-07, 0, 14, 0, 14, 0, -14, 0, -6.119594e-07, -6.23007, 0.14, 72.659996)
 
-[node name="pitsGarage15" type="Node3D" parent="Scenery/Paddock" unique_id=1075163604 instance=ExtResource("12_wp2pg")]
+[node name="pitsGarage15" type="Node3D" parent="Scenery/Paddock" unique_id=1000925770 instance=ExtResource("12_wp2pg")]
 transform = Transform3D(-6.119594e-07, 0, 14, 0, 14, 0, -14, 0, -6.119594e-07, -6.23007, 0.14, 86.659996)
 
-[node name="pitsGarage16" type="Node3D" parent="Scenery/Paddock" unique_id=1277871154 instance=ExtResource("12_wp2pg")]
+[node name="pitsGarage16" type="Node3D" parent="Scenery/Paddock" unique_id=145538541 instance=ExtResource("12_wp2pg")]
 transform = Transform3D(-6.119594e-07, 0, 14, 0, 14, 0, -14, 0, -6.119594e-07, -6.23007, 0.14, 100.659996)
 
 [node name="pitsOffice17" type="Node3D" parent="Scenery/Paddock" unique_id=750475652 instance=ExtResource("13_uo5tg")]
@@ -1054,13 +1054,13 @@ transform = Transform3D(-6.119594e-07, 0, 14, 0, 14, 0, -14, 0, -6.119594e-07, -
 [node name="tentLong18" type="Node3D" parent="Scenery/Paddock" unique_id=1527839463 instance=ExtResource("14_oyfpv")]
 transform = Transform3D(10.822146, 0, -8.881507, 0, 14, 0, 8.881507, 0, 10.822146, 6.1669025, 0.14, -30.805923)
 
-[node name="tentLong19" type="Node3D" parent="Scenery/Paddock" unique_id=688274877 instance=ExtResource("14_oyfpv")]
+[node name="tentLong19" type="Node3D" parent="Scenery/Paddock" unique_id=1070161854 instance=ExtResource("14_oyfpv")]
 transform = Transform3D(-6.119594e-07, 0, -14, 0, 14, 0, 14, 0, -6.119594e-07, 25.199999, 0.14, 12.459999)
 
-[node name="tentLong20" type="Node3D" parent="Scenery/Paddock" unique_id=2029276458 instance=ExtResource("14_oyfpv")]
+[node name="tentLong20" type="Node3D" parent="Scenery/Paddock" unique_id=1073647765 instance=ExtResource("14_oyfpv")]
 transform = Transform3D(-6.119594e-07, 0, -14, 0, 14, 0, 14, 0, -6.119594e-07, 25.199999, 0.14, 40.46)
 
-[node name="tentLong21" type="Node3D" parent="Scenery/Paddock" unique_id=1310050878 instance=ExtResource("14_oyfpv")]
+[node name="tentLong21" type="Node3D" parent="Scenery/Paddock" unique_id=344439842 instance=ExtResource("14_oyfpv")]
 transform = Transform3D(-6.119594e-07, 0, -14, 0, 14, 0, 14, 0, -6.119594e-07, 25.199999, 0.14, 68.46)
 
 [node name="bannerTowerRed22" type="Node3D" parent="Scenery/Paddock" unique_id=489017262 instance=ExtResource("15_s56ja")]
@@ -1069,9 +1069,9 @@ transform = Transform3D(-6.119594e-07, 0, 14, 0, 14, 0, -14, 0, -6.119594e-07, -
 [node name="bannerTowerGreen23" type="Node3D" parent="Scenery/Paddock" unique_id=2008144795 instance=ExtResource("16_kewft")]
 transform = Transform3D(-6.119594e-07, 0, -14, 0, 14, 0, 14, 0, -6.119594e-07, 0.8036003, 0.14, 44.7636)
 
-[node name="Horizon" type="MeshInstance3D" parent="Scenery" unique_id=924061974]
+[node name="Horizon" type="MeshInstance3D" parent="Scenery" unique_id=1729051989]
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_c7bsm")
 
-[node name="SpawnPoint" type="Marker3D" parent="." unique_id=1691723572]
+[node name="SpawnPoint" type="Marker3D" parent="." unique_id=11214184]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.415, 1, 24.5)

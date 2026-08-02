@@ -1134,12 +1134,22 @@ no derivatives — because the web build runs Compatibility.
 > `_build_lighting`. The suite compares the baked material against the *linear*
 > form, so the conversion cannot be dropped silently.
 
-> **True night is deliberately absent**, and it is the preset `ideas.md` singles
-> out as most worth having. A night circuit needs the trackside lighting columns
-> to emit light, and they are placed and dark today. Night with no lights is not
-> atmospheric, it is unplayable. La Sarthe gets `dusk` instead — a 24-hour race
-> at the hour you can still see — with its ambient lifted well above the others
-> to do the job the columns will do properly later.
+**Night, and the thing it was waiting for.** The trackside columns had been
+placed since M3 and had never emitted anything, so a genuinely dark circuit was
+unplayable rather than atmospheric. `night` therefore carries a `lit` flag, and
+La Sarthe — a 24-hour race — runs under it.
+
+The columns light the road with **flat additive discs**, not `OmniLight3D`s. Two
+reasons, and both matter: a circuit carries twenty-odd columns, and twenty-odd
+point lights is a great deal to ask of the Compatibility renderer the web build
+is stuck with; and a real light produces exactly the smooth falloff gradient this
+look avoids everywhere else — the ground plane is unshaded, the sky is banded, the
+car is flat paint. The pools are 24 m across against a 70 m column spacing, so
+there is dark between them, which is the point. A continuous wash would be
+daylight.
+
+`dusk` stays as a preset in its own right rather than as the stepping stone it
+started as.
 
 What was missing was saturation, not detail. Kenney's palette is **pastel** —
 mint grass, near-white kerbs, a soft orange car — and saturation is a property of

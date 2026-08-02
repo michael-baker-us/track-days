@@ -478,10 +478,12 @@ four presets are attached one per shipped circuit — noon, sunset, dusk, overca
 `SkyPreset` keeps each hour as one struct because sun, sky, fog and grade are not
 independent; changing one without the others is nearly always wrong.
 
-**Night is not built, and that is the notable gap.** It needs the trackside
-lighting columns to emit light — they are placed and dark. La Sarthe gets dusk
-instead, with ambient lifted to compensate. Finishing night means giving the
-columns real lights and checking what that costs on the Compatibility renderer.
+**Night is built, and La Sarthe races under it.** The blocker was real — the
+trackside columns had never emitted anything — and it is closed with flat
+additive light pools rather than point lights: twenty-odd omni lights is a lot to
+ask of the Compatibility renderer, and a real light's falloff gradient is the
+thing this look avoids everywhere else. Pools are 24 m across against 70 m
+spacing, so the dark between them survives.
 
 **Horizon silhouettes are in.** A ring of distant land at 1.2 km, generated per
 circuit from a seed so each has its own skyline, unshaded and coloured by the

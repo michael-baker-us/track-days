@@ -22,16 +22,16 @@ extends RefCounted
 ##
 ## ## What is deliberately missing
 ##
-## **True night.** The obvious fourth preset is the one `ideas.md` singles out as
-## most worth building, and it is not here, because a night circuit needs the
-## trackside lighting columns to actually emit light — they are placed and dark
-## today. A night with no lights is not atmospheric, it is unplayable. La Sarthe
-## gets `dusk` instead, which is a 24-hour race at the hour you can still see.
+## Nothing, now. `night` was held back until the trackside columns could light
+## the road, because a dark circuit with dark lamps is not atmospheric, it is
+## unplayable — so the preset carries a `lit` flag and La Sarthe races under it.
+## `dusk` stays, because it is a different hour rather than a stepping stone.
 
 const PRESETS := {
 	# The look M8 arrived at, kept as the default so nothing that does not ask
 	# for an hour changes.
 	"noon": {
+		"lit": false,
 		"silhouette": Color(0.30, 0.42, 0.55),
 		"sun_angle": Vector3(-50.0, 35.0, 0.0),
 		"sun_color": Color(1.0, 0.96, 0.89),
@@ -53,6 +53,7 @@ const PRESETS := {
 	# the bottom and deep at the top. The lowest sun angle here, because a long
 	# shadow across the road is most of what says "late".
 	"sunset": {
+		"lit": false,
 		"silhouette": Color(0.26, 0.18, 0.34),
 		"sun_angle": Vector3(-14.0, 118.0, 0.0),
 		"sun_color": Color(1.0, 0.72, 0.42),
@@ -73,6 +74,7 @@ const PRESETS := {
 	# Le Mans after the light has gone but before it is dark. As close to night as
 	# this can get while the trackside columns are still unlit.
 	"dusk": {
+		"lit": false,
 		"silhouette": Color(0.10, 0.12, 0.24),
 		"sun_angle": Vector3(-8.0, 205.0, 0.0),
 		"sun_color": Color(0.62, 0.66, 0.95),
@@ -93,9 +95,37 @@ const PRESETS := {
 		"fog_begin": 260.0,
 		"grade": Vector3(1.25, 1.18, 1.02),
 	},
+	# Le Mans in the small hours, and the reason the trackside columns exist. The
+	# only preset with `lit` set: the pools of light they throw are what makes a
+	# dark circuit driveable, so night and lit columns arrive together or not at
+	# all.
+	"night": {
+		"lit": true,
+		"silhouette": Color(0.05, 0.06, 0.13),
+		# The moon, near enough. Low and cold, and weak enough that the pools of
+		# light do the work.
+		"sun_angle": Vector3(-32.0, 232.0, 0.0),
+		"sun_color": Color(0.55, 0.62, 0.90),
+		"sun_energy": 0.28,
+		"top": Color(0.015, 0.02, 0.07),
+		"horizon": Color(0.10, 0.12, 0.26),
+		"ground": Color(0.05, 0.06, 0.09),
+		"sun_disc": Color(0.86, 0.90, 1.0),
+		"cloud": Color(0.13, 0.15, 0.28),
+		"cloud_amount": 0.35,
+		"horizon_falloff": 1.2,
+		"sun_size": 0.035,
+		# Low enough to read as night, high enough that the road is not guesswork
+		# between the lamps. The pools carry the rest.
+		"ambient": Color(0.30, 0.34, 0.52),
+		"ambient_energy": 0.42,
+		"fog_begin": 200.0,
+		"grade": Vector3(1.2, 1.22, 1.0),
+	},
 	# Suzuka in flat morning cloud: no drama, and that is the point of having it —
 	# a circuit that reads as weather rather than as an hour.
 	"overcast": {
+		"lit": false,
 		"silhouette": Color(0.52, 0.58, 0.64),
 		"sun_angle": Vector3(-62.0, 15.0, 0.0),
 		"sun_color": Color(0.92, 0.94, 0.98),
@@ -122,7 +152,7 @@ const DEFAULT := "noon"
 const BY_TRACK := {
 	"ardennes": "noon",
 	"monte_carlo": "sunset",
-	"la_sarthe": "dusk",
+	"la_sarthe": "night",
 	"suzuka": "overcast",
 }
 
