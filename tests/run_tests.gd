@@ -550,6 +550,52 @@ func _layout_for(id: String) -> Array:
 			return src.SUZUKA
 	return []
 
+## Weather is a **colour treatment**, and specifically not a grip change.
+##
+## `docs/ideas.md` notes that lowering grip is what would make weather a gameplay
+## variant rather than a filter — and that is exactly why it is not done here.
+## Grip belongs to the surface, records are keyed on `track|car|surface`, and
+## changing grip without engaging that key would make every lap on the circuit
+## quietly incomparable with every other. M17 has the key to do it properly.
+##
+## This pins that decision, so a later change cannot make weather affect pace
+## without someone deliberately removing this test.
+func test_weather_changes_the_look_and_not_the_lap() -> void:
+	var wet := []
+	for name in SkyPreset.PRESETS:
+		# The weather hours are the ones that shorten how far you can see.
+		if float(SkyPreset.PRESETS[name]["fog_begin"]) <= 150.0:
+			wet.append(name)
+	check_true("some hour is weather (%s)" % wet, wet.size() > 0)
+
+	for name in wet:
+		var preset: Dictionary = SkyPreset.PRESETS[name]
+		# The one place this look goes *down* in saturation rather than up.
+		check_true("%s is desaturated (%.2f)" % [name, (preset["grade"] as Vector3).x],
+			(preset["grade"] as Vector3).x < 1.0)
+		check_true("%s has heavy cloud (%.2f)" % [name, preset["cloud_amount"]],
+			float(preset["cloud_amount"]) > 0.8)
+
+	# And the lap it produces is the same lap. Par comes from the circuit and the
+	# car, and nothing else — a circuit raced in a storm is judged exactly as it
+	# would be in sunshine, because nothing about the car has changed.
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var layout := _layout_for(id)
+		if layout.is_empty():
+			continue
+		var builder := TrackBuilder.new()
+		builder.measure(layout)
+		for spec in GameState.cars():
+			check_near("%s par for %s ignores the weather" % [id, spec.id],
+				GameState.par_for(entry, spec.id),
+				ParTime.ideal_lap(builder.centreline, spec), 0.05)
+
+	# The surface a lap is recorded against is still the only one there is, so no
+	# weather has quietly introduced a second.
+	check("laps are still recorded on one surface",
+		GameState.selected_surface, GameState.DEFAULT_SURFACE)
+
 ## Every preset has to be complete. They are dictionaries, so a missing key is a
 ## crash at bake time rather than a compile error, and the one that gets forgotten
 ## is always the one only a later preset needed.
@@ -4941,6 +4987,7 @@ func _physics_process(_delta: float) -> bool:
 		test_night_lights_the_columns_it_needs()
 		test_the_ground_takes_its_theme_and_its_hour()
 		test_roadside_markers_are_dense_enough_to_read_as_speed()
+		test_weather_changes_the_look_and_not_the_lap()
 		test_a_ghost_round_trips_through_bytes()
 		test_a_damaged_ghost_is_refused()
 		test_a_ghost_interpolates_and_then_holds()

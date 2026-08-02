@@ -127,6 +127,43 @@ const PRESETS := {
 		"fog_begin": 200.0,
 		"grade": Vector3(1.2, 1.22, 1.0),
 	},
+	# Weather, as a **colour treatment** rather than a simulation. Horizon Chase
+	# does rain and snow as strong tinted overlays with a matching sky, not as wet
+	# surfaces and spray, which is both cheaper and more in keeping.
+	#
+	# Deliberately *not* a grip change, though `docs/ideas.md` notes that is what
+	# would make it a gameplay variant rather than a filter. Grip belongs to the
+	# surface, and records are keyed on `track|car|surface` — so lowering it here
+	# would make every lap time on this circuit quietly incomparable with every
+	# other. That is M17's job, and it has the key to do it with.
+	"storm": {
+		"lit": false,
+		"ground_tint": 0.5,
+		"silhouette": Color(0.30, 0.33, 0.36),
+		# High and weak: an overcast sky has no direction to it, and a low sun
+		# would cast long shadows through cloud that is meant to be solid.
+		"sun_angle": Vector3(-70.0, 40.0, 0.0),
+		"sun_color": Color(0.78, 0.81, 0.86),
+		"sun_energy": 0.5,
+		"top": Color(0.26, 0.29, 0.34),
+		"horizon": Color(0.52, 0.55, 0.58),
+		"ground": Color(0.24, 0.28, 0.26),
+		"sun_disc": Color(0.70, 0.73, 0.78),
+		"cloud": Color(0.36, 0.39, 0.44),
+		# Nearly solid, and dark against a dark sky, so the bands read as weather
+		# rather than as decoration.
+		"cloud_amount": 0.95,
+		"horizon_falloff": 1.6,
+		"sun_size": 0.2,
+		"ambient": Color(0.60, 0.64, 0.70),
+		"ambient_energy": 0.75,
+		# The closest fog of any hour: shortening how far you can see is most of
+		# what makes weather feel like weather.
+		"fog_begin": 120.0,
+		# Desaturated and flat, which is the one place this look goes *down* in
+		# saturation rather than up.
+		"grade": Vector3(0.82, 1.06, 0.98),
+	},
 	# Suzuka in flat morning cloud: no drama, and that is the point of having it —
 	# a circuit that reads as weather rather than as an hour.
 	"overcast": {
@@ -159,7 +196,7 @@ const BY_TRACK := {
 	"ardennes": "noon",
 	"monte_carlo": "sunset",
 	"la_sarthe": "night",
-	"suzuka": "overcast",
+	"suzuka": "storm",
 }
 
 static func named(preset: String) -> Dictionary:

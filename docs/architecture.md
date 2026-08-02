@@ -1099,6 +1099,25 @@ Three things about it are load-bearing:
 It fades with height rather than growing, because a shadow that grew as the car
 rose would read as the car *sinking*.
 
+### Weather is an hour, not a physics change
+
+`storm` is a `SkyPreset` like any other: heavy cloud, the closest fog, and a
+grade that **desaturates** — the one place in the game the look goes down in
+saturation rather than up. Horizon Chase does rain and snow as tinted overlays
+with a matching sky rather than as wet surfaces and spray, which is cheaper and
+more in keeping.
+
+> **It deliberately does not touch grip**, although that is what would make it a
+> gameplay variant rather than a filter. Grip belongs to the *surface*, and a lap
+> record is keyed on `track|car|surface`. Lowering grip for weather without
+> engaging that key would leave every lap on the circuit quietly incomparable
+> with every other — the precise failure the composite key was introduced to
+> prevent. M17 owns surfaces and has the key to do it with.
+>
+> The suite pins this: par for every circuit must equal what the model gives from
+> the circuit and the car alone, so weather cannot start affecting pace without
+> someone deliberately deleting that test.
+
 ### Where a circuit is, as distinct from when
 
 `SceneryTheme` says what the land is made of — its colour and how much grows on

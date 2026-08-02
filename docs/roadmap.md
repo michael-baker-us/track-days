@@ -533,9 +533,21 @@ than a property of markers: anything placed in the hundreds would crowd the
 directional light's atlas, which the **car's** shadow needs and which is the one
 shadow that matters.
 
-**Also not done:** weather. The camera pass is deliberately last — it is a *feel*
-change and the numbers are already parameterised, so it wants driving rather than
-guessing.
+**Weather is in, as a colour treatment.** Suzuka races under `storm`: heavy dark
+cloud, the closest fog of any hour, and the one grade in the game that goes
+*down* in saturation rather than up.
+
+**Deliberately not a grip change**, though `ideas.md` notes that is what would
+make it a gameplay variant rather than a filter. Grip belongs to the surface, and
+records are keyed on `track|car|surface` — lowering it here would make every lap
+on the circuit quietly incomparable with every other. **M17 has the key to do it
+properly**, and a test pins the decision so it cannot be undone by accident.
+
+**Still not done: the camera pass.** Deliberately last — it is a *feel* change,
+the numbers are already parameterised in `CarTuning`, and it wants driving rather
+than guessing. The concrete proposal, when someone can judge it: lower and nearer
+than the current 1.4 m up and 4.2 m back, a wider base FOV, and a slight camera
+yaw leading the corner, which the chase camera does not do at all today.
 
 And **none of the hours or places have been looked at.** The suite asserts each
 circuit carries its own and that the presets are complete, which is not the same
