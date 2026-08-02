@@ -1437,35 +1437,96 @@ to vary, would be fitting a socket before there is a bulb.
 
 ## Audio
 
-> **Off by default, and that is a verdict rather than a setting.** The synthesised
-> sounds below were listened to once and called annoying. They are structurally
-> right — seamless loops, pitch keyed to measured speeds — and they are a buzz
-> and a hiss rather than a car. `GameState.audio_enabled` defaults to false, with
-> a switch on the pause menu, until a proper audio pass replaces them. Flipping
-> the default is a one-line change when that happens.
->
-> Everything below describes what is there and why it is shaped that way. None of
-> it argues that it sounds good.
+> **Still off by default, and that is a verdict rather than a setting.** The
+> sounds have been rebuilt (below) but **nobody has listened to the new ones**.
+> The old ones were listened to once and called annoying, which is the only
+> listening test that counts, and no amount of headless assertion substitutes for
+> it. `GameState.audio_enabled` stays false, with a switch on the pause menu, and
+> flipping it is a one-line change the moment someone has heard this.
 
 There was none at all, and there is no audio in the Kenney kits — they are art.
-So it is **synthesised** by `SoundBank` and baked into two looping
-`AudioStreamWAV` resources by `tools/build_audio.gd`. That keeps the game
-buildable from what is committed, the same reason the theme, the circuits and the
-car are baked by scripts, and it means the sounds can be tuned against handling
-numbers that are measured rather than against whatever a downloaded loop was.
+So it is **synthesised** by `SoundBank` and baked into `AudioStreamWAV` resources
+by `tools/build_audio.gd`. That keeps the game buildable from what is committed,
+the same reason the theme, the circuits and the car are baked by scripts, and it
+means the sounds can be tuned against handling numbers that are measured rather
+than against whatever a downloaded loop was.
 
 Saved as `.tres`, not `.wav`: a `.wav` in the project is an *import*, cached
 under `.godot/`, which is neither committed nor stable. A resource carries its
-samples inline, so what is committed is exactly what the game loads. Together
-they are 32 KB, or 0.5% of the web `.pck`.
+samples inline, so what is committed is exactly what the game loads. Six streams
+come to 100 KB, about 1% of the web `.pck`.
+
+### An engine is a series of explosions, not a chord
+
+The first engine summed sixteen harmonics of 50 Hz with a sub-harmonic underneath.
+That is structurally what an engine's *spectrum* looks like, and it sounded like
+an organ — because what makes an engine an engine is not its spectrum. It is that
+the sound arrives as a **train of sharp pressure pulses**, one per firing, each
+ringing through the exhaust and dying before the next. Steady sine partials
+contain no pulses at all. That is the version that got switched off.
+
+A voice is now built by placing firings *in time*: sixteen impulses across the
+buffer, each a decaying resonance. Overlapping tails give the body, the impulse
+edges give the lumpiness, and per-cylinder amplitudes are deliberately uneven so
+there is a once-per-cycle wobble.
+
+> **The decay rate is the load-bearing number and it is easy to get an order of
+> magnitude wrong.** Firings are 10 ms apart, so a decay of 190 leaves 15% of a
+> pulse sounding when the next arrives — overlap, which is the body. The first
+> attempt used 26, which leaves **77%**: that is not a pulse train, it is the
+> harmonic stack again with extra steps. It measured as one, which is why the
+> suite pins the *shape* rather than the spectrum — split the buffer into sixteen
+> windows and every window's loudest sample must land near the start of it. That
+> is true of decaying impulses and false of anything continuous, and unlike a
+> spectral check it cannot be satisfied by a chord that happens to be loud in the
+> right places.
+
+**Two voices, crossfaded by the throttle.** A car that only changes pitch reads as
+a siren: an ear hears effort as *timbre*. `engine_load` is bright and rings on,
+`engine_overrun` is dull and dies between firings, and both play at one pitch —
+letting them drift apart would be two engines. Both are normalised, so the suite
+tells them apart by how much of each window's energy survives into its second
+half, not by loudness.
+
+### The scrub knows what it is scrubbing on
+
+Squeal is a **tarmac** phenomenon — tread stuttering against a hard surface, and
+tonal. Dirt throws material, which is broadband and much lower; snow packs it,
+quieter and duller than either. One buffer per surface, chosen by `car_audio.gd`
+when the car enters the tree rather than baked into the car scene, because one car
+scene serves every condition. A squeal on snow was the loudest wrong note in the
+old mix once surfaces existed.
+
+### Impacts, now that there is something to hit
+
+The barriers became solid in the same pass that took grip off the grass, and
+running out of road was until then a silent event that simply stopped the car —
+which reads as the game freezing rather than as a crash. The sound is three things
+at once, because an impact is: the thud of mass arriving, the broadband crack of
+the collision, and the rail ringing after. The ring is deliberately inharmonic; a
+barrier is not tuned, and two partials a musical interval apart would chime.
+
+> **Triggered by a step change in velocity, not by a contact signal.**
+> `contact_monitor` costs a broadphase report every frame for something that
+> happens seconds apart, and it reports *touching* — a car resting against a rail
+> touches continuously. A velocity change of 3 m/s inside one physics frame cannot
+> be produced by driving: the measured 1.62 g stop is 0.27 m/s per frame. It also
+> catches landings from a crest for free. Repeats inside 0.25 s are swallowed, or
+> scraping a barrier machine-guns.
 
 **The rule that makes a generated loop seamless:** every partial's frequency must
 be an integer multiple of the buffer's own fundamental (mix rate ÷ frame count).
 A component that does not complete whole cycles inside the buffer arrives at the
 loop point mid-swing and clicks — once per loop, forever, and quietly enough in
-isolation to ship. It is also why the tyre "noise" is 240 summed partials rather
-than a random number generator: random samples cannot be made to meet their own
-start.
+isolation to ship. It is why the tyre band is 240 summed partials rather than a
+random number generator.
+
+The engine voices satisfy it a different way: every sample is a function of
+`fposmod(t - t0, duration)`, so sample *i* and sample *i + frames* are identical
+by construction whatever the resonant frequency. A noise *table* of exactly the
+buffer's length is periodic for the same reason and is safe to index modulo —
+the restriction only bites when noise is generated per sample under a continuous
+envelope. The impact stream is the one that must **not** loop.
 
 The suite checks this by comparing the wrap against the buffer's own largest
 sample-to-sample step, not against a fixed threshold. An absolute limit cannot

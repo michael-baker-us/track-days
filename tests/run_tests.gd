@@ -1242,7 +1242,13 @@ func test_audio_resources_match_their_source() -> void:
 	# `SoundBank`, not `tools/build_audio.gd`: the tool extends SceneTree, so
 	# `new()`-ing it here allocates a second viewport and scenario and leaks them
 	# at exit. The synthesis lives in the class for exactly this reason.
-	for pair in [["engine", SoundBank.engine()], ["tyre", SoundBank.tyre()]]:
+	var built := [
+		["engine_load", SoundBank.engine_load()],
+		["engine_overrun", SoundBank.engine_overrun()],
+	]
+	for surface in SoundBank.TYRE_VOICES.keys():
+		built.append(["tyre_%s" % surface, SoundBank.tyre(surface)])
+	for pair in built:
 		var committed: AudioStreamWAV = load(
 			"res://resources/audio/%s.tres" % pair[0]
 		)
@@ -1261,6 +1267,133 @@ func test_audio_resources_match_their_source() -> void:
 		check("%s loops over all of itself" % pair[0],
 			committed.loop_end, committed.data.size() / 2)
 
+## An engine is a series of explosions, not a chord — and this is the assertion
+## that says so.
+##
+## The first version of this sound summed sixteen harmonics of 50 Hz. That is
+## structurally what an engine *spectrum* looks like and it sounded like an organ,
+## because what makes an engine an engine is that the sound arrives in pulses: one
+## per firing, each ringing and dying before the next. A listener called it
+## annoying, which is the only listening test that counts.
+##
+## Rewriting it as a pulse train is easy to undo by accident, since a chord and a
+## pulse train can have similar spectra and identical loudness. So the shape is
+## pinned directly: split the buffer into `FIRINGS` windows and every window's
+## loudest sample must fall near the *start* of it, which is true of a train of
+## decaying impulses and false of anything continuous.
+func test_the_engine_is_a_pulse_train() -> void:
+	for name in ["engine_load", "engine_overrun"]:
+		var wav: AudioStreamWAV = load("res://resources/audio/%s.tres" % name)
+		if wav == null:
+			continue
+		var frames := wav.data.size() / 2
+		var window := frames / SoundBank.FIRINGS
+		var front_loaded := 0
+		var crest := 0.0
+		var energy := 0.0
+		for f in SoundBank.FIRINGS:
+			var loudest := 0
+			var at := 0
+			for i in window:
+				var v := absi(wav.data.decode_s16((f * window + i) * 2))
+				energy += float(v) * float(v)
+				if v > loudest:
+					loudest = v
+					at = i
+			crest = maxf(crest, float(loudest))
+			# Within the first fifth of the window: a firing, not a drone.
+			if at < window / 5:
+				front_loaded += 1
+		check_true("%s fires %d/%d times at the start of its window"
+			% [name, front_loaded, SoundBank.FIRINGS],
+			front_loaded >= SoundBank.FIRINGS - 2)
+
+		# And impulsive overall, which a summed-harmonic buzz is not: peak well
+		# above RMS is what "made of transients" measures as.
+		var rms := sqrt(energy / float(frames))
+		check_true("%s is impulsive (crest %.1f)" % [name, crest / maxf(rms, 1.0)],
+			crest / maxf(rms, 1.0) > 2.2)
+
+## The two engine voices have to actually differ, or crossfading between them is
+## an expensive way to change nothing.
+##
+## Timbre, not volume, is how an ear hears effort — a car that only changes pitch
+## reads as a siren. Both are normalised, so they cannot be told apart by loudness;
+## what separates them is that the overrun voice *dies between firings* and the
+## loaded one rings on. Measured as how much of each window's energy survives into
+## its second half.
+func test_the_engine_has_two_voices() -> void:
+	var tail := {}
+	for name in ["engine_load", "engine_overrun"]:
+		var wav: AudioStreamWAV = load("res://resources/audio/%s.tres" % name)
+		if wav == null:
+			return
+		var frames := wav.data.size() / 2
+		var window := frames / SoundBank.FIRINGS
+		var head := 0.0
+		var rest := 0.0
+		for f in SoundBank.FIRINGS:
+			for i in window:
+				var v := absf(float(wav.data.decode_s16((f * window + i) * 2)))
+				if i < window / 2:
+					head += v
+				else:
+					rest += v
+		tail[name] = rest / maxf(head, 1.0)
+	check_true("the loaded engine rings on (%.2f) more than the overrun (%.2f)"
+		% [tail["engine_load"], tail["engine_overrun"]],
+		float(tail["engine_load"]) > float(tail["engine_overrun"]) * 1.15)
+
+## Hitting a barrier makes a noise, and driving does not.
+##
+## The trigger is a step change in velocity rather than a contact signal:
+## `contact_monitor` reports *touching*, and a car resting against a rail touches
+## continuously. It also has to be well clear of anything the driver can do on
+## purpose — the measured 1.62 g stop is about 0.27 m/s per physics frame, against
+## a threshold of 3.
+func test_hitting_something_is_audible() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	var audio: Node = car.get_node_or_null("Audio") if car != null else null
+	if audio == null:
+		return
+	var impact: AudioStreamPlayer3D = audio._impact
+	check_true("the crash sound exists", impact.stream != null)
+	if impact.stream != null:
+		# The one stream in the game that must not loop.
+		check("and does not loop", (impact.stream as AudioStreamWAV).loop_mode,
+			AudioStreamWAV.LOOP_DISABLED)
+
+	# Braking hard is not a crash.
+	impact.volume_db = -80.0
+	audio._since_impact = 99.0
+	audio._last_velocity = (car as VehicleBody3D).linear_velocity + Vector3(0.3, 0, 0)
+	audio._check_impact(1.0 / 60.0)
+	check("the hardest braking is silent", impact.volume_db, -80.0)
+
+	# Arriving at a wall is.
+	audio._since_impact = 99.0
+	audio._last_velocity = (car as VehicleBody3D).linear_velocity + Vector3(14.0, 0, 0)
+	audio._check_impact(1.0 / 60.0)
+	check_true("a wall at speed is not (%.0f dB)" % impact.volume_db,
+		impact.volume_db > -20.0)
+	# Bigger hits are lower: more of the structure is loaded.
+	check_true("and a big hit is pitched down (%.2f)" % impact.pitch_scale,
+		impact.pitch_scale < 1.0)
+
+	# Scraping along a rail is one crash, not thirty.
+	var was := impact.volume_db
+	impact.volume_db = -80.0
+	audio._last_velocity = (car as VehicleBody3D).linear_velocity + Vector3(14.0, 0, 0)
+	audio._check_impact(1.0 / 60.0)
+	check("a second hit in the same moment is swallowed", impact.volume_db, -80.0)
+	check_true("the first one was real", was > -20.0)
+
+	# And the scrub is the one for the surface being raced, not a squeal on snow.
+	var scrub: AudioStreamPlayer3D = audio._tyre
+	check_true("the tyres know what they are on",
+		scrub.stream == load("res://resources/audio/tyre_%s.tres"
+			% GameState.selected_surface))
+
 ## Every partial in a generated loop has to complete whole cycles inside the
 ## buffer, or the waveform arrives at its own start mid-swing and clicks once per
 ## loop -- forever, and inaudibly enough in isolation to ship.
@@ -1272,7 +1405,8 @@ func test_audio_resources_match_their_source() -> void:
 ## between adjacent samples is completely normal. What makes a click is the wrap
 ## being an *outlier* for that particular waveform, not being large.
 func test_generated_loops_meet_their_own_start() -> void:
-	for name in ["engine", "tyre"]:
+	for name in ["engine_load", "engine_overrun",
+			"tyre_tarmac", "tyre_dirt", "tyre_snow"]:
 		var wav: AudioStreamWAV = load("res://resources/audio/%s.tres" % name)
 		if wav == null:
 			continue
@@ -5625,6 +5759,9 @@ func _physics_process(_delta: float) -> bool:
 		test_a_bad_share_code_fails_politely()
 		test_a_share_code_can_carry_a_ghost_but_does_not_by_default()
 		test_audio_resources_match_their_source()
+		test_the_engine_is_a_pulse_train()
+		test_the_engine_has_two_voices()
+		test_hitting_something_is_audible()
 		test_generated_loops_meet_their_own_start()
 		test_sound_is_off_until_asked_for()
 		test_the_car_is_silent_when_sound_is_off()

@@ -12,7 +12,16 @@ const OUT_DIR := "res://resources/audio"
 func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
 	var failed := false
-	for pair in [["engine.tres", SoundBank.engine()], ["tyre.tres", SoundBank.tyre()]]:
+	var bank := [
+		["engine_load.tres", SoundBank.engine_load()],
+		["engine_overrun.tres", SoundBank.engine_overrun()],
+		["impact.tres", SoundBank.impact()],
+	]
+	# One scrub per surface: squeal is a tarmac phenomenon, and playing it on snow
+	# was the loudest wrong note in the old mix.
+	for surface in SoundBank.TYRE_VOICES.keys():
+		bank.append(["tyre_%s.tres" % surface, SoundBank.tyre(surface)])
+	for pair in bank:
 		var stream: AudioStreamWAV = pair[1]
 		var err := ResourceSaver.save(stream, OUT_DIR.path_join(pair[0]))
 		print("%s: %s (%d frames)" % [

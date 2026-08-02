@@ -216,7 +216,8 @@ Engine pitch from wheel RPM, tyre squeal from the skid values every wheel alread
 reports, and music that matches the palette. Nothing else makes the existing
 driving feel this much better per line of code.
 
-**Status: built, heard, and judged not good enough. Off by default.**
+**Status: rebuilt after being judged not good enough. Still off by default,
+because nobody has heard the new one.**
 
 The first person to listen to it called it annoying, which is the only listening
 test that counts and the one no amount of headless assertion substitutes for.
@@ -225,15 +226,48 @@ against measured handling numbers, and not a car. **Sound is now opt-in** via a
 switch on the pause menu, because shipping something irritating as the default is
 worse than shipping silence.
 
-**This milestone is not closed.** It wants a real audio pass: recorded or properly
-modelled engine samples with load and overrun, tyre scrub that varies with
-surface and slip angle, and the rest of the game's sound — collisions, kerbs,
-the start-light sequence, UI. When that exists the default flips in one constant
-(`GameState.audio_enabled`) and nothing else changes.
+### The pass that item asked for, done — except the listening
 
-Both sounds are **synthesised** — there is no audio in the Kenney kits, so
-`SoundBank` generates them and `tools/build_audio.gd` bakes two looping
-`AudioStreamWAV` resources. 32 KB together, 0.5% of the web `.pck`.
+Three of the four things named above now exist.
+
+1. **The engine is modelled with load and overrun.** The old one summed sixteen
+   harmonics of 50 Hz: structurally what an engine *spectrum* looks like, and an
+   organ to listen to, because what makes an engine an engine is that the sound
+   arrives as a **train of pressure pulses** — one per firing, each ringing and
+   dying before the next. Steady sines contain no pulses at all. A voice is now
+   sixteen decaying resonant impulses placed in time, with uneven per-cylinder
+   amplitudes for a once-per-cycle wobble.
+
+   There are **two** of them, crossfaded by the throttle: bright and ringing on
+   under power, dull and dying between firings on a closed throttle. A car that
+   only changes pitch reads as a siren — the ear hears effort as timbre.
+
+   > The decay rate is the load-bearing number. Firings are 10 ms apart, so 190
+   > leaves 15% of a pulse sounding when the next arrives, which is the body of
+   > the sound. The first attempt used 26 — **77%** — which is the harmonic stack
+   > again with extra steps, and it measured as one. The suite now pins the shape
+   > directly rather than the spectrum: split the buffer into sixteen windows and
+   > every window's loudest sample must land near the start of it.
+
+2. **Tyre scrub varies with surface.** Squeal is a *tarmac* phenomenon — tread
+   stuttering against something hard, and tonal. Dirt throws material, broadband
+   and much lower; snow packs it, quieter and duller than either. One buffer each,
+   chosen when the car enters the tree. A squeal on snow was the loudest wrong
+   note in the old mix.
+
+3. **Collisions.** The barriers went solid in M17, and until now running out of
+   road was a silent event that simply stopped the car, which reads as the game
+   freezing. Triggered by a step change in velocity rather than a contact signal —
+   `contact_monitor` reports *touching*, and 3 m/s inside one physics frame cannot
+   be produced by driving, since the measured 1.62 g stop is 0.27 m/s per frame.
+
+Six streams, 100 KB, about 1% of the web `.pck`.
+
+**Not done: kerbs, the start-light sequence, and UI sound.** And the default is
+**still off**, which is the honest position — every claim above is a measurement,
+and the thing that condemned the last version was a person listening to it. The
+constant is `GameState.audio_enabled`; flipping it is one line, and it should be
+flipped by whoever hears this and thinks it is right.
 
 One correction to the item above: pitch is **not** taken from wheel RPM. Wheel
 speed rises monotonically, so that gives one twenty-second slide rather than an
@@ -245,8 +279,8 @@ a chiptune is composition — a different kind of work, and one where generating
 procedurally would produce something worse than silence. It wants either an
 authored track or a real decision to build a sequencer.
 
-**Unheard.** Every assertion here is about sample data and pitch arithmetic. Nobody
-has listened to either sound.
+**Unheard.** Every assertion here is about sample data, pulse shape and pitch
+arithmetic. Nobody has listened to the current sounds at all.
 
 ---
 

@@ -1,13 +1,28 @@
 class_name CarAudio
 extends Node3D
 
-## Engine note and tyre scrub, driven from what the car is already doing.
+## Engine note, tyre scrub and impacts, driven from what the car is already doing.
 ##
-## Both sounds are single looping buffers baked by `tools/build_audio.gd`; this
-## only moves their pitch and volume. Nothing here synthesises anything at
+## Every sound is a buffer baked by `tools/build_audio.gd`; this only moves pitch,
+## volume and the balance between two voices. Nothing here synthesises anything at
 ## runtime, which matters for the web build — it is single-threaded, and a
 ## per-frame `AudioStreamGenerator` fill would be competing with the physics step
 ## for the same thread.
+##
+## ## Two engine voices, crossfaded by the throttle
+##
+## A car that only changes *pitch* reads as a siren: the ear hears effort as
+## timbre, not as frequency. `engine_load` is bright and rings on, `engine_overrun`
+## is dull and dies between firings, and the throttle mixes between them at a
+## single pitch. It is the largest of the changes that came out of the first sound
+## being switched off for being annoying.
+##
+## ## The scrub knows what it is scrubbing on
+##
+## Squeal is a tarmac phenomenon — tread stuttering against a hard surface. Dirt
+## throws material and snow packs it, so each surface gets its own buffer, chosen
+## when the car enters the tree. A squeal on snow was the loudest wrong note in
+## the old mix.
 ##
 ## ## The gearbox is a lie, deliberately
 ##
@@ -55,14 +70,37 @@ const SQUEAL_MIN_KMH := 8.0
 const PITCH_LERP := 8.0
 const GAIN_LERP := 10.0
 
+## How fast the throttle moves the mix between the two engine voices. Quicker
+## than the gain smoothing: lifting off should be heard immediately, because that
+## is the whole information the overrun voice carries.
+const LOAD_LERP := 14.0
+
+## A change in velocity this big **within one physics frame** is a collision.
+## Braking is nowhere near it — the measured 1.62 g stop is about 0.27 m/s per
+## frame at 60 Hz — so nothing the driver does on purpose can trip it, and no
+## contact monitoring is needed to catch a wall.
+const IMPACT_DV := 3.0
+## The change that counts as a full-volume hit, and the quietest one worth
+## playing at all.
+const IMPACT_FULL_DV := 12.0
+const IMPACT_MIN_GAIN := 0.15
+## Impacts closer together than this are one crash, not several. Without it a car
+## scraping along a barrier retriggers every few frames and machine-guns.
+const IMPACT_GAP := 0.25
+
 @onready var _engine: AudioStreamPlayer3D = $Engine
+@onready var _overrun: AudioStreamPlayer3D = $Overrun
 @onready var _tyre: AudioStreamPlayer3D = $Tyre
+@onready var _impact: AudioStreamPlayer3D = $Impact
 
 var _car: VehicleBody3D
 var _wheels: Array[VehicleWheel3D] = []
 var _pitch := PITCH_IDLE
 var _engine_gain := 0.0
+var _load_mix := 0.0
 var _tyre_gain := 0.0
+var _last_velocity := Vector3.ZERO
+var _since_impact := 0.0
 
 func _ready() -> void:
 	_car = get_parent() as VehicleBody3D
@@ -70,6 +108,12 @@ func _ready() -> void:
 		for child in _car.get_children():
 			if child is VehicleWheel3D:
 				_wheels.append(child)
+		_last_velocity = _car.linear_velocity
+	# Chosen here rather than baked into the car scene: the surface is picked on
+	# the title screen, and one car scene serves every condition.
+	var scrub := "res://resources/audio/tyre_%s.tres" % GameState.selected_surface
+	if ResourceLoader.exists(scrub):
+		_tyre.stream = load(scrub)
 	_apply()
 
 ## Starts or stops both loops together.
@@ -79,11 +123,13 @@ func _ready() -> void:
 func _set_playing(on: bool) -> void:
 	if on == _engine.playing:
 		return
-	for player in [_engine, _tyre]:
+	for player in [_engine, _overrun, _tyre]:
 		if on:
 			player.play()
 		else:
 			player.stop()
+	if not on:
+		_impact.stop()
 
 ## Whether there is anyone to hear this.
 ##
@@ -107,24 +153,53 @@ func _physics_process(delta: float) -> void:
 	_set_playing(GameState.audio_enabled() and _audible())
 
 	var paused := get_tree().paused
-	_engine.stream_paused = paused
-	_tyre.stream_paused = paused
+	for player in [_engine, _overrun, _tyre, _impact]:
+		player.stream_paused = paused
 	if paused or _car == null or not _engine.playing:
 		return
 
 	var speed_kmh := _car.linear_velocity.length() * 3.6
 	_pitch = lerpf(_pitch, _target_pitch(speed_kmh), minf(1.0, PITCH_LERP * delta))
 
-	var throttle: float = _car.engine_force / maxf(_car.tuning.engine_force, 1.0)
+	var throttle: float = clampf(
+		absf(_car.engine_force) / maxf(_car.tuning.engine_force, 1.0), 0.0, 1.0
+	)
 	_engine_gain = lerpf(
-		_engine_gain,
-		IDLE_GAIN + THROTTLE_GAIN * clampf(absf(throttle), 0.0, 1.0),
+		_engine_gain, IDLE_GAIN + THROTTLE_GAIN * throttle,
 		minf(1.0, GAIN_LERP * delta)
 	)
+	_load_mix = lerpf(_load_mix, throttle, minf(1.0, LOAD_LERP * delta))
 	_tyre_gain = lerpf(
 		_tyre_gain, _squeal(speed_kmh), minf(1.0, GAIN_LERP * delta)
 	)
+	_check_impact(delta)
 	_apply()
+
+## Fires the crash sound when the car's velocity changes faster than driving can
+## change it.
+##
+## Measured against the physics rather than against a contact signal on purpose.
+## `contact_monitor` costs a broadphase report every frame for something that
+## happens seconds apart, and it reports touching rather than *hitting* — a car
+## resting against a barrier is in contact continuously. A step change in
+## velocity is exactly the thing worth hearing, and it catches landings from a
+## crest as well as walls.
+func _check_impact(delta: float) -> void:
+	_since_impact += delta
+	var change := (_car.linear_velocity - _last_velocity).length()
+	_last_velocity = _car.linear_velocity
+	if change < IMPACT_DV or _since_impact < IMPACT_GAP:
+		return
+	_since_impact = 0.0
+	var force := clampf(
+		(change - IMPACT_DV) / (IMPACT_FULL_DV - IMPACT_DV), 0.0, 1.0
+	)
+	_impact.volume_db = _to_db(lerpf(IMPACT_MIN_GAIN, 1.0, force))
+	# Bigger hits are lower: a heavy impact loads more of the structure, and a
+	# glancing one is mostly the rail.
+	_impact.pitch_scale = lerpf(1.25, 0.8, force)
+	if _audible():
+		_impact.play()
 
 ## Where in its band the note sits, given how fast the car is going.
 ##
@@ -158,8 +233,12 @@ func _squeal(speed_kmh: float) -> float:
 	return clampf((SQUEAL_FROM - worst) / SQUEAL_FROM, 0.0, 1.0)
 
 func _apply() -> void:
+	# One pitch across both voices — they are the same engine seen in two states,
+	# and letting them drift apart would be two engines.
 	_engine.pitch_scale = _pitch
-	_engine.volume_db = _to_db(_engine_gain)
+	_overrun.pitch_scale = _pitch
+	_engine.volume_db = _to_db(_engine_gain * _load_mix)
+	_overrun.volume_db = _to_db(_engine_gain * (1.0 - _load_mix))
 	# Scrub rises in pitch with how hard it is being asked for, which is most of
 	# what distinguishes a protest from a slide.
 	_tyre.pitch_scale = 0.85 + 0.3 * _tyre_gain
@@ -173,7 +252,7 @@ func _apply() -> void:
 ## out of every headless run, and a suite whose log ends in errors is a suite
 ## nobody reads the end of.
 func _exit_tree() -> void:
-	for player in [_engine, _tyre]:
+	for player in [_engine, _overrun, _tyre, _impact]:
 		if player != null:
 			player.stop()
 			player.stream = null

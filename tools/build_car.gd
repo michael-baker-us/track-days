@@ -182,8 +182,12 @@ func _shadow() -> MeshInstance3D:
 	mi.material_override = mat
 	return mi
 
-const ENGINE_STREAM := "res://resources/audio/engine.tres"
-const TYRE_STREAM := "res://resources/audio/tyre.tres"
+const ENGINE_STREAM := "res://resources/audio/engine_load.tres"
+const OVERRUN_STREAM := "res://resources/audio/engine_overrun.tres"
+## Whatever surface is baked in here is replaced at load: `car_audio.gd` swaps in
+## the one for the condition being raced. This is only what the scene ships with.
+const TYRE_STREAM := "res://resources/audio/tyre_tarmac.tres"
+const IMPACT_STREAM := "res://resources/audio/impact.tres"
 
 ## The engine note and the tyre scrub, as children of the car so they travel with
 ## it and are positioned in 3D by being where the car is.
@@ -204,7 +208,11 @@ func _audio() -> Node3D:
 
 	# Node names must match the @onready paths in scripts/car/car_audio.gd.
 	holder.add_child(_player("Engine", ENGINE_STREAM, 34.0))
+	holder.add_child(_player("Overrun", OVERRUN_STREAM, 34.0))
 	holder.add_child(_player("Tyre", TYRE_STREAM, 26.0))
+	# Carries further than either: a crash is the loudest thing that happens and
+	# should not fade out because the camera is trailing the car.
+	holder.add_child(_player("Impact", IMPACT_STREAM, 45.0))
 	return holder
 
 ## `unit_size` is how far the sound carries. The engine is set well beyond the
