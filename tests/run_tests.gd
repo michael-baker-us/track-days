@@ -596,6 +596,81 @@ func test_weather_changes_the_look_and_not_the_lap() -> void:
 	check("laps are still recorded on one surface",
 		GameState.selected_surface, GameState.DEFAULT_SURFACE)
 
+## A player's circuit can be raced at any hour, in any place.
+##
+## Every visual feature built in M16 — the sky, the hours, night with lit columns,
+## the horizon, the themes, the markers, the weather — applied only to the four
+## shipped circuits until this. A drawn circuit was always noon in a meadow, which
+## is exactly the "same field twice" `docs/ideas.md` warns about.
+##
+## One control sets both axes, because choosing an hour and a place separately is
+## a question about lighting rigs rather than about circuits.
+func test_a_drawn_circuit_can_choose_its_look() -> void:
+	var editor: Control = staged_editor
+	if editor == null:
+		return
+
+	var layout := sample_layout()
+	layout.display_name = "Look Test"
+	editor._layout = layout
+	editor._grid.layout = layout
+	editor._refresh_look()
+
+	# Every look in the cycle is reachable, and the cycle comes back round.
+	var seen := {}
+	var start: String = layout.look
+	for _i in CircuitLook.ORDER.size() + 1:
+		editor._cycle_look()
+		seen[layout.look] = true
+		check_true("%s is a real look" % layout.look,
+			CircuitLook.LOOKS.has(layout.look))
+	check("the cycle reaches every look",
+		seen.size(), CircuitLook.ORDER.size())
+
+	# Each look resolves to a real hour and a real place.
+	for name in CircuitLook.LOOKS:
+		var look: Dictionary = CircuitLook.LOOKS[name]
+		check_true("%s names a real hour" % name,
+			SkyPreset.PRESETS.has(look["sky"]))
+		check_true("%s names a real place" % name,
+			SceneryTheme.THEMES.has(look["theme"]))
+		check_true("%s has a label to show" % name,
+			not String(look["label"]).is_empty())
+
+	# It survives being saved and shared, or a circuit arrives somewhere else
+	# looking like something its author never chose.
+	layout.look = "night"
+	var reloaded := TrackLayout.from_dict(layout.to_dict())
+	check("the look is saved with the circuit", reloaded.look, "night")
+	var decoded := ShareCode.decode(ShareCode.encode(layout))
+	check_true("and travels in the share code", decoded.ok)
+	if decoded.ok:
+		check("intact", decoded.layout.look, "night")
+
+	# And the builder actually uses it: a circuit built as night is lit, the same
+	# circuit built as bright is not.
+	var compiled := layout.compile()
+	check_true("the circuit compiles", compiled.ok)
+	if compiled.ok:
+		var at_night := TrackBuilder.new().build(
+			"look_test", compiled.segments, true, "night")
+		check_true("built at night, the columns light it",
+			not at_night.root.find_children(
+				"LightPools", "MeshInstance3D", true, false).is_empty())
+		at_night.root.free()
+
+		var by_day := TrackBuilder.new().build(
+			"look_test", compiled.segments, true, "bright")
+		check_true("built bright, they do not",
+			by_day.root.find_children(
+				"LightPools", "MeshInstance3D", true, false).is_empty())
+		by_day.root.free()
+
+	# Shipped circuits are unaffected: their look is part of what they are.
+	for id in CircuitLook.BY_TRACK:
+		check_true("%s still names its own look" % id,
+			CircuitLook.LOOKS.has(CircuitLook.BY_TRACK[id]))
+
 ## Every preset has to be complete. They are dictionaries, so a missing key is a
 ## crash at bake time rather than a compile error, and the one that gets forgotten
 ## is always the one only a later preset needed.
@@ -4754,7 +4829,8 @@ func test_editor_panel_is_wired_and_fits() -> void:
 		return
 	for path in [
 		"Split/Stack/Grid",
-		"Split/Side/Rows/NameEdit",
+		"Split/Side/Rows/NameRow/NameEdit",
+		"Split/Side/Rows/NameRow/LookButton",
 		"Split/Side/Rows/Picker",
 		"Split/Side/Rows/ToolRow/DrawButton",
 		"Split/Side/Rows/ToolRow/EraseButton",
@@ -5100,6 +5176,7 @@ func _physics_process(_delta: float) -> bool:
 		# final some frames after the scene is added.
 		test_title_menu_fits_however_many_tracks()
 		test_a_pasted_code_opens_through_the_field()
+		test_a_drawn_circuit_can_choose_its_look()
 		test_a_refused_crossing_can_still_be_raised_on_the_canvas()
 		test_dragging_a_bend_flat_straightens_the_road()
 		test_dragging_a_corner_into_line_straightens_it()

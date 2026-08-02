@@ -26,7 +26,8 @@ const UNDO_LIMIT := 64
 @onready var _phone_actions: HBoxContainer = $Split/Stack/BottomBar/Slots/PhoneActions
 @onready var _bottom_slots: VBoxContainer = $Split/Stack/BottomBar/Slots
 @onready var _more_button: Button = $Split/Stack/TopBar/Slots/Tools/MoreButton
-@onready var _name_edit: LineEdit = $Split/Side/Rows/NameEdit
+@onready var _name_edit: LineEdit = $Split/Side/Rows/NameRow/NameEdit
+@onready var _look_button: Button = $Split/Side/Rows/NameRow/LookButton
 @onready var _picker: OptionButton = $Split/Side/Rows/Picker
 @onready var _draw_button: Button = $Split/Side/Rows/ToolRow/DrawButton
 @onready var _erase_button: Button = $Split/Side/Rows/ToolRow/EraseButton
@@ -89,6 +90,7 @@ func _ready() -> void:
 	_erase_button.toggled.connect(_set_erase_mode)
 	_fit_button.pressed.connect(_grid.fit_view)
 	_cross_button.toggled.connect(_set_allow_crossings)
+	_look_button.pressed.connect(_cycle_look)
 	_legend_toggle.toggled.connect(_show_legend)
 	_close_button.pressed.connect(_close_gap)
 	_name_edit.text_changed.connect(func(t): _layout.display_name = t)
@@ -109,6 +111,7 @@ func _ready() -> void:
 
 	_name_edit.text = _layout.display_name
 	_cross_button.button_pressed = _layout.allow_crossings
+	_refresh_look()
 	_refresh_picker()
 	_reset_undo()
 	_recompile()
@@ -406,6 +409,7 @@ func _undo_last() -> void:
 	_grid.layout = _layout
 	_name_edit.text = _layout.display_name
 	_cross_button.button_pressed = _layout.allow_crossings
+	_refresh_look()
 	_undo_button.disabled = _undo.size() < 2
 	_recompile()
 
@@ -767,6 +771,7 @@ func _on_picked(index: int) -> void:
 	_grid.layout = _layout
 	_name_edit.text = _layout.display_name
 	_cross_button.button_pressed = _layout.allow_crossings
+	_refresh_look()
 	_delete_button.disabled = _layout.id.is_empty()
 	_reset_undo()
 	_recompile()
@@ -856,6 +861,7 @@ func _on_paste_open() -> void:
 	_grid.layout = _layout
 	_name_edit.text = _layout.display_name
 	_cross_button.button_pressed = _layout.allow_crossings
+	_refresh_look()
 	_delete_button.disabled = true
 	_reset_undo()
 	_refresh_picker()
@@ -885,6 +891,31 @@ func _set_allow_crossings(on: bool) -> void:
 		if on else "Crossings off."
 	)
 	_recompile()
+
+## Cycles the hour and the place this circuit is raced at.
+##
+## One control for both, because a player choosing them separately is being asked
+## a question about lighting rigs rather than about circuits — `docs/ideas.md`
+## says the same. `CircuitLook` holds the pairings.
+##
+## Saved with the layout and carried in its share code, so a circuit arrives
+## somewhere else looking the way it was built.
+func _cycle_look() -> void:
+	_layout.look = CircuitLook.after(
+		_layout.look if CircuitLook.LOOKS.has(_layout.look) else CircuitLook.DEFAULT
+	)
+	_refresh_look()
+	_flash("Look: %s. Test drive to see it." % _look_label())
+	_update_panel()
+
+func _refresh_look() -> void:
+	_look_button.text = _look_label()
+	_look_button.tooltip_text = (
+		"The hour and the place this circuit is raced at. Shown on a test drive."
+	)
+
+func _look_label() -> String:
+	return String(CircuitLook.resolve("", _layout.look)["label"])
 
 func _on_save() -> void:
 	_layout.display_name = _name_edit.text.strip_edges()
@@ -922,6 +953,7 @@ func _on_delete() -> void:
 	_grid.layout = _layout
 	_name_edit.text = _layout.display_name
 	_cross_button.button_pressed = _layout.allow_crossings
+	_refresh_look()
 	_reset_undo()
 	_refresh_picker()
 	_recompile()

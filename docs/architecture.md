@@ -1118,6 +1118,31 @@ more in keeping.
 > the circuit and the car alone, so weather cannot start affecting pace without
 > someone deliberately deleting that test.
 
+### One choice sets both
+
+`SkyPreset` says *when* and `SceneryTheme` says *where*, kept apart because they
+compose. But a player picking them one at a time is being asked a question about
+lighting rigs rather than about circuits, so `CircuitLook` pairs them and is the
+only thing anyone selects — one button in the editor, beside the name.
+
+Three things fall out of it:
+
+- **A drawn circuit can be raced at any hour.** Every visual feature in M16
+  applied to the four shipped circuits only; a player's track was always noon in
+  a meadow, which is exactly the "same field twice" `ideas.md` warns about. The
+  look is saved with the layout and travels in its share code.
+- **`overcast` and `dusk` are reachable again.** Both were written as hours for
+  shipped circuits and then displaced — La Sarthe went to `night` once the
+  columns could light it, Suzuka to `storm` — and without a pairing to name them
+  they were data nothing could select.
+- **One place answers what a circuit looks like.** The hour and the place used to
+  be listed separately, by track name, in two files that could disagree about
+  which circuits existed.
+
+The builder holds the chosen look as state for the duration of a build rather
+than threading it through every scenery function, because by now that is eight
+call sites deep.
+
 ### Where a circuit is, as distinct from when
 
 `SceneryTheme` says what the land is made of — its colour and how much grows on

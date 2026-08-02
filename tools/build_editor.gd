@@ -85,10 +85,16 @@ func _initialize() -> void:
 
 	rows.add_child(_header())
 
+	# Name and look side by side: both answer "what is this circuit", and pairing
+	# them uses a row that already exists. The column is 720 units on every window
+	# and a row of its own has to come out of something else.
 	var name_edit := LineEdit.new()
 	name_edit.name = "NameEdit"
 	name_edit.placeholder_text = "Circuit name"
-	rows.add_child(name_edit)
+	name_edit.size_flags_stretch_ratio = 2.2
+	var look_button := _button("LookButton", "Look")
+	look_button.custom_minimum_size = Vector2(150.0, 0.0)
+	rows.add_child(_row("NameRow", [name_edit, look_button]))
 
 	var picker := OptionButton.new()
 	picker.name = "Picker"
@@ -362,13 +368,19 @@ func _bar(node_name: String, row_name: String, resident: Button) -> PanelContain
 	slots.add_child(row)
 	return bar
 
-func _row(node_name: String, buttons: Array) -> HBoxContainer:
+## A row of controls sharing the width.
+##
+## Typed `Control`, not `Button`: it was buttons only until the name field wanted
+## to share a row with one, and a typed loop variable does not fail at build time
+## — it fails at *run* time, leaving the row half-built and the `@onready` paths
+## that point into it null.
+func _row(node_name: String, controls: Array) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.name = node_name
 	row.add_theme_constant_override("separation", 6)
-	for b: Button in buttons:
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(b)
+	for c: Control in controls:
+		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(c)
 	return row
 
 

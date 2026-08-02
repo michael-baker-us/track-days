@@ -555,6 +555,10 @@ var _triangles := 0
 var _gate_spacing := 0.0
 ## Centreline index ranges covered by tunnel road, filled during the walk.
 var _tunnel_spans: Array[Vector2i] = []
+## Which look this circuit is being built with. Empty means "whatever the circuit
+## is named", which is how the shipped ones get theirs; a player's track carries
+## its own choice and passes it in.
+var _look := ""
 ## One entry per placed tile: its node, and the centreline index range it spans.
 ## Filled during the walk and consumed by `_reshape_tiles`, which cannot run until
 ## the whole loop is known — a corner's bank reaches back into the straight
@@ -586,7 +590,10 @@ var _ramp_lift := PackedFloat32Array()
 ##
 ## With `with_geometry` false nothing is instanced and `result.root` is null;
 ## see `measure()`.
-func build(track_name: String, layout: Array, with_geometry := true) -> BuildResult:
+func build(
+	track_name: String, layout: Array, with_geometry := true, look := ""
+) -> BuildResult:
+	_look = look
 	centreline = []
 	bank = PackedFloat32Array()
 	_triangles = 0
@@ -1610,8 +1617,8 @@ func _build_ground(root_node: Node3D, track_name: String = "") -> void:
 	# `unshaded` — deliberately, because flat bright grass is the look — which
 	# means it receives no light and would otherwise stay noon-bright green under
 	# a night sky. The tint is what the lighting cannot do for it.
-	var theme := SceneryTheme.for_track(track_name)
-	var tint: float = SkyPreset.for_track(track_name).get("ground_tint", 1.0)
+	var theme := CircuitLook.theme_of(track_name, _look)
+	var tint: float = CircuitLook.sky_of(track_name, _look).get("ground_tint", 1.0)
 	shader_mat.set_shader_parameter("base_color", (theme["ground"] as Color) * tint)
 	shader_mat.set_shader_parameter("line_color", (theme["lines"] as Color) * tint)
 	plane.material = shader_mat
@@ -1665,7 +1672,7 @@ const GRADE_CONTRAST := 1.10
 const GRADE_BRIGHTNESS := 1.02
 
 func _build_lighting(root_node: Node3D, track_name: String = "") -> void:
-	var preset := SkyPreset.for_track(track_name)
+	var preset := CircuitLook.sky_of(track_name, _look)
 
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
@@ -1832,7 +1839,7 @@ func _build_scenery(root_node: Node3D, track_name: String) -> void:
 ## No collision, like all scenery, and no shadow: a 2.4 km ring inside the
 ## shadow-casting range would push everything else out of the shadow atlas.
 func _build_horizon(scenery: Node3D, track_name: String) -> void:
-	var preset := SkyPreset.for_track(track_name)
+	var preset := CircuitLook.sky_of(track_name, _look)
 	var rng := RandomNumberGenerator.new()
 	# Seeded off the circuit, so each one gets its own skyline and gets the same
 	# one every time it is built.
@@ -2084,7 +2091,7 @@ func _scenery_posts(scenery: Node3D, road: Dictionary, track_name: String) -> vo
 func _light_pools(
 	scenery: Node3D, track_name: String, at: Array[Vector3]
 ) -> void:
-	if at.is_empty() or not SkyPreset.for_track(track_name).get("lit", false):
+	if at.is_empty() or not CircuitLook.sky_of(track_name, _look).get("lit", false):
 		return
 
 	var mat := ShaderMaterial.new()
@@ -2137,7 +2144,7 @@ func _light_pools(
 func _scenery_markers(
 	scenery: Node3D, road: Dictionary, track_name: String
 ) -> void:
-	var theme := SceneryTheme.for_track(track_name)
+	var theme := CircuitLook.theme_of(track_name, _look)
 	var prop := _prop(String(theme["marker"]))
 	var step: float = float(theme["marker_step"]) * SCALE
 	var xforms: Array[Transform3D] = []
@@ -2160,7 +2167,7 @@ func _scenery_trees(
 	scenery: Node3D, rng: RandomNumberGenerator, road: Dictionary,
 	track_name: String
 ) -> void:
-	var theme := SceneryTheme.for_track(track_name)
+	var theme := CircuitLook.theme_of(track_name, _look)
 	var chance: float = theme["tree_chance"]
 	var tree_scale: float = theme["tree_scale"]
 	var large := _prop("treeLarge")

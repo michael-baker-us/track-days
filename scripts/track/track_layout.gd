@@ -172,6 +172,13 @@ var reversed := false
 ## refuses. The flag is what lets the compiler be finished and tested ahead of
 ## the two layers around it.
 var allow_crossings := false
+
+## Which hour and place this circuit is raced at, by name — see `CircuitLook`.
+##
+## Empty means the default, which is what every circuit drawn before looks
+## existed will load as. Shipped circuits ignore it: they are looked up by name,
+## because their look is part of what they are rather than something chosen.
+var look := ""
 ## Bend cell -> chosen corner size. Absent means "largest that fits".
 var corner_sizes := {}
 ## Bend cell -> chosen bank level, 0 for a flat corner. Absent means "whatever
@@ -749,6 +756,7 @@ func to_dict() -> Dictionary:
 		"start": [start_cell.x, start_cell.y],
 		"reversed": reversed,
 		"crossings": allow_crossings,
+		"look": look,
 		"corner_sizes": sizes,
 		"corner_banks": banks,
 		"elevation": levels,
@@ -760,6 +768,7 @@ static func from_dict(data: Dictionary) -> TrackLayout:
 	layout.display_name = String(data.get("name", "Untitled"))
 	layout.reversed = bool(data.get("reversed", false))
 	layout.allow_crossings = bool(data.get("crossings", false))
+	layout.look = String(data.get("look", ""))
 
 	for pair in data.get("cells", []):
 		if pair is Array and pair.size() == 2:

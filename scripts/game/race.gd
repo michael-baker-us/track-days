@@ -84,7 +84,9 @@ func _make_track(track_info: Dictionary) -> Node3D:
 		return load(track_info["scene"]).instantiate()
 	var layout: TrackLayout = track_info["layout"]
 	var compiled := layout.compile()
-	return TrackBuilder.new().build(layout.id, compiled.segments).root
+	return TrackBuilder.new().build(
+		layout.id, compiled.segments, true, layout.look
+	).root
 
 ## Leaving a race is `scripts/ui/pause_menu.gd`'s job, not this scene's. It used
 ## to happen here, the instant Escape was pressed — fine on a keyboard, wrong on

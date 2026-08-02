@@ -543,6 +543,11 @@ records are keyed on `track|car|surface` — lowering it here would make every l
 on the circuit quietly incomparable with every other. **M17 has the key to do it
 properly**, and a test pins the decision so it cannot be undone by accident.
 
+**A drawn circuit can now choose its look.** One button in the editor cycles six
+pairings of hour and place, saved with the layout and carried in its share code —
+so every visual feature in this milestone reaches player circuits rather than only
+the four shipped ones.
+
 **Still not done: the camera pass.** Deliberately last — it is a *feel* change,
 the numbers are already parameterised in `CarTuning`, and it wants driving rather
 than guessing. The concrete proposal, when someone can judge it: lower and nearer
