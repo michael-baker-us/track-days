@@ -225,6 +225,14 @@ const TREE_GAP_FAR := 4.6
 ## Each clearance sits just inside the gap its prop is placed at, so a prop is
 ## only ever rejected by a *different* piece of road than the one it belongs to.
 const RAIL_CLEARANCE := 0.55
+## How far the railing will step in from the road edge, in metres, looking for
+## somewhere it fits before giving up on that stretch entirely. See
+## `_scenery_barrier`.
+const RAIL_PULL_IN := [0.0, 1.4, 2.8]
+## How much of its own lap a railing point ignores when asking whether it is clear
+## of the road. Comfortably more than the road is wide, so the leg it is lining
+## never rejects it, and far less than the distance to any other leg.
+const RAIL_OWN_SPAN := 30
 const POST_CLEARANCE := 0.9
 const TREE_CLEARANCE := 1.15
 ## Buildings are a tile square, so they need most of a tile of room; the banner
@@ -1476,6 +1484,23 @@ static func _relative_transform(node: Node3D, ancestor: Node3D) -> Transform3D:
 		at = at.get_parent() as Node3D
 	return out
 
+## Above this height a section is carried on a bridge deck, and there is no
+## ground beside it.
+const RAISED_ABOVE := 0.5
+
+## How far out the road's usable edge is at a point, in metres.
+##
+## On the ground it is `RIBBON_HALF`: the collision ribbon runs 1.4 m past the
+## visible tile, over the verge, which is deliberate — it catches a car that has
+## run wide instead of dropping it off an invisible kerb.
+##
+## **On a raised section there is no verge.** The tile *is* the deck and it stops
+## at `ROAD_HALF`, so anything placed beyond that is standing in mid-air. That is
+## exactly how the trackside railing looked on every bridge: its outer face sat at
+## 8.9 m against a deck edge at 7.
+func _edge_half(i: int) -> float:
+	return ROAD_HALF if centreline[i].y > RAISED_ABOVE else RIBBON_HALF
+
 ## The group the drivable ribbon's body joins, and the collision layer it adds to
 ## itself, so anything that needs to know whether a point is on the road can ask
 ## the collision world rather than re-deriving it from the centreline.
@@ -1688,10 +1713,13 @@ func _build_wall_collision(root_node: Node3D) -> void:
 	# drivable surface by construction, and it inherits banking and height for
 	# free.
 	var faces := PackedVector3Array()
-	for side in [-RIBBON_HALF, RIBBON_HALF]:
+	for hand in [-1.0, 1.0]:
 		for i in centreline.size() - 1:
+			# Tucked in to the deck edge on a bridge; see `_edge_half`.
+			var side: float = _edge_half(i) * hand
+			var next_side: float = _edge_half(i + 1) * hand
 			var a := _ribbon_point(centreline[i], _sides[i], bank[i], side)
-			var b := _ribbon_point(centreline[i + 1], _sides[i + 1], bank[i + 1], side)
+			var b := _ribbon_point(centreline[i + 1], _sides[i + 1], bank[i + 1], next_side)
 			if a.distance_to(b) < 0.01:
 				continue
 			var a_top := a + Vector3.UP * WALL_H
@@ -1892,6 +1920,18 @@ func _build_lighting(root_node: Node3D, track_name: String = "") -> void:
 	# static, so it has the track but not the hour. Metadata serialises into the
 	# packed scene, so a baked circuit and a painted one carry it the same way.
 	root_node.set_meta("road_glow", preset.get("road_glow", 0.0))
+	# The centreline, so anything at *runtime* can ask where the road goes.
+	#
+	# A shipped circuit is a packed scene and the layout that produced it lives in
+	# `tools/`, which the game deliberately never loads — so until now the only
+	# things that knew the shape of a baked circuit were its collision ribbon and
+	# its sixteen gates. That is enough to drive on and not enough to reason
+	# about: a scripted lap, a minimap, a "you are off the racing line" cue and a
+	# kerb all want the same two numbers, how far along and how far across.
+	#
+	# About 20 KB on the longest circuit, which is a fifth of what the audio
+	# costs.
+	root_node.set_meta("centreline", PackedVector3Array(centreline))
 	# The car's headlights, for the same reason and by the same route. Written
 	# from the *resolved* preset rather than from a track id, so a painted circuit
 	# carries its hour as surely as a shipped one.
@@ -2392,10 +2432,23 @@ func _scenery_barrier(scenery: Node3D, road: Dictionary) -> void:
 		var prev := {}
 		for i in _barrier_vertices():
 			var here := _barrier_station(i, side)
-			# A break here is deliberate: it means the barrier would have run
-			# across another leg's tarmac. Where two legs pass that close, the
-			# barrier already standing between them serves both.
-			if not _clear_of_road(road, here["inner"], RAIL_CLEARANCE * SCALE):
+			# **Pulled in before it is given up on.**
+			#
+			# A barrier point that lands on another leg's tarmac has to go — but
+			# the old rule simply dropped it, on the reasoning that "the barrier
+			# already standing between them serves both". Where two legs run one
+			# tile apart, *both* sides are rejected by that rule, each assuming
+			# the other exists, and neither is built: measured, 50 m stretches of
+			# several circuits had no railing on either side. Trying a tighter
+			# offset first keeps the rail wherever one will fit at all.
+			var fitted := false
+			for pull in RAIL_PULL_IN:
+				here = _barrier_station(i, side, pull)
+				if _clear_of_road(road, here["inner"], RAIL_CLEARANCE * SCALE,
+						i, RAIL_OWN_SPAN):
+					fitted = true
+					break
+			if not fitted:
 				prev = {}
 				continue
 			if not prev.is_empty():
@@ -2438,10 +2491,12 @@ func _barrier_vertices() -> PackedInt32Array:
 	return keep
 
 ## Where the barrier's foot sits at one centreline point, and which way is out.
-func _barrier_station(i: int, side: float) -> Dictionary:
+func _barrier_station(i: int, side: float, pull: float = 0.0) -> Dictionary:
 	# Taken across the banked cross-section, so on a banked corner the barrier
 	# stands on the embankment rather than sinking into it.
-	var base := _ribbon_point(centreline[i], _sides[i], bank[i], RAIL_GAP * SCALE * side)
+	var base := _ribbon_point(
+		centreline[i], _sides[i], bank[i], maxf(_edge_half(i) - pull, 1.0) * side
+	)
 	var out_dir := _sides[i] * side
 	out_dir.y = 0.0
 	out_dir = out_dir.normalized() if out_dir.length() > 0.001 else Vector3.RIGHT
@@ -2873,29 +2928,51 @@ const ROAD_INDEX_CELL := 1.5
 ## Flattened to the XZ plane deliberately: a raised section still occupies the
 ## ground beneath it as far as scenery is concerned, because the ground plane a
 ## tree stands on runs under the whole circuit.
+## Each entry is `(x, z, index along the centreline)`. The third component is what
+## lets a caller ask "clear of the road *other than the bit I am standing beside*".
 func _road_index() -> Dictionary:
 	var cell := ROAD_INDEX_CELL * SCALE
 	var index := {}
-	for p in centreline:
+	for i in centreline.size():
+		var p := centreline[i]
 		var key := Vector2i(int(floor(p.x / cell)), int(floor(p.z / cell)))
 		if not index.has(key):
-			index[key] = PackedVector2Array()
-		index[key].append(Vector2(p.x, p.z))
+			index[key] = PackedVector3Array()
+		index[key].append(Vector3(p.x, p.z, float(i)))
 	return index
 
 ## Whether `pt` is at least `clearance` from every part of the road.
-func _clear_of_road(index: Dictionary, pt: Vector3, clearance: float) -> bool:
+##
+## `beside` and `span` exempt a stretch of the lap from the test, for the one
+## caller that is *supposed* to be close to the road: the trackside railing stands
+## at the road's own edge, so measured against its own leg it is never clear of
+## anything. Everything else — posts, trees, markers — wants the plain question
+## and passes no exemption.
+##
+## Without this the railing vanished from every raised section the moment it was
+## tucked in to the deck edge, because at 7 m from its own centreline it failed a
+## 7.7 m clearance against the very road it was lining.
+func _clear_of_road(
+	index: Dictionary, pt: Vector3, clearance: float,
+	beside: int = -1, span: int = 0
+) -> bool:
 	var cell := ROAD_INDEX_CELL * SCALE
 	var flat := Vector2(pt.x, pt.z)
 	var cx := int(floor(pt.x / cell))
 	var cz := int(floor(pt.z / cell))
+	var total := centreline.size()
 	for dx in [-1, 0, 1]:
 		for dz in [-1, 0, 1]:
-			var bucket: PackedVector2Array = index.get(Vector2i(cx + dx, cz + dz),
-				PackedVector2Array())
+			var bucket: PackedVector3Array = index.get(Vector2i(cx + dx, cz + dz),
+				PackedVector3Array())
 			for q in bucket:
-				if flat.distance_to(q) < clearance:
-					return false
+				if flat.distance_to(Vector2(q.x, q.y)) >= clearance:
+					continue
+				if beside >= 0 and total > 0:
+					var apart: int = absi(int(q.z) - beside)
+					if mini(apart, total - apart) <= span:
+						continue
+				return false
 	return true
 
 ## A prop's mesh and the shift that moves its origin to the centre of its

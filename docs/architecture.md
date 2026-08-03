@@ -1159,6 +1159,46 @@ Two things about how they are built:
 > `TyreMarks` both use it, so the tyres and the marks they leave can never
 > disagree about where the circuit is.
 
+### The road has two edges, and a bridge only has one
+
+`_edge_half` is where the road's usable edge is at a point, and it is not the same
+number everywhere.
+
+On the ground it is `RIBBON_HALF` — the collision ribbon runs 1.4 m past the
+visible tile, out over the verge, which is deliberate: it catches a car that has
+run wide instead of dropping it off an invisible kerb. **On a raised section there
+is no verge.** The tile *is* the deck and it stops at `ROAD_HALF`, so anything
+placed beyond that is standing in mid-air.
+
+That is exactly how the trackside railing looked on every bridge on every circuit:
+its outer face sat at 8.9 m against a deck edge at 7. The rail follows the deck
+edge now, and **so do the collision walls**, so the thing you can see and the thing
+that stops you still coincide.
+
+> **The clearance rule culled both rails and left neither.** A railing point that
+> lands on another leg's tarmac has to go, and the old rule dropped it on the
+> reasoning that "the barrier already standing between them serves both". Where
+> two legs run one tile apart, *both* sides are rejected by that rule — each
+> assuming the other exists — and neither is built. It now steps the rail inward
+> and only gives up if nothing fits.
+>
+> Tucking the rail to the deck edge then broke it a second way: at 7 m from its
+> own centreline it failed a 7.7 m clearance **against the very road it was
+> lining**, so the railing vanished from every raised section. `_clear_of_road`
+> takes an optional stretch of the lap to exempt, and the railing is the one
+> caller that is *supposed* to be close to the road. Posts, trees and markers ask
+> the plain question.
+
+### The circuit carries its own centreline
+
+`TrackBuilder` writes the centreline onto the built root as metadata. A shipped
+circuit is a packed scene and the layout that produced it lives in `tools/`, which
+the game never loads — so until now the only things that knew the shape of a baked
+circuit were its collision ribbon and its sixteen gates. That is enough to drive on
+and not enough to reason about: a scripted lap, a minimap, an off-the-racing-line
+cue and a kerb all want the same two numbers, how far along and how far across.
+About 20 KB on the longest circuit, a fifth of what the audio costs.
+
 ### The start of a race
 
 **3 — 2 — 1 — GO**, as a number in the middle of the screen, with three lamps on

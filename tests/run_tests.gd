@@ -1373,6 +1373,69 @@ func test_a_drawn_circuit_can_choose_its_look() -> void:
 		check_true("%s still names its own look" % id,
 			CircuitLook.LOOKS.has(CircuitLook.BY_TRACK[id]))
 
+## **The trackside railing stands on something.**
+##
+## The rail is placed at the road's edge and follows the road's height. On the
+## ground that edge is the collision ribbon, which runs 1.4 m past the visible
+## tile over the verge — deliberate, so a car running wide is caught rather than
+## dropped off an invisible kerb.
+##
+## **On a bridge there is no verge.** The tile *is* the deck and it stops at
+## `ROAD_HALF`, so the rail's outer face at 8.9 m stood in mid-air beside every
+## raised section on every circuit. It follows the deck edge now, and so do the
+## collision walls, so the two still coincide.
+func test_the_railing_stands_on_the_deck() -> void:
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var line: PackedVector3Array = circuit.get_meta(
+			"centreline", PackedVector3Array()
+		)
+		check_true("%s carries its centreline (%d points)" % [id, line.size()],
+			line.size() > 50)
+		if line.is_empty():
+			circuit.free()
+			continue
+
+		var raised := 0
+		var floating := 0
+		var furthest := 0.0
+		for name in ["BarrierLeft", "BarrierRight"]:
+			var found: Array = circuit.find_children(name, "MeshInstance3D", true, false)
+			if found.is_empty():
+				continue
+			var verts: PackedVector3Array = ((found[0] as MeshInstance3D).mesh
+				.surface_get_arrays(0))[Mesh.ARRAY_VERTEX]
+			# Sampled: a circuit's railing is tens of thousands of vertices and
+			# the nearest-point search is linear in the centreline.
+			var step := maxi(1, verts.size() / 400)
+			var at := 0
+			while at < verts.size():
+				var v: Vector3 = verts[at]
+				var best := INF
+				var bi := 0
+				for i in line.size():
+					var d := Vector2(line[i].x - v.x, line[i].z - v.z).length_squared()
+					if d < best:
+						best = d
+						bi = i
+				var out := sqrt(best)
+				furthest = maxf(furthest, out)
+				if line[bi].y > TrackBuilder.RAISED_ABOVE:
+					raised += 1
+					# Allowing the rail's own thickness beyond the deck edge.
+					if out > TrackBuilder.ROAD_HALF + TrackBuilder.BARRIER_THICK + 0.05:
+						floating += 1
+				at += step
+		check_true("%s has railing beside its raised sections (%d samples)"
+			% [id, raised], raised > 0 or line.size() < 10)
+		check("%s hangs none of it in mid-air" % id, floating, 0)
+		# And on the ground it still reaches the collision wall, so the rail you
+		# can see is the thing that stops you.
+		check_true("%s puts the rail out at the road edge (%.2f m)" % [id, furthest],
+			furthest >= TrackBuilder.RIBBON_HALF - 0.05)
+		circuit.free()
+
 ## **A tyre looks the same on every circuit.**
 ##
 ## The wheels shared the bodywork's material, and that material carries a fresnel
@@ -6513,6 +6576,7 @@ func _physics_process(_delta: float) -> bool:
 		test_the_start_lamps_keep_their_colour()
 		test_one_light_casts_the_shadows()
 		test_tyres_do_not_change_colour()
+		test_the_railing_stands_on_the_deck()
 		test_the_dark_hours_are_lit()
 		test_every_hour_lights_its_track()
 		test_the_car_lights_its_own_way()
