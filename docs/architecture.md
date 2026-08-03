@@ -1175,6 +1175,16 @@ its outer face sat at 8.9 m against a deck edge at 7. The rail follows the deck
 edge now, and **so do the collision walls**, so the thing you can see and the thing
 that stops you still coincide.
 
+> **Measure the railing by triangle, never by vertex.** `_barrier_vertices` keeps
+> only the points where the road turns, climbs, or has run straight for a tile —
+> so a straight is drawn as *one long quad with no vertices in the middle of it*.
+> A check that marks a stretch "railed" wherever a vertex lands reports that quad
+> as a hole, and two separate investigations chased 50 m and 16 m "gaps" that were
+> nothing of the kind. Walking the triangles and marking the arc each one actually
+> spans is what finally answered it: the worst genuine hole is 7 m at the lap seam
+> on three circuits, and 32 m at Suzuka's crossing, where rail cannot stand on the
+> other leg's tarmac and the break is correct.
+
 > **A curve offset inward by more than its own radius folds back through
 > itself.** That is the classic parallel-curve failure, and it is what tied the
 > railing in a bow at every tight corner: a size-1 corner has a 7 m centreline

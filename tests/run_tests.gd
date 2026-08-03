@@ -1486,6 +1486,62 @@ func test_the_railing_stands_on_the_deck() -> void:
 				k += stride
 		check_true("%s keeps the rail off the tarmac (%.2f m)" % [id, closest],
 			closest >= TrackBuilder.ROAD_HALF - 0.05)
+
+		# **And it is continuous, measured by triangle rather than by vertex.**
+		#
+		# This is the metric three earlier attempts got wrong. `_barrier_vertices`
+		# keeps only the points where the road turns or climbs, so a straight is
+		# drawn as one long quad with no vertices in the middle of it — and a
+		# check that marks "railed" wherever a *vertex* lands reports that quad as
+		# a hole. Two separate investigations chased 50 m and 16 m "gaps" that
+		# were nothing but long spans. Walking the triangles and marking the arc
+		# each one actually covers is what finally answered it.
+		var arc := PackedFloat32Array()
+		arc.resize(line.size())
+		var lap := 0.0
+		for i in line.size():
+			arc[i] = lap
+			lap += line[i].distance_to(line[(i + 1) % line.size()])
+		var railed := {}
+		for name in ["BarrierLeft", "BarrierRight"]:
+			var strips: Array = circuit.find_children(name, "MeshInstance3D", true, false)
+			if strips.is_empty():
+				continue
+			var pts: PackedVector3Array = ((strips[0] as MeshInstance3D).mesh
+				.surface_get_arrays(0))[Mesh.ARRAY_VERTEX]
+			var along := PackedFloat32Array()
+			along.resize(pts.size())
+			for k in pts.size():
+				var near := INF
+				var ni := 0
+				for i in line.size():
+					var d := Vector2(line[i].x - pts[k].x,
+						line[i].z - pts[k].z).length_squared()
+					if d < near:
+						near = d
+						ni = i
+				along[k] = arc[ni]
+			var tri := 0
+			while tri + 2 < pts.size():
+				var lo: float = minf(along[tri], minf(along[tri + 1], along[tri + 2]))
+				var hi: float = maxf(along[tri], maxf(along[tri + 1], along[tri + 2]))
+				# A triangle at the start/finish seam spans the whole lap by this
+				# measure; it is skipped rather than swallowing every hole.
+				if hi - lo < lap * 0.5:
+					var m := int(lo)
+					while m <= int(hi):
+						railed[m] = true
+						m += 1
+				tri += 3
+		var hole := 0
+		var worst_hole := 0
+		for m in range(0, int(lap)):
+			hole = 0 if railed.has(m) else hole + 1
+			worst_hole = maxi(worst_hole, hole)
+		# Suzuka crosses itself, and rail cannot stand on the other leg's tarmac —
+		# a real 32 m break there is correct. Anything much beyond that is not.
+		check_true("%s railing has no hole longer than %d m" % [id, worst_hole],
+			worst_hole <= 40)
 		circuit.free()
 
 ## **A ghost does not carry the car's shadow.**
