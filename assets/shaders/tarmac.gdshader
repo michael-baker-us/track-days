@@ -60,6 +60,14 @@ uniform float patch_amount : hint_range(0.0, 0.6) = 0.0;
 uniform float stones : hint_range(0.0, 1.0) = 0.0;
 // Snow's specular glinting, as holes of low roughness rather than added light.
 uniform float sparkle : hint_range(0.0, 1.0) = 0.0;
+// How much the road lifts itself out of the dark, as emission.
+//
+// Zero in daylight. At the dark hours it is the *floor* under the lighting rig:
+// the lamps shape the road and the glow guarantees there is a road there to
+// shape. Emission rather than a raised ambient because ambient lifts everything
+// — the sky, the field, the barriers — and turns night into an overcast
+// afternoon, while this lifts only the surface being driven on.
+uniform float glow : hint_range(0.0, 1.0) = 0.0;
 
 varying vec3 world_pos;
 varying vec3 world_normal;
@@ -127,6 +135,9 @@ void fragment() {
 	}
 
 	ALBEDO = albedo;
+	// Proportional to the albedo, so a worn patch and a fresh one stay different
+	// in the dark rather than flattening into one lit sheet.
+	EMISSION = albedo * glow;
 	// Rougher where the aggregate sits proud, so the sun picks out the texture
 	// instead of leaving one even sheen across the whole width.
 	ROUGHNESS = clamp(roughness, 0.02, 1.0);

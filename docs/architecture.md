@@ -1159,6 +1159,114 @@ Two things about how they are built:
 > `TyreMarks` both use it, so the tyres and the marks they leave can never
 > disagree about where the circuit is.
 
+### Lighting the track
+
+Two things light a circuit here, and a third stops it going black.
+
+**A key light.** One `DirectionalLight3D`, warm, steeply down, `shadow_enabled`.
+It lights the road, the barriers and the buildings uniformly and gives the car a
+shadow that swings as it turns. The field around the circuit stays dark for free,
+because the ground plane is `unshaded` and receives nothing — the contrast a
+floodlit circuit is made of falls out of the existing architecture.
+
+**Floodlight masts.** Real fixtures, standing at the verge on alternating sides,
+21 m tall with a lit headframe, one every 26 m. Each throws a cone at the road
+about 50 m *ahead of itself*, so the pool lands as a long ellipse along the track
+and consecutive pools overlap end to end.
+
+**A `road_glow` floor**, a small emission term on the road material whose only job
+is to stop pure black between fixtures.
+
+> **Why the masts aim down the track rather than at their own feet.** A spot goes
+> to **zero at its cone edge**, whatever `spot_angle_attenuation` is. A cone aimed
+> straight down stamps a circle, and circles tile badly: a row of them is a row of
+> discs with dark rims. Struck at a shallow angle the same cone lays a long
+> ellipse, and ellipses along a line overlap properly.
+>
+> Aimed along the **centreline**, by stepping forward through the resampled
+> points, not by extrapolating the tangent — a straight line 50 m from a corner
+> leaves the circuit, and half the masts on La Sarthe were measured aiming into
+> the field with only the width of the cone keeping the road lit.
+>
+> The headframe runs **parallel with the track** (local Z, which `_yaw_along` lays
+> down the circuit). Built along local X it reached 4.5 m either side of the pole:
+> out over the tarmac on one side and into the field on the other, at whatever
+> angle each corner happened to take.
+
+Measured on the drivable surface, computing what the renderer computes: **no point
+of the road is unlit, and no point depends on a single cone** — a lone cone means
+its edge is nearby, and an edge is zero. Brightness under the masts varies about
+two and a half to one, which on top of the key light reads as pools rather than as
+spots.
+
+> **The painted light pools are gone.** They were flat additive discs laid on the
+> tarmac under each column — a stand-in for lighting from before there was any,
+> and defended here for a long time as the graphic statement, a hard-edged pool
+> being more in keeping than a smooth falloff. That stopped being true the moment
+> real fixtures existed. What they actually looked like, said three separate times
+> by the person playing it, was **yellow glow spots**. A disc of colour added to
+> the road is not light and no tuning makes it behave like light: it does not move
+> with the eye, it does not fall on the car, and its edge is a circle from every
+> angle.
+
+**Ambient comes down** at the dark hours, and that is a consequence of the
+lighting working rather than a separate decision. Ambient is a flat fill: every
+unit of it is contrast the lights do not get to create, and a night lit mostly by
+ambient is an overcast afternoon with the brightness pulled down.
+
+> **Five separate ways this was wrong before**, each kept because each is a
+> different mistake.
+>
+> **Aim.** The lamps were anchored on the column line 13.3 m from the centreline,
+> with a `+ Vector3(0, 0, 0)` where the offset back to the road should have been,
+> and aimed straight down. A lamp 9.5 m up with a 28 degree half-cone lights a
+> ring from 8.25 m to 18.35 m out; the road ends at 7. **No lamp could touch the
+> tarmac at any energy.**
+>
+> **Spacing.** They then inherited the columns' 70 m spacing, so the only
+> continuously lit thing was whatever the headlights pointed at — a circuit that
+> reads as a torch being carried round it. No amount of energy fixes a gap.
+>
+> **Units, twice.** `spot_angle` is the **half**-angle, measured from the axis to
+> the edge, which is why it caps at 89.9 rather than 180; treating it as a full
+> angle and halving it made cones four times wider than intended, so a "80 degree"
+> cone reached 125 m from a 22 m mast. And `light_energy` figures are not
+> comparable between lights at different distances from what they light: a mast is
+> 22 m away and a headlight about 8, so beams that measured as a safe margin were
+> delivering **3.4 against a mast's 1.4**. Compare *delivered*, never raw.
+>
+> **Energy.** Chosen from geometry with nothing to compare against, the masts hit
+> 11.0 — delivering 9.3 to a circuit whose moon is 0.28, **33x the light of the
+> hour being lit**. They are set against the noon sun's 1.15 now.
+>
+> **Scope.** `surface_road` matched Kenney's shared `"road"` material name across
+> the whole scene, so twelve scenery surfaces per circuit — building aprons, pit
+> garage floors — were re-surfaced as tarmac. Invisible while tarmac was only a
+> colour; **glowing buildings** the moment the road gained an emission floor. It
+> matches by branch now: `RoadVisuals` and nothing else.
+>
+> **And one that hid in a measurement rather than in the code:**
+> `look_at_from_position` works through `global_transform` and quietly does
+> nothing on a node outside the tree. The whole circuit is built detached and then
+> packed, so it could never work — every mast was left pointing along its default
+> -Z, horizontally. The aim is built as a `Basis` now.
+
+> **The headlights are handed their hour, not given a rule to derive it from.**
+> The first version read the scene's sun and ambient and turned on in proportion
+> to the darkness. It was a nicer shape and it broke, because sun and ambient are
+> dials for how a scene *looks* — they get rebalanced whenever the look changes,
+> and they have been twice since. The circuit carries the figure as metadata, the
+> same way it carries `road_glow`, and `race.gd` hands it over.
+>
+> It arrives **before the car is in the tree** — `race.gd` instances the car,
+> tints its rim, sets its hour and only then adds it — so a `set_hour` that wrote
+> only to lights collected in `_ready` did nothing whatever in the game while
+> passing every test, because the suite's car was already in the tree.
+
+Checked for **every hour**, on a circuit built from scratch, not only on the
+shipped circuits that happen to be dark. Checking less than that is how three
+rigs in a row survived a green suite.
+
 ### Surfaces have to be made of something
 
 Grip is what makes snow *be* snow, but colour alone is not what makes it *look*

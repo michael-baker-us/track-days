@@ -126,6 +126,7 @@ func _bake(spec: CarSpec) -> bool:
 
 	car.add_child(_audio())
 	car.add_child(_shadow())
+	car.add_child(_headlights(body_size.z))
 	# What the tyres leave behind. A plain node like the others; it configures
 	# itself from the surface being raced on when it enters the tree.
 	var marks := MultiMeshInstance3D.new()
@@ -213,6 +214,44 @@ func _audio() -> Node3D:
 	# Carries further than either: a crash is the loudest thing that happens and
 	# should not fade out because the camera is trailing the car.
 	holder.add_child(_player("Impact", IMPACT_STREAM, 45.0))
+	return holder
+
+## Two beams in front of the car, off in daylight.
+##
+## Built here rather than left to the circuit because the light that matters most
+## at a dark hour is the one that *moves with the driver*: the trackside lamps are
+## 70 m apart, so between two of them nothing was lighting the piece of road being
+## looked at. `car_lights.gd` works out for itself how dark the scene is and sets
+## them, so no plumbing runs from the circuit's hour down into the car scene.
+func _headlights(body_length: float) -> Node3D:
+	var holder := Node3D.new()
+	holder.name = "Headlights"
+	holder.set_script(load("res://scripts/car/car_lights.gd"))
+	for side in [-1.0, 1.0]:
+		var beam := SpotLight3D.new()
+		beam.name = "Left" if side < 0.0 else "Right"
+		# Measured from the car's own nose, not written down. Placing them at a
+		# fixed z put the beams *inside* the bodywork, and the two cars are
+		# different lengths — see car_lights.gd.
+		beam.position = Vector3(
+			side * CarLights.SPACING,
+			CarLights.HEIGHT,
+			body_length * 0.5 + CarLights.AHEAD
+		)
+		# Splayed outward, so the pair covers the road's width rather than
+		# lighting one lane twice.
+		beam.rotation_degrees = Vector3(CarLights.PITCH, side * CarLights.SPLAY, 0.0)
+		beam.light_color = CarLights.COLOUR
+		# Set by `car_lights.gd` on the first frame from how dark the circuit is.
+		beam.light_energy = 0.0
+		beam.visible = false
+		beam.spot_range = CarLights.RANGE
+		beam.spot_angle = CarLights.ANGLE
+		beam.spot_attenuation = 1.1
+		# See car_lights.gd: two shadow-casting spots following the camera would
+		# be the most expensive thing in a Compatibility-renderer frame.
+		beam.shadow_enabled = false
+		holder.add_child(beam)
 	return holder
 
 ## `unit_size` is how far the sound carries. The engine is set well beyond the

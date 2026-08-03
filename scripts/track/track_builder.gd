@@ -66,11 +66,91 @@ const MARKER_GAP := 0.72
 const MARKER_CLEARANCE := 0.7
 const MARKER_SCALE := 3.2
 
-const POOL_SHADER := "res://assets/shaders/light_pool.gdshader"
-const POOL_RADIUS := 24.0
-const POOL_LIFT := 0.05
-const POOL_STRENGTH := 1.35
-const POOL_COLOR := Color(1.0, 0.86, 0.62)
+## The trackside lamps. Height is where a `lightPostLarge` head sits at
+## `POST_SCALE`; the cone is wide enough that consecutive lamps overlap at
+## `POST_STEP` rather than leaving the road dark between them, which was most of
+## what made night unreadable.
+## Circuit floodlighting: high masts, wide cones, and **close enough together
+## that their pools overlap**.
+##
+## Spacing is the number that matters and it was the one thing wrong after the
+## lamps were aimed at the road. Lights hung off the visible columns inherited
+## `POST_STEP`, which is 70 m — a cone 17 m across every 70 m leaves three
+## quarters of the lap unlit, so the only continuously lit thing was whatever the
+## car's own headlights were pointing at. That is what "the light follows the car"
+## looks like, and no amount of energy fixes it.
+##
+## At 22 m a 44 degree half-angle reaches 21 m either side, so a mast lights a
+## 42 m circle; at 28 m apart, consecutive circles overlap and the track is lit
+## end to end. That is how a real circuit is lit and it is why the lights are no
+## longer tied to the columns — a lamp post every 28 m would be a fence.
+##
+## The reach has to clear more than half the spacing, because the road is 17 m of
+## drivable ribbon wide and the far corner of it is the worst case: a first
+## attempt at 16 m and 26 m apart left points **17.4 m** from the nearest mast
+## against a 14.4 m reach, all of them on the outside of corners, where the outer
+## edge stretches between two masts placed by arc length along the centre.
+## Floodlight masts: what a circuit is recognisably lit by.
+##
+## `MAST_LOOKAHEAD` is the one that makes the lighting continuous. A cone aimed
+## straight down at its own feet stamps a *circle*, and circles tile badly — a
+## spot goes to zero at its cone edge whatever its attenuation, so a row of them
+## is a row of discs with dark rims. Aimed down the track instead, the cone
+## strikes the road at a shallow angle and lays a long ellipse along it, and
+## consecutive masts overlap end to end.
+const MAST_STEP := 26.0
+const MAST_GAP := 1.05
+const MAST_HEIGHT := 21.0
+## How many resampled steps ahead a mast aims: 2 x 26 m, so the cone strikes
+## the road about 50 m down the track and lays a long ellipse along it.
+const MAST_LOOKAHEAD := 2
+const MAST_RANGE := 130.0
+## **Godot's `spot_angle` is the half-angle**, measured from the cone axis to its
+## edge — which is why it is capped at 89.9 rather than 180. Earlier code here
+## treated it as the full angle and halved it, so cones set to "80 degrees" were
+## in fact 80 degrees *from the axis*: a reach of 22 x tan(80) = 125 m from a 22 m
+## mast, very nearly a hemisphere. That is a large part of why everything within
+## sight of one blew out to white.
+const MAST_ANGLE := 40.0
+## The structure, in metres. Deliberately large: the silhouette of the masts is
+## most of what says "floodlit circuit" before a single light is switched on.
+const MAST_POLE := 0.7
+const MAST_RIG_W := 9.0
+const MAST_RIG_H := 0.7
+const MAST_LAMPS := 6
+const MAST_LAMP_W := 1.2
+const MAST_LAMP_H := 0.9
+const MAST_GLOW := 2.4
+const MAST_COLOR := Color(0.30, 0.31, 0.34)
+
+const LAMP_HEIGHT := 12.0
+## **Far beyond where the light is needed, on purpose.** Godot's spot falloff is
+## `pow(1 - distance/range, attenuation)`, so a range set to just clear the work
+## puts the road near the bottom of the curve: at range 36 with attenuation 1.3,
+## the point directly under a mast received 0.29 of full and the far edge of its
+## cone received **0.09** — and the edge is exactly where two masts overlap, so
+## the one place continuity depends on was the one place with no light. Bright
+## discs under the masts, dark between them.
+##
+## At range 90 and attenuation 0.6 the same two points get 0.85 and 0.78 — flat
+## across the whole pool, which is what a floodlit circuit looks like. The energy
+## figures came down to match, because the light is no longer being thrown away.
+const LAMP_RANGE := 90.0
+const LAMP_FALLOFF := 0.6
+## Flattens the cone across its width for the same reason: the default
+## concentrates light at the centre, which puts the dark part back at the edges.
+const LAMP_CONE_FALLOFF := 0.35
+## Godot caps a spot at 89.9 degrees, so the cone cannot be widened much further
+## than this — past here the only way to reach more road is to raise the mast.
+## Also a half-angle: 40 degrees from 12 m up is a 10 m pool, which is an
+## accent under a lamp post. Read as a full angle it was 76 from the axis,
+## reaching 48 m — the whole width of the circuit and most of the field.
+const LAMP_ANGLE := 40.0
+## Past this a lamp switches off entirely, so the count that is live is the
+## handful around the car rather than the whole circuit.
+const LAMP_FADE_FROM := 140.0
+const LAMP_FADE_OVER := 40.0
+
 
 ## The overlay laid on the tarmac: how many strips across the road, how far the
 ## rubber spreads either side of the racing line, and how dark it gets.
@@ -1731,6 +1811,50 @@ func _build_lighting(root_node: Node3D, track_name: String = "") -> void:
 	sun.directional_shadow_max_distance = 320.0
 	root_node.add_child(sun)
 
+	# Recorded on the root rather than passed, because the thing that applies it
+	# runs at *load*: `surface_road` rebuilds the road material every race and is
+	# static, so it has the track but not the hour. Metadata serialises into the
+	# packed scene, so a baked circuit and a painted one carry it the same way.
+	root_node.set_meta("road_glow", preset.get("road_glow", 0.0))
+	# The car's headlights, for the same reason and by the same route. Written
+	# from the *resolved* preset rather than from a track id, so a painted circuit
+	# carries its hour as surely as a shipped one.
+	root_node.set_meta("headlights", preset.get("headlights", 0.0))
+
+	# The floodlighting, and it is **not** the trackside masts.
+	#
+	# Building the base illumination out of downward spot cones does not work, and
+	# the reason is the angular falloff: a spot goes to *zero* at its cone edge
+	# whatever `spot_angle_attenuation` is set to. So sixty-four cones pointed
+	# straight down at a flat road are sixty-four discs with dark rims — "a bunch
+	# of glowing yellow spots", which is what they were called and what they were.
+	# Earlier arithmetic here claimed 92% brightness at the overlap; it measured
+	# only the *distance* term and ignored the angular one, which is the term that
+	# matters at exactly that point.
+	#
+	# A real circuit under floodlights is *evenly* lit, with the world beyond it
+	# dark — the light arrives from many masts at once from many directions, which
+	# is much closer to a directional light than to a point one. So that is what
+	# it is: a second `DirectionalLight3D`, warm, steeply down, **casting
+	# shadows**. It lights the road, the barriers and the buildings uniformly, it
+	# gives the car a shadow that swings as it turns, and it costs one light.
+	#
+	# It does not light the field, because the ground plane is `unshaded` and
+	# receives nothing — so the surroundings stay dark by construction, which is
+	# the contrast a floodlit circuit is made of.
+	if float(preset.get("key_energy", 0.0)) > 0.0:
+		var key := DirectionalLight3D.new()
+		key.name = "Floodlight"
+		key.rotation_degrees = preset.get("key_angle", Vector3(-72.0, 20.0, 0.0))
+		key.light_color = preset.get("key_color", Color.WHITE)
+		key.light_energy = preset["key_energy"]
+		# The point of it. Without shadows this is a brightness multiplier rather
+		# than lighting, and a night circuit reads as flat whatever its energy.
+		key.shadow_enabled = true
+		key.shadow_normal_bias = 0.5
+		key.directional_shadow_max_distance = 220.0
+		root_node.add_child(key)
+
 	var we := WorldEnvironment.new()
 	we.name = "WorldEnvironment"
 	var env := Environment.new()
@@ -1844,7 +1968,24 @@ static func surface_road(track_root: Node3D, surface: String = "") -> void:
 	tarmac.set_shader_parameter("patch_amount", spec.get("patch", 0.0))
 	tarmac.set_shader_parameter("stones", spec.get("stones", 0.0))
 	tarmac.set_shader_parameter("sparkle", spec.get("sparkle", 0.0))
-	for mi in _mesh_instances(track_root):
+	# The floor under the whole lighting rig. Whatever the sun and the lamps are
+	# doing, the tarmac does not drop below readable — a racing line you cannot
+	# see is not a hard circuit, it is a broken one. Zero in daylight, so this
+	# costs the bright hours nothing.
+	tarmac.set_shader_parameter("glow", track_root.get_meta("road_glow", 0.0))
+	# **Only the road visuals**, not everything in the scene wearing a material
+	# Kenney happened to call "road".
+	#
+	# The kit shares one atlas, and twelve scenery surfaces on a shipped circuit —
+	# building aprons, pit garage floors — carry that same material name. They
+	# were being re-surfaced as tarmac too. That was invisible while tarmac was
+	# only a colour; the moment the road gained an emission floor for the dark
+	# hours it became **glowing buildings**, which is exactly how it was found.
+	#
+	# Matching by branch rather than by material name is the fix: `RoadVisuals`
+	# holds the tiles the car drives on and nothing else.
+	var visuals := track_root.get_node_or_null("RoadVisuals")
+	for mi in _mesh_instances(visuals if visuals != null else track_root):
 		if mi.mesh == null:
 			continue
 		for i in mi.mesh.get_surface_count():
@@ -1913,6 +2054,7 @@ func _build_scenery(root_node: Node3D, track_name: String) -> void:
 	_scenery_barrier(scenery, road)
 	_scenery_posts(scenery, road, track_name)
 	_scenery_trees(scenery, rng, road, track_name)
+	_lamp_lights(scenery, track_name)
 	_scenery_paddock(scenery, road)
 	_scenery_markers(scenery, road, track_name)
 	_build_tunnels(scenery)
@@ -2240,73 +2382,227 @@ static func _barrier_quad(
 func _scenery_posts(scenery: Node3D, road: Dictionary, track_name: String) -> void:
 	var post := _prop("lightPostLarge")
 	var xforms: Array[Transform3D] = []
-	var lit: Array[Vector3] = []
-	for p in _resample(_offset_line(-1.0, POST_GAP * SCALE), POST_STEP):
-		var pt: Vector3 = p[0]
+	# Walked along the **centreline**, with the column offset out from it, rather
+	# than walked along the offset line.
+	#
+	# This is what makes the lamps light the road. The old version resampled the
+	# column line and then kept those same points as "the road beside the column"
+	# — with a `+ Vector3(0, 0, 0)` where the offset back to the track should have
+	# gone. So every lamp and every pool was anchored 13.3 m from the centreline,
+	# out on the grass. A lamp 9.5 m up with a 28 degree half-cone lights a circle
+	# from 8.25 m to 18.35 m out, and the road ends at 7: the lamps could not
+	# reach the track at all, at any energy. Walking the centreline means the road
+	# point is what is known and the column is what is derived, which is the way
+	# round that cannot drift.
+	for p in _resample(centreline, POST_STEP):
+		var road_pt: Vector3 = p[0]
+		var tan: Vector2 = p[1]
+		# Same perpendicular and sign as `_offset_line(-1.0)`, so the columns
+		# stand exactly where they always did.
+		var out := Vector2(-tan.y, tan.x).normalized() * (POST_GAP * SCALE) * -1.0
+		var pt := road_pt + Vector3(out.x, 0.0, out.y)
 		# Standing on the ground rather than on the road, so a column beside a
 		# raised section is as tall as the climb makes it look.
 		pt.y = 0.0
 		if not _clear_of_road(road, pt, POST_CLEARANCE * SCALE):
 			continue
-		xforms.append(_prop_xform(pt, _yaw_along(p[1]), POST_SCALE, post["offset"]))
-		# The road beside the column, not the column's own foot: the lamp hangs
-		# over the track and the pool belongs under the lamp.
-		lit.append(p[0] + Vector3(0.0, 0.0, 0.0))
+		xforms.append(_prop_xform(pt, _yaw_along(tan), POST_SCALE, post["offset"]))
 	_multimesh(scenery, "LightPosts", post, xforms)
-	_light_pools(scenery, track_name, lit)
 
-## The pools of light the columns throw, at the hours that say they are lit.
+## A real light on every trackside column, at the hours that have any.
 ##
-## This is what `night` was waiting for. The columns have been placed trackside
-## since M3 and have never emitted anything, so a genuinely dark circuit was
-## unplayable rather than atmospheric — which is why the preset carries a `lit`
-## flag and why night and lit columns had to arrive together.
+## The pools below are painted on the tarmac and light **only** the tarmac. That
+## was the whole of the night rig, and it is why a dark circuit still read as
+## broken: the car itself, the barriers, the trees and the kerbs all stayed black
+## whatever lamp they were under, and a car passing a column did not brighten.
+## Nothing about a light is happening in an additive disc.
 ##
-## Flat additive discs rather than `OmniLight3D`s. Twenty-odd point lights is a
-## great deal to ask of the Compatibility renderer the web build is stuck with,
-## and a real light produces exactly the smooth falloff gradient this look avoids
-## everywhere else — the ground plane is unshaded, the sky is banded, the car is
-## flat. See assets/shaders/light_pool.gdshader.
-func _light_pools(
-	scenery: Node3D, track_name: String, at: Array[Vector3]
-) -> void:
-	if at.is_empty() or not CircuitLook.sky_of(track_name, _look).get("lit", false):
+## A `SpotLight3D` aimed down is what a street lamp actually is, and it gives all
+## of that for free — including on the road's own relief, which dirt and snow now
+## have.
+##
+## > The old comment here argued against real lights on two grounds. One was the
+## > look: a real light has a smooth falloff gradient, which this game avoids
+## > everywhere else. That is still true, and it is why the pools stay — the hard
+## > edge on the road is the graphic statement and the lamp is the illumination.
+## > They do different jobs.
+## >
+## > The other was cost: twenty-odd point lights is a great deal to ask of the
+## > Compatibility renderer the web build is stuck with. That one is answered
+## > rather than dismissed — `distance_fade` switches a lamp off past 190 m, so
+## > the number *live* at any moment is the handful around the car rather than the
+## > whole circuit. Shadows stay off, which is where the real cost would be.
+func _lamp_lights(scenery: Node3D, track_name: String) -> void:
+	var preset := CircuitLook.sky_of(track_name, _look)
+	var energy: float = preset.get("lamp_energy", 0.0)
+	if centreline.size() < 4 or energy <= 0.0:
 		return
 
-	var mat := ShaderMaterial.new()
-	mat.shader = load(POOL_SHADER)
-	mat.set_shader_parameter("pool_color", POOL_COLOR.srgb_to_linear())
-	mat.set_shader_parameter("strength", POOL_STRENGTH)
+	var at := _resample(centreline, MAST_STEP)
+	if at.size() < 3:
+		return
 
+	var masts := Node3D.new()
+	masts.name = "Floodlights"
+	scenery.add_child(masts)
+
+	var frames: Array[Transform3D] = []
+	var heads: Array[Transform3D] = []
+	var colour: Color = preset.get("lamp_color", Color.WHITE)
+
+	for i in at.size():
+		var road: Vector3 = at[i][0]
+		var tan: Vector2 = at[i][1]
+		# Alternating sides, so the track is lit from both and a car is never
+		# edge-lit from one direction all lap. It also halves how often a mast
+		# appears on either verge, which keeps them reading as landmarks.
+		var side := 1.0 if i % 2 == 0 else -1.0
+		var out := Vector2(-tan.y, tan.x).normalized() * (MAST_GAP * SCALE) * side
+		var foot := Vector3(road.x + out.x, road.y, road.z + out.y)
+		var yaw := _yaw_along(tan)
+
+		frames.append(Transform3D(Basis(Vector3.UP, yaw), foot))
+		heads.append(Transform3D(
+			Basis(Vector3.UP, yaw), foot + Vector3.UP * MAST_HEIGHT
+		))
+
+		# **Aimed at the road well ahead of the mast, not straight down at its own
+		# feet.** That is what makes the pools tile: a cone striking the road at
+		# an angle lays down a long ellipse along the track, so consecutive masts
+		# overlap end to end instead of stamping separate circles.
+		#
+		# Aimed *along the centreline*, by stepping forward through the same
+		# resampled list, rather than by extrapolating the tangent. A straight
+		# line 50 m from a corner leaves the circuit — measured, half the masts on
+		# La Sarthe were aiming past the track into the field, and only the width
+		# of the cone was keeping the road lit at all.
+		var target: Vector3 = at[(i + MAST_LOOKAHEAD) % at.size()][0]
+		var head := foot + Vector3.UP * MAST_HEIGHT
+		var lamp := SpotLight3D.new()
+		lamp.name = "Mast%03d" % i
+		# **Aimed by building the basis, not by `look_at_from_position`.** That
+		# call works through `global_transform` and quietly does nothing on a node
+		# outside the tree — and the whole circuit is built detached and then
+		# packed, so it could never work here. Every mast was left pointing along
+		# its default -Z, horizontally, and 92% of the road was measured unlit.
+		lamp.transform = Transform3D(
+			Basis.looking_at(target - head, Vector3.UP), head
+		)
+		lamp.light_color = colour
+		lamp.light_energy = energy
+		lamp.spot_range = MAST_RANGE
+		lamp.spot_angle = MAST_ANGLE
+		lamp.spot_attenuation = LAMP_FALLOFF
+		lamp.spot_angle_attenuation = LAMP_CONE_FALLOFF
+		# Shadows belong to the key light. These exist to put visible pools on the
+		# track, and a shadow map apiece is what makes a light of this count
+		# unaffordable on the Compatibility renderer the web build needs.
+		lamp.shadow_enabled = false
+		# Only the masts near the car are ever live.
+		lamp.distance_fade_enabled = true
+		lamp.distance_fade_begin = LAMP_FADE_FROM
+		lamp.distance_fade_length = LAMP_FADE_OVER
+		masts.add_child(lamp)
+
+	_multimesh_of(masts, "MastFrames", _mast_frame_mesh(), frames)
+	var head_mm := _multimesh_of(masts, "MastHeads", _mast_head_mesh(), heads)
+	if head_mm != null:
+		# The fixtures have to *look* switched on. A mast throwing light while its
+		# own lamps are dark grey is the clearest possible sign the light is not
+		# coming from anything.
+		var glow := StandardMaterial3D.new()
+		glow.albedo_color = colour
+		glow.emission_enabled = true
+		glow.emission = colour
+		glow.emission_energy_multiplier = MAST_GLOW
+		glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		head_mm.material_override = glow
+
+## The structure: a column with a headframe across the top, in one mesh so a
+## circuit's worth of masts is a single instanced draw.
+##
+## Built from boxes rather than vendored, because the Kenney racing kit has street
+## lamps and no floodlight masts — and a floodlit circuit is recognisable almost
+## entirely by the silhouette of the masts around it.
+func _mast_frame_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for centre in at:
-		var c := centre
-		# Just clear of the road surface, and never below it. The shader also
-		# refuses to write depth, which is what actually settles the fight.
-		c.y += POOL_LIFT
-		var r := POOL_RADIUS
-		st.set_uv(Vector2(0.0, 0.0))
-		st.add_vertex(c + Vector3(-r, 0.0, -r))
-		st.set_uv(Vector2(1.0, 0.0))
-		st.add_vertex(c + Vector3(r, 0.0, -r))
-		st.set_uv(Vector2(1.0, 1.0))
-		st.add_vertex(c + Vector3(r, 0.0, r))
-
-		st.set_uv(Vector2(0.0, 0.0))
-		st.add_vertex(c + Vector3(-r, 0.0, -r))
-		st.set_uv(Vector2(1.0, 1.0))
-		st.add_vertex(c + Vector3(r, 0.0, r))
-		st.set_uv(Vector2(0.0, 1.0))
-		st.add_vertex(c + Vector3(-r, 0.0, r))
-
-	var mi := MeshInstance3D.new()
-	mi.name = "LightPools"
+	_box(st, Vector3(0.0, MAST_HEIGHT * 0.5, 0.0),
+		Vector3(MAST_POLE, MAST_HEIGHT, MAST_POLE))
+	# **Spanning local Z, which `_yaw_along` lays down the track.** The headframe
+	# runs *parallel* with the circuit, so a row of masts reads as a line of
+	# fixtures rather than as arms poking across the road at every angle a corner
+	# happens to take. Built along local X it reached 4.5 m either side of the
+	# pole, straight out over the tarmac on one side and into the field on the
+	# other.
+	_box(st, Vector3(0.0, MAST_HEIGHT + MAST_RIG_H * 0.5, 0.0),
+		Vector3(MAST_POLE * 1.6, MAST_RIG_H, MAST_RIG_W))
+	st.generate_normals()
 	var mesh: ArrayMesh = st.commit()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = MAST_COLOR
+	mat.roughness = 0.85
 	mesh.surface_set_material(0, mat)
-	mi.mesh = mesh
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	scenery.add_child(mi)
+	return mesh
+
+## The lamps on the headframe, as a separate mesh so they can be emissive while
+## the structure is not.
+func _mast_head_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var span := MAST_RIG_W - MAST_LAMP_W
+	# Along the headframe, which is along the track.
+	for i in MAST_LAMPS:
+		var t := (float(i) / float(MAST_LAMPS - 1) - 0.5) * span
+		_box(st, Vector3(0.0, MAST_RIG_H + MAST_LAMP_H * 0.5, t),
+			Vector3(MAST_LAMP_W * 0.7, MAST_LAMP_H, MAST_LAMP_W))
+	st.generate_normals()
+	return st.commit()
+
+## One axis-aligned box, appended to a running surface.
+func _box(st: SurfaceTool, centre: Vector3, size: Vector3) -> void:
+	var h := size * 0.5
+	var corner := [
+		centre + Vector3(-h.x, -h.y, -h.z), centre + Vector3(h.x, -h.y, -h.z),
+		centre + Vector3(h.x, h.y, -h.z), centre + Vector3(-h.x, h.y, -h.z),
+		centre + Vector3(-h.x, -h.y, h.z), centre + Vector3(h.x, -h.y, h.z),
+		centre + Vector3(h.x, h.y, h.z), centre + Vector3(-h.x, h.y, h.z),
+	]
+	for face in [[0, 1, 2, 3], [5, 4, 7, 6], [4, 0, 3, 7],
+			[1, 5, 6, 2], [3, 2, 6, 7], [4, 5, 1, 0]]:
+		for i in [0, 1, 2, 0, 2, 3]:
+			st.add_vertex(corner[face[i]])
+
+## A `MultiMesh` of one shape at a list of transforms, written through `buffer`
+## because the per-instance setters do not survive a headless run.
+func _multimesh_of(
+	parent: Node3D, node_name: String, mesh: Mesh, xforms: Array[Transform3D]
+) -> MultiMeshInstance3D:
+	if xforms.is_empty():
+		return null
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = mesh
+	mm.instance_count = xforms.size()
+	mm.buffer = _instance_buffer(xforms)
+	var mi := MultiMeshInstance3D.new()
+	mi.name = node_name
+	mi.multimesh = mm
+	parent.add_child(mi)
+	return mi
+
+## The painted light pools are **gone**, and this note is what is left of them.
+##
+## They were flat additive discs laid on the tarmac under each column: a stand-in
+## for lighting from before there was any, and defended for a long time as the
+## graphic statement — a hard-edged pool being more in keeping than a smooth
+## falloff. That defence stopped being true the moment real fixtures existed, and
+## what they actually looked like, said three separate times by the person
+## playing it, was *yellow glow spots*. A disc of colour added to the road is not
+## light and no amount of tuning makes it behave like light: it does not move with
+## the eye, it does not fall on the car, and its edge is a circle at every angle.
+##
+## The masts light the road now. See `_lamp_lights`.
 
 ## Small markers down both verges, close together.
 ##

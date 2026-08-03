@@ -395,54 +395,362 @@ func test_circuits_have_a_horizon() -> void:
 
 ## Night, and the thing it was waiting for.
 ##
-## The trackside columns have been placed since M3 and have never emitted
-## anything, so a genuinely dark circuit was unplayable rather than atmospheric.
-## `night` therefore ships with lit columns or not at all — which makes the pools
-## and the `lit` flag one feature, and worth checking as one.
+## The circuits that need track lighting have it, and the ones that do not have
+## none of it.
+##
+## This replaced a test of the painted light pools, which are gone. They were flat
+## additive discs on the tarmac standing in for lighting from before there was
+## any, and what they looked like — said three times by the person playing it —
+## was *yellow glow spots*. A disc of colour added to the road is not light: it
+## does not move with the eye, it does not fall on the car, and its edge is a
+## circle from every angle.
 func test_night_lights_the_columns_it_needs() -> void:
 	var lit := []
 	for name in SkyPreset.PRESETS:
-		if SkyPreset.PRESETS[name].get("lit", false):
+		if float(SkyPreset.PRESETS[name].get("lamp_energy", 0.0)) > 0.0:
 			lit.append(name)
-	check_true("some hour lights the columns (%s)" % lit, lit.size() > 0)
+	check_true("some hour lights the track (%s)" % str(lit), lit.size() > 0)
 
 	for entry in GameState.TRACKS:
 		var id: String = entry["id"]
-		var wants_light: bool = SkyPreset.for_track(id).get("lit", false)
+		var wants_light: bool = float(
+			SkyPreset.for_track(id).get("lamp_energy", 0.0)
+		) > 0.0
 		var circuit: Node3D = load(entry["scene"]).instantiate()
-		var pools := circuit.find_children("LightPools", "MeshInstance3D", true, false)
-		check("%s has pools exactly when its hour is lit" % id,
-			not pools.is_empty(), wants_light)
-
-		if not pools.is_empty():
-			var mesh: MeshInstance3D = pools[0]
-			# One pool per column, and the columns are 70 m apart, so a circuit
-			# of this size should carry a good handful.
-			var posts := circuit.find_children("LightPosts", "MultiMeshInstance3D", true, false)
-			check_true("%s pools every column it placed" % id,
-				not posts.is_empty()
-				and mesh.mesh.get_aabb().size.x > 100.0)
-			# A pool that cast a shadow would be a contradiction, and one that
-			# wrote depth would fight the road it lies on.
-			check("%s pools cast no shadow" % id,
-				mesh.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
-			var mat := mesh.mesh.surface_get_material(0) as ShaderMaterial
-			check_true("%s pools use the pool shader" % id, mat != null)
-			if mat != null:
-				# Linear on the way in, like every other colour handed to a
-				# shader. This is the trap that turned the sky white.
-				check_true("%s pool colour is linear" % id,
-					(mat.get_shader_parameter("pool_color") as Color)
-						.is_equal_approx(TrackBuilder.POOL_COLOR.srgb_to_linear()))
+		check("%s has floodlights exactly when its hour asks for them" % id,
+			not circuit.find_children("Mast*", "SpotLight3D", true, false).is_empty(),
+			wants_light)
+		# Nothing paints light on the road any more.
+		check("%s has no painted pools" % id,
+			circuit.find_children("LightPools", "MeshInstance3D", true, false).size(), 0)
+		if wants_light:
+			# The fixtures are visible objects, not invisible light sources.
+			check_true("%s stands its masts up" % id,
+				not circuit.find_children("MastFrames", "MultiMeshInstance3D",
+					true, false).is_empty())
+			var heads: Array = circuit.find_children("MastHeads",
+				"MultiMeshInstance3D", true, false)
+			check_true("%s lights their heads" % id,
+				not heads.is_empty()
+				and (heads[0] as MultiMeshInstance3D).material_override != null)
+			# **Parallel with the track.** The headframe is laid along local Z,
+			# which `_yaw_along` puts down the circuit; built along X it reached
+			# 4.5 m either side of the pole, out over the tarmac on one side and
+			# into the field on the other.
+			if not heads.is_empty():
+				var box := ((heads[0] as MultiMeshInstance3D).multimesh.mesh
+					as Mesh).get_aabb()
+				check_true("%s runs its fixtures along the track (%.1f m vs %.1f m)"
+					% [id, box.size.z, box.size.x],
+					box.size.z > box.size.x * 3.0)
 		circuit.free()
 
-	# And a lit hour has to be dark enough to need them, or the pools are
-	# decoration on a bright circuit.
-	for name in lit:
+## The lighting rig, and what it took to arrive at it.
+##
+## Real circuit floodlighting is **even**, with the world beyond it dark. Getting
+## there meant discarding three rigs, and the assertions below are shaped by what
+## each one got wrong rather than by what the current one does.
+func test_the_dark_hours_are_lit() -> void:
+	for name in SkyPreset.PRESETS:
 		var preset: Dictionary = SkyPreset.PRESETS[name]
-		check_true("%s is actually dark (ambient %.2f, sun %.2f)"
-			% [name, preset["ambient_energy"], preset["sun_energy"]],
-			preset["ambient_energy"] < 0.6 and preset["sun_energy"] < 0.4)
+		for key in ["lamp_energy", "lamp_color", "key_energy", "key_color",
+				"key_angle", "road_glow", "headlights"]:
+			check_true("%s carries its %s" % [name, key], preset.has(key))
+
+	check_true("night is the most floodlit hour",
+		SkyPreset.PRESETS["night"]["key_energy"]
+			> SkyPreset.PRESETS["dusk"]["key_energy"])
+	check_near("noon needs none", SkyPreset.PRESETS["noon"]["key_energy"], 0.0, 0.001)
+	check_near("and no glow", SkyPreset.PRESETS["noon"]["road_glow"], 0.0, 0.001)
+	# A floor against pure black, not a light source. It was five times this and
+	# made the road read as a lightbox rather than a surface.
+	check_true("night keeps a floor under the road",
+		SkyPreset.PRESETS["night"]["road_glow"] > 0.02)
+	check_true("but does not light the circuit with it",
+		SkyPreset.PRESETS["night"]["road_glow"] < 0.1)
+
+	# The road shader can actually be told to glow. `set_shader_parameter` says
+	# nothing about a name it does not recognise, so a renamed uniform would leave
+	# every dark circuit exactly as dark and report nothing.
+	var uniforms := {}
+	for u in (load("res://assets/shaders/tarmac.gdshader") as Shader).get_shader_uniform_list():
+		uniforms[String(u["name"])] = true
+	check_true("the road shader takes a glow", uniforms.has("glow"))
+
+	var night: Node3D = load("res://scenes/track/track_la_sarthe.tscn").instantiate()
+
+	# **The floodlighting is a key light, not a field of spot cones.**
+	#
+	# A spot goes to *zero* at its cone edge whatever `spot_angle_attenuation` is,
+	# so cones pointed straight down at a flat road are discs with dark rims.
+	# Sixty-four of them read as "a bunch of glowing yellow spots", which is what
+	# they were. The arithmetic that passed them measured only the *distance*
+	# falloff and ignored the angular one — the term that matters at precisely the
+	# point two cones are supposed to join.
+	var key := night.get_node_or_null("Floodlight") as DirectionalLight3D
+	check_true("a night circuit is floodlit by a key light", key != null)
+	if key == null:
+		night.free()
+		return
+	# Without shadows a light is a brightness multiplier, and a night circuit
+	# reads as flat whatever energy it is given.
+	check_true("which casts shadows", key.shadow_enabled)
+	check_true("at an energy in sight of daylight (%.2f vs %.2f)"
+		% [key.light_energy, SkyPreset.PRESETS["noon"]["sun_energy"]],
+		key.light_energy > 0.4
+		and key.light_energy < float(SkyPreset.PRESETS["noon"]["sun_energy"]) * 1.6)
+	check_true("from above (%.0f degrees)" % key.rotation_degrees.x,
+		key.rotation_degrees.x < -55.0)
+
+	var lamps: Array = night.find_children("Mast*", "SpotLight3D", true, false)
+	check_true("a night circuit has floodlight masts (%d)" % lamps.size(),
+		lamps.size() > 10)
+	if lamps.is_empty():
+		night.free()
+		return
+
+	# **The masts stand off the track and aim at it**, which is what a real
+	# floodlight does — and what the first rig did not: it anchored them on the
+	# column line 13.3 m out and aimed them straight *down*, so their cones lit a
+	# ring of grass from 8.25 m to 18.35 m out while the road ended at 7 m. No
+	# lamp could touch the tarmac at any energy.
+	root.add_child(night)
+	var space := root.world_3d.direct_space_state
+	var aimed := 0
+	for node in lamps:
+		var mast := node as SpotLight3D
+		var from: Vector3 = mast.global_position
+		var query := PhysicsRayQueryParameters3D.create(
+			from, from + -mast.global_transform.basis.z * 200.0,
+			TrackBuilder.ROAD_LAYER
+		)
+		if not space.intersect_ray(query).is_empty():
+			aimed += 1
+	# Most, not all, and deliberately: a mast aims at the centreline about 50 m
+	# ahead of itself, and on a tight corner that point sits inside the arc, so
+	# the *axis* clips the verge while the cone still covers the road. Coverage is
+	# guaranteed by the measurement below, which is the claim that matters; this
+	# only catches a rig aimed somewhere else entirely, as the first one was.
+	check_true("the masts are aimed at the road (%d of %d)" % [aimed, lamps.size()],
+		float(aimed) > float(lamps.size()) * 0.8)
+
+	# **No gaps between their pools**, computed the way the renderer computes it:
+	# a point is lit by a cone only if it is *inside* the cone, and its brightness
+	# is the distance falloff times the angular one.
+	var faces: PackedVector3Array = (
+		(night.get_node("RoadSurface/RoadCollision") as CollisionShape3D).shape
+		as ConcavePolygonShape3D
+	).get_faces()
+	var unlit := 0
+	var single := 0
+	var points := 0
+	var dimmest := INF
+	var brightest := 0.0
+	var stride := maxi(3, (faces.size() / 3 / 300) * 3)
+	var sample := 0
+	while sample < faces.size():
+		var here: Vector3 = faces[sample]
+		var sum := 0.0
+		var cones := 0
+		for node in lamps:
+			var mast := node as SpotLight3D
+			var away: Vector3 = here - mast.global_position
+			var span := away.length()
+			if span > mast.spot_range or span < 0.01:
+				continue
+			# Godot points a spot along its local -Z, and `spot_angle` is the
+			# **half**-angle — measured from the axis to the edge, which is why it
+			# is capped at 89.9 rather than 180. Reading it as a full angle and
+			# halving it made cones four times wider than intended.
+			var edge := cos(deg_to_rad(mast.spot_angle))
+			var along := away.normalized().dot(-mast.global_transform.basis.z)
+			if along <= edge:
+				continue
+			cones += 1
+			sum += mast.light_energy \
+				* pow(1.0 - span / mast.spot_range, mast.spot_attenuation) \
+				* pow((along - edge) / (1.0 - edge), mast.spot_angle_attenuation)
+		points += 1
+		if cones == 0:
+			unlit += 1
+		elif cones == 1:
+			single += 1
+		dimmest = minf(dimmest, sum)
+		brightest = maxf(brightest, sum)
+		sample += stride
+
+	check_true("the road was sampled (%d points)" % points, points > 100)
+	check("no part of the track is unlit", unlit, 0)
+	# Not one point may depend on a *single* cone, because a lone cone means
+	# somewhere nearby is its edge, and a cone's edge is zero.
+	check("and none of it hangs off one cone", single, 0)
+	check_true("the pools are pools, not spots (%.2f to %.2f)"
+		% [dimmest, brightest],
+		dimmest > brightest * 0.15)
+	check_true("the masts light on top of the key, not instead of it (%.2f vs %.2f)"
+		% [brightest, key.light_energy],
+		brightest < key.light_energy * 1.4)
+	root.remove_child(night)
+
+	# The glow floor rides on the circuit rather than being passed down, because
+	# the thing that applies it runs at load and is static.
+	check_true("the circuit remembers how much its road glows",
+		float(night.get_meta("road_glow", 0.0)) > 0.02)
+	TrackBuilder.surface_road(night, "tarmac")
+	var glowing := false
+	for child in night.find_children("*", "MeshInstance3D", true, false):
+		var mesh_node := child as MeshInstance3D
+		if mesh_node.mesh == null:
+			continue
+		for i in mesh_node.mesh.get_surface_count():
+			var m := mesh_node.get_surface_override_material(i) as ShaderMaterial
+			if m == null or m.get_shader_parameter("glow") == null:
+				continue
+			glowing = float(m.get_shader_parameter("glow")) > 0.02
+			break
+		if glowing:
+			break
+	check_true("and the road it is re-surfaced with actually glows", glowing)
+	night.free()
+
+	# A daylit circuit gets none of it.
+	var day: Node3D = load("res://scenes/track/track_ardennes.tscn").instantiate()
+	check("a noon circuit has no masts",
+		day.find_children("Mast*", "SpotLight3D", true, false).size(), 0)
+	check_true("and no key light", day.get_node_or_null("Floodlight") == null)
+	check_near("and no glow", float(day.get_meta("road_glow", -1.0)), 0.0, 0.001)
+	day.free()
+
+## **Every hour, on a circuit built from scratch.** Not just the two shipped ones
+## that happen to be dark — checking less than this is how three rigs in a row
+## survived a green suite.
+func test_every_hour_lights_its_track() -> void:
+	var layout := TrackLayout.new()
+	layout.cells.assign(TrackShape.cells_from_corners([
+		Vector2i(0, 0), Vector2i(9, 0), Vector2i(9, 7), Vector2i(0, 7)
+	]))
+	var segments: Array = layout.compile().segments
+	var noon_sun: float = SkyPreset.PRESETS["noon"]["sun_energy"]
+
+	for look in CircuitLook.ORDER:
+		var hour := CircuitLook.sky_of("", look)
+		var wants: float = hour.get("key_energy", 0.0)
+		var built := TrackBuilder.new().build("hour_%s" % look, segments, true, look)
+		if built == null or built.root == null:
+			check_true("%s builds at all" % look, false)
+			continue
+		var track := built.root
+		var key := track.get_node_or_null("Floodlight") as DirectionalLight3D
+		var masts: Array = track.find_children("Mast*", "SpotLight3D", true, false)
+
+		if wants <= 0.0:
+			check_true("%s is daylight and needs no floodlighting" % look, key == null)
+			check("%s stands no masts either" % look, masts.size(), 0)
+			track.free()
+			continue
+
+		check_true("%s is floodlit" % look, key != null)
+		if key == null:
+			track.free()
+			continue
+		check_true("%s casts shadows from it" % look, key.shadow_enabled)
+		# In the same order as daylight. Set from geometry alone an earlier rig
+		# reached 33 times the moonlight of the hour it was lighting, and every
+		# surface within reach blew out to white.
+		check_true("%s lights the track at %.2f against a noon sun of %.2f"
+			% [look, key.light_energy, noon_sun],
+			key.light_energy > noon_sun * 0.25 and key.light_energy < noon_sun * 1.6)
+		check_true("%s stands fixtures along the circuit (%d)" % [look, masts.size()],
+			masts.size() > 3)
+		check_true("%s: the key light leads the masts" % look,
+			key.light_energy > float(hour.get("lamp_energy", 0.0)))
+		check_true("%s: and leads the car's own beams" % look,
+			key.light_energy
+				> float(hour.get("headlights", 0.0)) * CarLights.FULL_ENERGY)
+		# Ambient is a flat fill: every unit of it is contrast the lights do not
+		# get to make. Compared against whichever light is dominant at this hour,
+		# which at sunset is still the sun.
+		var dominant: float = maxf(key.light_energy, float(hour["sun_energy"]))
+		check_true("%s does not drown its lighting in ambient (%.2f vs %.2f)"
+			% [look, hour["ambient_energy"], dominant],
+			float(hour["ambient_energy"]) < dominant)
+		track.free()
+
+## Headlights, and why the hour is handed to them.
+func test_the_car_lights_its_own_way() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	var lights: Node = car.get_node_or_null("Headlights") if car != null else null
+	check_true("the car has headlights", lights != null)
+	if lights == null:
+		return
+	var beams: Array = lights.find_children("*", "SpotLight3D", true, false)
+	check("two of them", beams.size(), 2)
+	if beams.size() < 2:
+		return
+
+	# **Clear of the bodywork.** The beams were at z = 1.15 on a body whose nose
+	# is at 1.28, so they sat *inside* the car, 0.42 m up and pitched 9 degrees
+	# down — putting the cone's near edge on the road 0.86 m ahead. A hot patch at
+	# the front bumper, which is what "it is lighting the tyres" looks like.
+	var nose := 0.0
+	for node in car.get_children():
+		if node is MeshInstance3D and (node as MeshInstance3D).mesh != null:
+			var box := ((node as MeshInstance3D).mesh as Mesh).get_aabb()
+			if box.size.y > 0.1:  # the body, not the flat shadow decal
+				nose = maxf(nose, box.position.z + box.size.z)
+	check_true("the beams start ahead of the nose (%.2f vs %.2f)"
+		% [(beams[0] as SpotLight3D).position.z, nose],
+		nose > 0.1 and (beams[0] as SpotLight3D).position.z > nose)
+	var wheel_top := 0.0
+	for node in car.get_children():
+		if node is VehicleWheel3D:
+			wheel_top = maxf(wheel_top,
+				(node as VehicleWheel3D).position.y + (node as VehicleWheel3D).wheel_radius)
+	check_true("and above the wheels (%.2f vs %.2f)"
+		% [(beams[0] as SpotLight3D).position.y, wheel_top],
+		(beams[0] as SpotLight3D).position.y > wheel_top)
+	check_true("splayed apart",
+		absf((beams[0] as SpotLight3D).position.x
+			- (beams[1] as SpotLight3D).position.x) > 0.5)
+
+	lights.set_hour(0.0)
+	check_near("off at noon", (beams[0] as SpotLight3D).light_energy, 0.0, 0.001)
+	check("and not even a light the renderer has to consider",
+		(beams[0] as SpotLight3D).visible, false)
+
+	lights.set_hour(SkyPreset.PRESETS["night"]["headlights"])
+	check_near("full beam at night", (beams[0] as SpotLight3D).light_energy,
+		CarLights.FULL_ENERGY * float(SkyPreset.PRESETS["night"]["headlights"]), 0.01)
+	check_true("and switched on", (beams[0] as SpotLight3D).visible)
+
+	# **Scene brightness cannot decide this**, which is why the hour is handed
+	# over rather than derived. Sun and ambient are dials for how a scene *looks*;
+	# they get rebalanced whenever the look changes, and they have been twice.
+	# Deriving a behaviour from them means every such rebalance silently reaches
+	# into the car.
+	check_true("every hour states its headlights outright",
+		SkyPreset.PRESETS["night"]["headlights"]
+			> SkyPreset.PRESETS["sunset"]["headlights"])
+
+	# And the circuit is what carries the answer, so a painted one works too.
+	var night: Node3D = load("res://scenes/track/track_la_sarthe.tscn").instantiate()
+	check_true("a night circuit asks for headlights",
+		float(night.get_meta("headlights", 0.0)) > 0.0)
+	night.free()
+
+	# **Set before the car is in the tree**, which is the order `race.gd` uses: it
+	# instances the car, tints its rim, sets its hour, and only then adds it. A
+	# version that wrote the beams inside `set_hour` alone passed every check
+	# above and did nothing whatever in the real game.
+	var fresh: Node = load("res://scenes/car/race.tscn").instantiate()
+	var fresh_lights := fresh.get_node("Headlights") as CarLights
+	fresh_lights.set_hour(1.0)
+	root.add_child(fresh)
+	var lit_beams: Array = fresh_lights.find_children("*", "SpotLight3D", true, false)
+	check_true("an hour set before the car is in the tree still arrives",
+		not lit_beams.is_empty()
+		and (lit_beams[0] as SpotLight3D).light_energy > CarLights.FULL_ENERGY * 0.9)
+	fresh.free()
 
 ## The land around a circuit, and the fix for a bug night introduced.
 ##
@@ -475,13 +783,13 @@ func test_the_ground_takes_its_theme_and_its_hour() -> void:
 	check_true("the circuits stand on different ground (%d)" % colours.size(),
 		colours.size() >= 3)
 
-	# The specific thing that was wrong: a lit-column hour has to darken the
-	# ground, or the grass glows at midnight.
+	# The specific thing that was wrong: an hour dark enough to need track
+	# lighting has to darken the ground, or the grass glows at midnight.
 	for name in SkyPreset.PRESETS:
 		var preset: Dictionary = SkyPreset.PRESETS[name]
-		if preset.get("lit", false):
+		if float(preset.get("key_energy", 0.0)) >= 0.7:
 			check_true("%s darkens the ground (%.2f)" % [name, preset["ground_tint"]],
-				preset["ground_tint"] < 0.4)
+				preset["ground_tint"] < 0.55)
 
 	# And themes vary how much grows, which is the other half of a place.
 	var densities := {}
@@ -654,16 +962,18 @@ func test_a_drawn_circuit_can_choose_its_look() -> void:
 	if compiled.ok:
 		var at_night := TrackBuilder.new().build(
 			"look_test", compiled.segments, true, "night")
-		check_true("built at night, the columns light it",
-			not at_night.root.find_children(
-				"LightPools", "MeshInstance3D", true, false).is_empty())
+		check_true("built at night, the circuit is floodlit",
+			at_night.root.get_node_or_null("Floodlight") != null
+			and not at_night.root.find_children(
+				"Mast*", "SpotLight3D", true, false).is_empty())
 		at_night.root.free()
 
 		var by_day := TrackBuilder.new().build(
 			"look_test", compiled.segments, true, "bright")
-		check_true("built bright, they do not",
-			by_day.root.find_children(
-				"LightPools", "MeshInstance3D", true, false).is_empty())
+		check_true("built bright, it is not",
+			by_day.root.get_node_or_null("Floodlight") == null
+			and by_day.root.find_children(
+				"Mast*", "SpotLight3D", true, false).is_empty())
 		by_day.root.free()
 
 	# Shipped circuits are unaffected: their look is part of what they are.
@@ -829,6 +1139,40 @@ func test_conditions_are_a_separate_record_and_a_separate_target() -> void:
 		RoadSurface.named("tarmac")["field_amount"], 0.0, 0.0001)
 	check_true("snow does", RoadSurface.named("snow")["field_amount"] > 0.5)
 	check_true("and dirt does", RoadSurface.named("dirt")["field_amount"] > 0.2)
+
+## Re-surfacing the road must touch **only the road**.
+##
+## The Kenney kit shares one atlas, and twelve scenery surfaces on a shipped
+## circuit — building aprons, pit garage floors — wear the same material name the
+## tarmac does. `surface_road` matched on that name across the whole scene, so it
+## was re-surfacing buildings as road. Invisible for as long as tarmac was only a
+## colour; the moment the road gained an emission floor for the dark hours it
+## became **glowing buildings**, which is how it was found.
+func test_only_the_road_is_re_surfaced() -> void:
+	var track: Node3D = load("res://scenes/track/track_la_sarthe.tscn").instantiate()
+	TrackBuilder.surface_road(track, "tarmac")
+	var road := 0
+	var elsewhere := 0
+	for node in track.find_children("*", "MeshInstance3D", true, false):
+		var mesh_node := node as MeshInstance3D
+		if mesh_node.mesh == null:
+			continue
+		var under_visuals := false
+		var walk: Node = mesh_node
+		while walk != null:
+			if walk.name == "RoadVisuals":
+				under_visuals = true
+				break
+			walk = walk.get_parent()
+		for i in mesh_node.mesh.get_surface_count():
+			if mesh_node.get_surface_override_material(i) is ShaderMaterial:
+				if under_visuals:
+					road += 1
+				else:
+					elsewhere += 1
+	check_true("the road itself is re-surfaced (%d surfaces)" % road, road > 20)
+	check("and nothing outside it is", elsewhere, 0)
+	track.free()
 
 ## Re-surfacing a built circuit, which happens on load rather than at bake time
 ## and therefore has to be safe to do repeatedly.
@@ -5760,6 +6104,9 @@ func _physics_process(_delta: float) -> bool:
 		test_a_share_code_can_carry_a_ghost_but_does_not_by_default()
 		test_audio_resources_match_their_source()
 		test_the_engine_is_a_pulse_train()
+		test_the_dark_hours_are_lit()
+		test_every_hour_lights_its_track()
+		test_the_car_lights_its_own_way()
 		test_the_engine_has_two_voices()
 		test_hitting_something_is_audible()
 		test_generated_loops_meet_their_own_start()
@@ -5770,6 +6117,7 @@ func _physics_process(_delta: float) -> bool:
 		test_tyre_marks_have_real_depth()
 		test_braking_degrades_with_the_surface()
 		test_surfacing_a_circuit_is_repeatable()
+		test_only_the_road_is_re_surfaced()
 		test_the_car_is_painted_and_rimmed()
 		test_the_rim_takes_the_circuits_own_sky()
 		test_engine_pitch_sweeps_rather_than_climbing_once()

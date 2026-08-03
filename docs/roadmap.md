@@ -507,7 +507,46 @@ columns already being placed trackside. Then horizon silhouettes, denser roadsid
 objects, a lower and closer camera pass, a rim light on the car, a blob shadow
 under it, scenery themes, and weather as a colour treatment.
 
-**Status: sky and hours built.** The shader replaces `ProceduralSkyMaterial`, and
+**Status: sky, hours and a real lighting rig built.**
+
+The dark hours were unreadable, because the whole night rig was additive discs
+painted on the tarmac — which light the road and *only* the road. Each hour now
+carries five numbers instead of one flag: real `SpotLight3D` lamps on the
+trackside columns (what lights everything that is not the road), the painted pools
+kept for the graphic hard edge, an emission floor on the road material so the
+racing line never drops below readable, headlights on the car, and a lamp colour
+shared between the light and its pool. `distance_fade` answers the count — 27
+lamps on La Sarthe, only the handful near the car ever live, shadows off.
+
+Five things caught in the doing, all recorded in `docs/architecture.md`. The
+lamps were anchored on the column line 13.3 m out, where their cones could not
+reach the road at any energy. They then inherited the columns' 70 m spacing, so a
+17 m pool every 70 m left the car's headlights as the only continuously lit thing
+— **no amount of energy fixes a gap**, and floodlighting is now walked at its own
+28 m spacing with 22 m masts. Even correctly spaced, the *falloff* was wrong: `spot_range` set to just clear the
+work put the road at the bottom of Godot's curve, so the far edge of each cone —
+where consecutive masts overlap — got 9% of what fell directly under the mast, and
+the circuit still read as discs with dark between. Range is now far past the work
+and the curve is flat where the light is used. The headlights themselves sat
+*inside* the bodywork, lighting the front bumper. And scene brightness **cannot**
+decide when they come on, because dusk carries a higher ambient than noon on
+purpose.
+
+The energies then had nothing to be measured against and came out at **33x the
+moonlight of the hour they were lighting**; they are now set against the noon
+sun, and the headlights against the masts, compared as light *delivered* rather
+than as raw `light_energy` — the two sit at very different distances from what
+they light. And `surface_road` matched Kenney's shared `"road"` material name
+across the whole scene, so twelve scenery surfaces per circuit were being
+re-surfaced as tarmac; harmless while tarmac was a colour, **glowing buildings**
+once the road gained an emission floor.
+
+Every hour is now checked on a circuit built from scratch rather than only the two
+shipped ones that happen to be dark: `evening` was found carrying no track
+lighting at all, which left Monte Carlo unlit, and now runs its masts at a
+fraction of night energy — the hour a circuit's floodlights come on while the sky
+is still bright.
+ The shader replaces `ProceduralSkyMaterial`, and
 four presets are attached one per shipped circuit — noon, sunset, dusk, overcast.
 `SkyPreset` keeps each hour as one struct because sun, sky, fog and grade are not
 independent; changing one without the others is nearly always wrong.

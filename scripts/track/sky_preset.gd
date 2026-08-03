@@ -25,15 +25,65 @@ extends RefCounted
 ##
 ## Nothing, now. `night` was held back until the trackside columns could light
 ## the road, because a dark circuit with dark lamps is not atmospheric, it is
-## unplayable — so the preset carries a `lit` flag and La Sarthe races under it.
-## `dusk` stays, because it is a different hour rather than a stepping stone.
+## unplayable. `dusk` stays, because it is a different hour rather than a stepping
+## stone.
+##
+## ## The lighting rig, which is five numbers rather than one flag
+##
+## `lit` used to be the whole of it, and it only turned on flat additive discs
+## painted on the tarmac. Those light the *road* and nothing else — at night the
+## car itself, the barriers and the trees all stayed black, and between two lamps
+## the circuit went to guesswork. So each hour now carries a rig:
+##
+## - `key_energy` / `key_color` / `key_angle` — **the floodlighting**, as a second
+##   `DirectionalLight3D` that casts shadows. Not spot lights: a spot goes to zero
+##   at its cone edge whatever its attenuation, so cones pointed down at a flat
+##   road are discs with dark rims — "a bunch of glowing yellow spots" is what
+##   sixty-four of them actually looked like. A real circuit under floodlights is
+##   *evenly* lit from many masts at once, which is far closer to a directional
+##   light, and this one costs one light and brings shadows with it. The field
+##   stays dark because the ground plane is unshaded and receives nothing.
+## - `lamp_energy` — the **floodlight masts**: real fixtures standing at the verge
+##   on alternating sides, 21 m tall with a lit headframe, each throwing a cone at
+##   the road well ahead of itself so consecutive pools overlap end to end. They
+##   are what makes a circuit look floodlit rather than merely bright, and they
+##   sit *on top of* the key light rather than instead of it — measured, the road
+##   under them varies about three to one, which reads as pools rather than as
+##   spots.
+##   **Set against the hour's own sun, not against the geometry.** A mast delivers
+##   `energy * pow(1 - height/range, falloff)` to the road, which for this rig is
+##   0.85 of its figure — so these numbers land within sight of the noon sun's
+##   1.15, and a night circuit is lit rather than incandescent. Chosen by geometry
+##   alone they reached 11.0, which is **33 times the moonlight of the hour they
+##   were lighting**, and every surface within reach of a mast blew out to white.
+##   Two masts overlap at the midpoints between them, so the delivered figure
+##   roughly doubles there; that is the ceiling to keep an eye on.
+## - `road_glow` — emission on the road material, and the **floor**: whatever the
+##   lamps and the sun are doing, the tarmac never drops below readable. A racing
+##   line you cannot see is not a hard circuit, it is a broken one. Kept small,
+##   and smaller since the floodlighting became continuous — it is there to stop
+##   pure black, not to light the circuit. Emission that does the lighting makes
+##   the road look like a lightbox rather than a surface.
+## - `headlights` — the car lights the road immediately in front of it. A
+##   *detail*, not the light source: when the trackside rig was too sparse to
+##   cover the lap, the headlights were the only thing continuously lit and the
+##   whole circuit read as a torch beam following the car. Floodlighting is what
+##   lights a circuit; headlights are what a car has.
+## - `lamp_color` — warm sodium at the evening hours, cold under a storm.
 
 const PRESETS := {
 	# The look M8 arrived at, kept as the default so nothing that does not ask
 	# for an hour changes.
 	"noon": {
 		"ground_tint": 1.0,
-		"lit": false,
+		# Broad daylight: the sun does all of it.
+		"key_energy": 0.0,
+		"key_color": Color(1.0, 0.97, 0.92),
+		"key_angle": Vector3(-70.0, 25.0, 0.0),
+		"lamp_energy": 0.0,
+		"lamp_color": Color(1.0, 0.86, 0.62),
+		"road_glow": 0.0,
+		"headlights": 0.0,
 		"silhouette": Color(0.30, 0.42, 0.55),
 		"sun_angle": Vector3(-50.0, 35.0, 0.0),
 		"sun_color": Color(1.0, 0.96, 0.89),
@@ -56,7 +106,17 @@ const PRESETS := {
 	# shadow across the road is most of what says "late".
 	"sunset": {
 		"ground_tint": 0.62,
-		"lit": false,
+		# The sun is low but still the light, so the masts are on at a fraction of
+		# their night energy — the hour a circuit's floodlights are switched on
+		# while the sky is still bright. Monte Carlo races here, and without them
+		# it was one of two shipped circuits with no track lighting at all.
+		"key_energy": 0.35,
+		"key_color": Color(1.0, 0.93, 0.82),
+		"key_angle": Vector3(-68.0, 25.0, 0.0),
+		"lamp_energy": 0.14,
+		"lamp_color": Color(1.0, 0.84, 0.58),
+		"road_glow": 0.015,
+		"headlights": 0.1,
 		"silhouette": Color(0.26, 0.18, 0.34),
 		"sun_angle": Vector3(-14.0, 118.0, 0.0),
 		"sun_color": Color(1.0, 0.72, 0.42),
@@ -78,7 +138,16 @@ const PRESETS := {
 	# this can get while the trackside columns are still unlit.
 	"dusk": {
 		"ground_tint": 0.34,
-		"lit": false,
+		# The hour lamps are actually for. Real lamps and headlights, but no
+		# painted pools: a hard-edged disc of light on the tarmac only reads
+		# when the tarmac around it is genuinely dark, and at dusk it is not.
+		"key_energy": 0.85,
+		"key_color": Color(1.0, 0.92, 0.80),
+		"key_angle": Vector3(-70.0, 20.0, 0.0),
+		"lamp_energy": 0.24,
+		"lamp_color": Color(1.0, 0.86, 0.64),
+		"road_glow": 0.03,
+		"headlights": 0.3,
 		"silhouette": Color(0.10, 0.12, 0.24),
 		"sun_angle": Vector3(-8.0, 205.0, 0.0),
 		"sun_color": Color(0.62, 0.66, 0.95),
@@ -95,7 +164,7 @@ const PRESETS := {
 		# dark circuit being an unreadable one, and it is doing the job the
 		# lighting columns will do properly later.
 		"ambient": Color(0.46, 0.50, 0.68),
-		"ambient_energy": 1.15,
+		"ambient_energy": 0.55,
 		"fog_begin": 260.0,
 		"grade": Vector3(1.25, 1.18, 1.02),
 	},
@@ -105,7 +174,16 @@ const PRESETS := {
 	# all.
 	"night": {
 		"ground_tint": 0.22,
-		"lit": true,
+		# Everything on. The lamps are the light source, the pools are what they
+		# put on the tarmac, and the glow is the floor under both — a circuit you
+		# cannot see between the lamps is not atmospheric, it is unplayable.
+		"key_energy": 1.25,
+		"key_color": Color(1.0, 0.93, 0.82),
+		"key_angle": Vector3(-74.0, 18.0, 0.0),
+		"lamp_energy": 0.35,
+		"lamp_color": Color(1.0, 0.87, 0.66),
+		"road_glow": 0.05,
+		"headlights": 0.5,
 		"silhouette": Color(0.05, 0.06, 0.13),
 		# The moon, near enough. Low and cold, and weak enough that the pools of
 		# light do the work.
@@ -120,10 +198,14 @@ const PRESETS := {
 		"cloud_amount": 0.35,
 		"horizon_falloff": 1.2,
 		"sun_size": 0.035,
-		# Low enough to read as night, high enough that the road is not guesswork
-		# between the lamps. The pools carry the rest.
+		# Much lower than it was, and that is a *consequence* of the floodlighting
+		# working. Ambient is a flat fill: every unit of it is contrast the lights
+		# do not get to create, and a night lit mostly by ambient looks like an
+		# overcast afternoon with the brightness pulled down. Now that a key light
+		# lights the circuit and casts shadows, this only has to keep the shadowed
+		# side of things off pure black.
 		"ambient": Color(0.30, 0.34, 0.52),
-		"ambient_energy": 0.42,
+		"ambient_energy": 0.22,
 		"fog_begin": 200.0,
 		"grade": Vector3(1.2, 1.22, 1.0),
 	},
@@ -137,7 +219,17 @@ const PRESETS := {
 	# would make every lap time on this circuit quietly incomparable with every
 	# other. That is M17's job, and it has the key to do it with.
 	"storm": {
-		"lit": false,
+		# Dark for a different reason: it is daytime under a black sky. The lamps
+		# are on and cool, the glow does most of the readability work, and there
+		# are no pools — the ground is still lit, so a disc on the road would
+		# read as a decal rather than as a lamp.
+		"key_energy": 0.75,
+		"key_color": Color(0.90, 0.94, 1.0),
+		"key_angle": Vector3(-72.0, 30.0, 0.0),
+		"lamp_energy": 0.22,
+		"lamp_color": Color(0.86, 0.90, 1.0),
+		"road_glow": 0.04,
+		"headlights": 0.25,
 		"ground_tint": 0.5,
 		"silhouette": Color(0.30, 0.33, 0.36),
 		# High and weak: an overcast sky has no direction to it, and a low sun
@@ -156,7 +248,7 @@ const PRESETS := {
 		"horizon_falloff": 1.6,
 		"sun_size": 0.2,
 		"ambient": Color(0.60, 0.64, 0.70),
-		"ambient_energy": 0.75,
+		"ambient_energy": 0.42,
 		# The closest fog of any hour: shortening how far you can see is most of
 		# what makes weather feel like weather.
 		"fog_begin": 120.0,
@@ -168,7 +260,15 @@ const PRESETS := {
 	# a circuit that reads as weather rather than as an hour.
 	"overcast": {
 		"ground_tint": 0.86,
-		"lit": false,
+		# Flat and grey rather than dark. Nothing is lit; the road only wants a
+		# little lifting out of the murk.
+		"key_energy": 0.0,
+		"key_color": Color(0.96, 0.97, 1.0),
+		"key_angle": Vector3(-70.0, 25.0, 0.0),
+		"lamp_energy": 0.0,
+		"lamp_color": Color(0.92, 0.94, 1.0),
+		"road_glow": 0.02,
+		"headlights": 0.0,
 		"silhouette": Color(0.52, 0.58, 0.64),
 		"sun_angle": Vector3(-62.0, 15.0, 0.0),
 		"sun_color": Color(0.92, 0.94, 0.98),

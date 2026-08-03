@@ -34,6 +34,12 @@ func _ready() -> void:
 	_car = load(GameState.selected_car_spec().scene_path()).instantiate()
 	_car.name = "Car"
 	_tint_car_rim(_car, String(track_info["id"]))
+	# The hour, handed over rather than worked out. See car_lights.gd: scene
+	# brightness cannot order the hours, because dusk carries a *higher* ambient
+	# than noon on purpose.
+	var beams := _car.get_node_or_null("Headlights") as CarLights
+	if beams != null:
+		beams.set_hour(float(track.get_meta("headlights", 0.0)))
 	add_child(_car)
 
 	var spawn: Marker3D = track.get_node("SpawnPoint")
