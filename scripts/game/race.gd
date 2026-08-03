@@ -44,8 +44,37 @@ func _ready() -> void:
 
 	var spawn: Marker3D = track.get_node("SpawnPoint")
 	_place_car(spawn.position, spawn.rotation.y)
+	_hold_for_the_lights(track)
 
 	_add_ghost()
+
+## Holds the car on the grid until the lights go out.
+##
+## Held on the brakes rather than frozen. `freeze` takes a `RigidBody3D` out of
+## the simulation, so its suspension never compresses and its wheels never find
+## the road — and unfreezing drops the whole car onto its springs, which is
+## exactly what a race start looked like. On the brakes the physics runs the whole
+## time, the car settles while the lights count, and the release moves nothing.
+##
+## **A circuit without lights races immediately.** They are trackside geometry and
+## a painted circuit that failed to place them would otherwise never start. The
+## question asked here is "am I held", and the answer with no gantry is no.
+func _hold_for_the_lights(track: Node3D) -> void:
+	var lights := track.get_node_or_null("StartLights") as StartLights
+	if lights == null or lights.is_released():
+		return
+	_car.held = true
+	lights.released.connect(_release_the_car)
+	# The number on screen is the instruction; the lamps on the gantry are
+	# decoration. `race.gd` is the only thing that can see both, so the wiring
+	# lives here rather than either end knowing about the other.
+	var hud := get_node_or_null("HUD")
+	if hud != null and hud.has_method("show_count"):
+		lights.counted.connect(hud.show_count)
+
+func _release_the_car() -> void:
+	if _car != null and is_instance_valid(_car):
+		_car.held = false
 
 ## Points the car's rim light at the hour this circuit is raced at.
 ##

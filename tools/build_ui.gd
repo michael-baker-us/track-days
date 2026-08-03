@@ -70,6 +70,20 @@ func _initialize() -> void:
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root_ctrl.add_child(banner)
 
+	# The countdown, and the largest thing on the screen while it is up.
+	#
+	# Centred rather than tucked beside the lap panel: it is an instruction, not a
+	# readout, and it is on screen for four seconds a race. It sits above the
+	# touch pads in the tree so a phone shows it over them.
+	var countdown := _label("Countdown", "", 140)
+	countdown.set_anchors_preset(Control.PRESET_FULL_RECT)
+	countdown.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	countdown.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# Nothing about the countdown should swallow a touch aimed at the pads under
+	# it, and it covers the whole screen.
+	countdown.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root_ctrl.add_child(countdown)
+
 	root_ctrl.add_child(_touch_controls())
 
 	# The touch route out of a race. Escape and the pad's Start do the same job

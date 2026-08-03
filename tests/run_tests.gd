@@ -445,6 +445,415 @@ func test_night_lights_the_columns_it_needs() -> void:
 					box.size.z > box.size.x * 3.0)
 		circuit.free()
 
+## A race has a start now, which it did not — and it counts you in rather than
+## asking you to read lights.
+##
+## The scene used to load with the car already free: the one moment every driver
+## looks at, and nothing in it. The first attempt at fixing that was a real
+## Formula 1 sequence — five columns of two, going out together — which is the
+## correct grammar for a motor race and the wrong one for this game, because it
+## asks you to *interpret* lights. The signal is the moment they extinguish, and
+## you only read that if you already know it is the rule. A number counting down
+## needs nothing known.
+func test_the_race_starts_on_the_lights() -> void:
+	var track: Node3D = load("res://scenes/track/track_ardennes.tscn").instantiate()
+	var lights := track.get_node_or_null("StartLights") as StartLights
+	check_true("the circuit has a start gantry", lights != null)
+	if lights == null:
+		track.free()
+		return
+	root.add_child(track)
+
+	# Mounted over the *line*, not over the car: the grid box is behind the line,
+	# so lamps hung over the car would be behind the driver.
+	check_true("the lamps hang above the road (%.1f m)" % lights.position.y,
+		lights.position.y > 4.0)
+	check_true("with housings", lights.get_node_or_null("Housings") != null)
+	# One node per lamp, because they light **in sequence**: a single shared
+	# material can only be all on or all off, which is a set of traffic lights
+	# rather than a countdown.
+	var lamps: Array = lights.find_children("Lens*", "MeshInstance3D", true, false)
+	check("one node per lamp", lamps.size(), TrackBuilder.LIGHTS_COUNT)
+
+	# The count, driven a step at a time, watched through the signal the HUD
+	# listens to.
+	var seen: Array = []
+	lights.counted.connect(func(n: int): seen.append(n))
+	check("nothing showing to begin with", lights.showing(), -1)
+	check_true("and the car is not released", not lights.is_released())
+
+	lights._process(StartLights.LEAD_IN + 0.01)
+	check("it counts in from three", lights.showing(), StartLights.COUNT_FROM)
+	check_true("and the car is still held", not lights.is_released())
+	for i in StartLights.COUNT_FROM - 1:
+		lights._process(StartLights.STEP)
+	check("down to one", lights.showing(), 1)
+	check_true("still held at one", not lights.is_released())
+
+	lights._process(StartLights.STEP)
+	check("then GO", lights.showing(), 0)
+	check_true("which is what releases the car", lights.is_released())
+	check("and every number was announced", seen, [3, 2, 1, 0])
+
+	# GO clears itself rather than sitting over the race.
+	lights._process(StartLights.GO_HOLD + 0.01)
+	check("GO clears itself", lights.showing(), -1)
+	check_true("without un-releasing the car", lights.is_released())
+
+	# **One more lamp lights red at each number, and all of them go green on GO.**
+	#
+	# Pinned as the whole pattern rather than as a couple of spot checks, because
+	# it is the entire read of the sequence: three lit means "about to go" at a
+	# glance, without looking at the number you were told to look at. The lamps
+	# count *up* as the number counts *down*, which is the part that is easy to
+	# get backwards.
+	var red := StartLights.LENS_RED * StartLights.LENS_GLOW
+	var green := StartLights.LENS_GREEN * StartLights.LENS_GLOW
+	var want := {
+		3: [red, StartLights.LENS_DARK, StartLights.LENS_DARK],
+		2: [red, red, StartLights.LENS_DARK],
+		1: [red, red, red],
+		0: [green, green, green],
+	}
+	for number in [3, 2, 1, 0]:
+		lights._paint(number)
+		var row := []
+		var matched := true
+		for i in lamps.size():
+			var got := _lens_colour(lamps[i])
+			var expected: Color = (want[number] as Array)[i]
+			matched = matched and got.is_equal_approx(expected)
+			row.append("green" if got.is_equal_approx(green)
+				else ("red" if got.is_equal_approx(red) else "dark"))
+		check_true("at %s the lamps read %s"
+			% ["GO" if number == 0 else str(number), str(row)], matched)
+
+	root.remove_child(track)
+	track.free()
+
+	# **Held on the brakes, not frozen.**
+	#
+	# `freeze` takes a `RigidBody3D` out of the simulation, so its suspension
+	# never compresses and its wheels never find the road — and the moment it is
+	# unfrozen the whole car falls onto its springs. Every race start visibly
+	# dropped the car onto the track. Held this way the physics runs the whole
+	# time and the release moves nothing.
+	var car: Node = get_first_node_in_group("player_car")
+	if car == null:
+		return
+	var was: bool = car.held
+	car.held = true
+	Input.action_press("accelerate")
+	car._physics_process(1.0 / 60.0)
+	Input.action_release("accelerate")
+	check_true("a held car is still simulated", not (car as RigidBody3D).freeze)
+	check_near("it makes no power", car.engine_force, 0.0, 0.001)
+	check_true("and sits on its brakes", car.brake > 0.0)
+	check_near("pointing straight ahead", car.steering, 0.0, 0.001)
+	car.held = was
+
+func _lens_colour(lens: Node) -> Color:
+	var mat := (lens as MeshInstance3D).material_override as StandardMaterial3D
+	return mat.albedo_color if mat != null else Color.BLACK
+
+## The land around a circuit, and the fix for a bug night introduced.
+##
+## The ground plane is `unshaded` — deliberately, because flat bright grass is the
+## look — which means it receives no light. Adding a night preset therefore left
+## La Sarthe with noon-bright green grass under a midnight sky. The hour supplies
+## a tint the lighting cannot.
+func test_the_ground_takes_its_theme_and_its_hour() -> void:
+	var colours := {}
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var mesh: MeshInstance3D = circuit.get_node("Ground/GroundMesh")
+		var mat := mesh.mesh.material as ShaderMaterial
+		check_true("%s ground is shaded by the grid shader" % id, mat != null)
+		if mat == null:
+			circuit.free()
+			continue
+
+		var theme := SceneryTheme.for_track(id)
+		var tint: float = SkyPreset.for_track(id)["ground_tint"]
+		var got: Color = mat.get_shader_parameter("base_color")
+		check_true("%s ground is its theme at its hour (%s)" % [id, got],
+			got.is_equal_approx((theme["ground"] as Color) * tint))
+		colours[got] = true
+		circuit.free()
+
+	# Four circuits, four grounds. A bug collapsing theme or tint would pass every
+	# check above and fail this one.
+	check_true("the circuits stand on different ground (%d)" % colours.size(),
+		colours.size() >= 3)
+
+	# The specific thing that was wrong: an hour dark enough to need track
+	# lighting has to darken the ground, or the grass glows at midnight.
+	for name in SkyPreset.PRESETS:
+		var preset: Dictionary = SkyPreset.PRESETS[name]
+		if float(preset.get("key_energy", 0.0)) >= 0.7:
+			check_true("%s darkens the ground (%.2f)" % [name, preset["ground_tint"]],
+				preset["ground_tint"] < 0.55)
+
+	# And themes vary how much grows, which is the other half of a place.
+	var densities := {}
+	for name in SceneryTheme.THEMES:
+		densities[SceneryTheme.THEMES[name]["tree_chance"]] = true
+	check_true("themes differ in how much grows (%d densities)" % densities.size(),
+		densities.size() >= 3)
+
+## Markers down the verges, close enough together to read as speed.
+##
+## "Density is speed" (`docs/ideas.md`): pace is sold by a lot of things streaming
+## past at the edge of vision, not by a bigger number on the speedometer. Trees
+## are too far out and too sparse to do it.
+func test_roadside_markers_are_dense_enough_to_read_as_speed() -> void:
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var found := circuit.find_children("Markers", "MultiMeshInstance3D", true, false)
+		check_true("%s has roadside markers" % id, not found.is_empty())
+		if found.is_empty():
+			circuit.free()
+			continue
+
+		var mm: MultiMesh = (found[0] as MultiMeshInstance3D).multimesh
+		var theme := SceneryTheme.for_track(id)
+		var lap: float = TrackBuilder.new().measure(
+			_layout_for(id)
+		).length if _layout_for(id).size() > 0 else 0.0
+
+		# Both verges, at the theme's spacing, so a lap should carry roughly twice
+		# the lap length over the step. Loose bounds: the clearance test drops
+		# markers wherever the circuit doubles back on itself.
+		var step: float = float(theme["marker_step"]) * TrackBuilder.SCALE
+		var expected := 2.0 * lap / step
+		check_true("%s carries a marker every few metres (%d for %.0f m)"
+			% [id, mm.instance_count, lap],
+			mm.instance_count > expected * 0.4)
+
+		# One draw call, and never a shadow caster: a few hundred small props
+		# casting shadows would swamp the atlas the car's own shadow needs.
+		check("%s markers cast no shadow" % id,
+			(found[0] as MultiMeshInstance3D).cast_shadow,
+			GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+		circuit.free()
+
+	# Themes differ in what stands beside the road and how often, or every place
+	# looks the same at speed however different its ground is.
+	var props := {}
+	var steps := {}
+	for name in SceneryTheme.THEMES:
+		props[SceneryTheme.THEMES[name]["marker"]] = true
+		steps[SceneryTheme.THEMES[name]["marker_step"]] = true
+	check_true("themes use different markers (%d)" % props.size(), props.size() >= 2)
+	check_true("at different spacings (%d)" % steps.size(), steps.size() >= 3)
+
+## Weather is a **colour treatment**, and specifically not a grip change.
+##
+## `docs/ideas.md` notes that lowering grip is what would make weather a gameplay
+## variant rather than a filter — and that is exactly why it is not done here.
+## Grip belongs to the surface, records are keyed on `track|car|surface`, and
+## changing grip without engaging that key would make every lap on the circuit
+## quietly incomparable with every other. M17 has the key to do it properly.
+##
+## This pins that decision, so a later change cannot make weather affect pace
+## without someone deliberately removing this test.
+func test_weather_changes_the_look_and_not_the_lap() -> void:
+	var wet := []
+	for name in SkyPreset.PRESETS:
+		# The weather hours are the ones that shorten how far you can see.
+		if float(SkyPreset.PRESETS[name]["fog_begin"]) <= 150.0:
+			wet.append(name)
+	check_true("some hour is weather (%s)" % wet, wet.size() > 0)
+
+	for name in wet:
+		var preset: Dictionary = SkyPreset.PRESETS[name]
+		# The one place this look goes *down* in saturation rather than up.
+		check_true("%s is desaturated (%.2f)" % [name, (preset["grade"] as Vector3).x],
+			(preset["grade"] as Vector3).x < 1.0)
+		check_true("%s has heavy cloud (%.2f)" % [name, preset["cloud_amount"]],
+			float(preset["cloud_amount"]) > 0.8)
+
+	# And the lap it produces is the same lap. Par comes from the circuit and the
+	# car, and nothing else — a circuit raced in a storm is judged exactly as it
+	# would be in sunshine, because nothing about the car has changed.
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var layout := _layout_for(id)
+		if layout.is_empty():
+			continue
+		var builder := TrackBuilder.new()
+		builder.measure(layout)
+		for spec in GameState.cars():
+			check_near("%s par for %s ignores the weather" % [id, spec.id],
+				GameState.par_for(entry, spec.id),
+				ParTime.ideal_lap(builder.centreline, spec), 0.05)
+
+	# The surface a lap is recorded against is still the only one there is, so no
+	# weather has quietly introduced a second.
+	check("laps are still recorded on one surface",
+		GameState.selected_surface, GameState.DEFAULT_SURFACE)
+
+## The road's own coordinate system, and the rubber that proves it works.
+##
+## M17's first step: both the racing-line rubber and the tyre-track deformation
+## texture need the road to carry how far *along* the lap and how far *across* the
+## road at every point. The tiles cannot — they are shared cached meshes and only
+## the banked and lifted ones are rebuilt — so it lives on a ribbon generated from
+## the centreline, which has both by construction.
+func test_the_road_carries_a_lateral_coordinate() -> void:
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var found := circuit.find_children("RoadOverlay", "MeshInstance3D", true, false)
+		check_true("%s has a road overlay" % id, not found.is_empty())
+		if found.is_empty():
+			circuit.free()
+			continue
+
+		var mesh: Mesh = (found[0] as MeshInstance3D).mesh
+		var arrays: Array = mesh.surface_get_arrays(0)
+		var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+		var cols: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+		check_true("%s overlay has vertices" % id, uvs.size() > 100)
+		check("%s overlay carries a colour per vertex" % id, cols.size(), uvs.size())
+
+		# The coordinate: along the lap in x, across the road in y, both 0..1.
+		var min_u := INF
+		var max_u := -INF
+		var min_v := INF
+		var max_v := -INF
+		for uv in uvs:
+			min_u = minf(min_u, uv.x)
+			max_u = maxf(max_u, uv.x)
+			min_v = minf(min_v, uv.y)
+			max_v = maxf(max_v, uv.y)
+		check_true("%s runs the length of the lap (%.2f..%.2f)" % [id, min_u, max_u],
+			min_u < 0.02 and max_u > 0.97)
+		check_true("%s spans the road (%.2f..%.2f)" % [id, min_v, max_v],
+			min_v < 0.01 and max_v > 0.99)
+
+		# The rubber. Baked into vertex alpha from the same racing line the lap
+		# estimate uses, so what is dark on the tarmac is the line the game
+		# thinks is quickest -- and it has to actually vary, or it is a flat wash.
+		var min_a := INF
+		var max_a := -INF
+		for c in cols:
+			min_a = minf(min_a, c.a)
+			max_a = maxf(max_a, c.a)
+		check_true("%s has rubber on the line and none off it (%.2f..%.2f)"
+			% [id, min_a, max_a], min_a < 0.2 and max_a > 0.9)
+
+		# Laid on the road, not floating over it or buried in it.
+		check("%s overlay casts no shadow" % id,
+			(found[0] as MeshInstance3D).cast_shadow,
+			GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+		circuit.free()
+
+	# The band follows the racing line rather than the centreline, which is the
+	# whole point: on a circuit with corners the two are not the same.
+	var builder := TrackBuilder.new()
+	builder.measure(_layout_for("monte_carlo"))
+	var line := ParTime.racing_line(builder.centreline)
+	var moved := 0
+	var furthest := 0.0
+	for i in line.size():
+		var d := line[i].distance_to(builder.centreline[i])
+		furthest = maxf(furthest, d)
+		if d > 1.0:
+			moved += 1
+	# It leaves the centreline where it matters and stays on it where it does
+	# not, which is why the count is low and the distance is not: a lap is mostly
+	# straight, and a straight has one best line through it.
+	# Measured, not aspired to: on Monte Carlo the line departs by at most about
+	# two metres of the six it is allowed. Relaxation converges on the
+	# *minimum-curvature* line, and a point is held back by its neighbours staying
+	# put, so it is smoother than a truly optimal line and uses less of the road.
+	# That is a known limit of the model rather than a bug — see the tuning
+	# journal, M10.
+	check_true("the racing line leaves the centreline at the corners (%d points, up to %.1f m)"
+		% [moved, furthest], moved > 10 and furthest > 1.5)
+	# And never off the road, which is what the clamp in `racing_line` is for.
+	check_true("but never off the road (%.1f m, limit %.1f)"
+		% [furthest, ParTime.LINE_HALF_WIDTH],
+		furthest <= ParTime.LINE_HALF_WIDTH + 0.01)
+
+## Conditions, and the record key finally doing the job it was built for.
+##
+## The `surface` slot has been in the key since M8, when there was one surface and
+## it looked like over-engineering. This is what it was for: the same circuit in
+## the same car on snow keeps its own record, its own par and its own medal, and
+## none of them can be mistaken for the dry ones.
+func test_conditions_are_a_separate_record_and_a_separate_target() -> void:
+	var was := GameState.selected_surface
+	var track := "test_surfaces"
+
+	# A lap on each surface, all in the same car on the same circuit.
+	var times := {"tarmac": 60.0, "dirt": 66.0, "snow": 72.0}
+	for surface in times:
+		GameState.selected_surface = surface
+		GameState.save_best_lap(track, times[surface], PackedFloat32Array())
+	for surface in times:
+		GameState.selected_surface = surface
+		check_near("%s keeps its own record" % surface,
+			GameState.best_lap_for(track), times[surface], 0.001)
+
+	# Deleting the circuit still takes all of them: one section per track.
+	GameState.clear_best_lap(track)
+	for surface in times:
+		GameState.selected_surface = surface
+		check_near("%s record went with the circuit" % surface,
+			GameState.best_lap_for(track), 0.0, 0.001)
+	GameState.selected_surface = was
+
+	# Grip is the mechanic. The colours make it read as snow; this makes it be
+	# snow, and it composes with the car rather than replacing it.
+	check_near("dry is full grip", RoadSurface.grip_of("tarmac"), 1.0, 0.001)
+	for surface in RoadSurface.ORDER:
+		var grip := RoadSurface.grip_of(surface)
+		check_true("%s grip is usable (%.2f)" % [surface, grip],
+			grip > 0.2 and grip <= 1.0)
+	check_true("snow is the loosest",
+		RoadSurface.grip_of("snow") < RoadSurface.grip_of("dirt")
+		and RoadSurface.grip_of("dirt") < RoadSurface.grip_of("tarmac"))
+
+	# An unknown surface falls back rather than returning nothing, so a save from
+	# a later version cannot make the car undriveable.
+	check_near("an unknown surface is dry", RoadSurface.grip_of("lava"), 1.0, 0.001)
+
+	# And the cycle reaches every one of them.
+	var seen := {}
+	var at := RoadSurface.DEFAULT
+	for _i in RoadSurface.ORDER.size():
+		at = RoadSurface.after(at)
+		seen[at] = true
+	check("the cycle reaches every surface", seen.size(), RoadSurface.ORDER.size())
+
+	# The look, which is the other half of a surface being a surface. Dirt and
+	# snow read as coloured card without relief: they are made of shape, and the
+	# road shader has no shape to give them unless they ask for it. Tarmac really
+	# is flat, so it asking for none is the thing that makes the other two differ.
+	for surface in RoadSurface.ORDER:
+		var spec := RoadSurface.named(surface)
+		for key in ["relief", "relief_scale", "patch", "stones", "sparkle",
+				"field", "field_amount", "mark_depth"]:
+			check_true("%s describes its %s" % [surface, key], spec.has(key))
+	check_near("tarmac is flat", RoadSurface.named("tarmac")["relief"], 0.0, 0.0001)
+	check_true("dirt is not", RoadSurface.named("dirt")["relief"] > 0.5)
+	check_true("nor is snow", RoadSurface.named("snow")["relief"] > 0.5)
+	check_true("dirt breaks up more than snow drifts",
+		RoadSurface.named("dirt")["relief"] > RoadSurface.named("snow")["relief"])
+	check_true("only snow glints", RoadSurface.named("snow")["sparkle"] > 0.0
+		and RoadSurface.named("dirt")["sparkle"] == 0.0
+		and RoadSurface.named("tarmac")["sparkle"] == 0.0)
+	# Only tarmac leaves the outfield alone. Snow that stopped at the kerb read as
+	# a painted road rather than as weather.
+	check_near("dry racing does not repaint the field",
+		RoadSurface.named("tarmac")["field_amount"], 0.0, 0.0001)
+	check_true("snow does", RoadSurface.named("snow")["field_amount"] > 0.5)
+	check_true("and dirt does", RoadSurface.named("dirt")["field_amount"] > 0.2)
+
 ## The lighting rig, and what it took to arrive at it.
 ##
 ## Real circuit floodlighting is **even**, with the world beyond it dark. Getting
@@ -752,99 +1161,6 @@ func test_the_car_lights_its_own_way() -> void:
 		and (lit_beams[0] as SpotLight3D).light_energy > CarLights.FULL_ENERGY * 0.9)
 	fresh.free()
 
-## The land around a circuit, and the fix for a bug night introduced.
-##
-## The ground plane is `unshaded` — deliberately, because flat bright grass is the
-## look — which means it receives no light. Adding a night preset therefore left
-## La Sarthe with noon-bright green grass under a midnight sky. The hour supplies
-## a tint the lighting cannot.
-func test_the_ground_takes_its_theme_and_its_hour() -> void:
-	var colours := {}
-	for entry in GameState.TRACKS:
-		var id: String = entry["id"]
-		var circuit: Node3D = load(entry["scene"]).instantiate()
-		var mesh: MeshInstance3D = circuit.get_node("Ground/GroundMesh")
-		var mat := mesh.mesh.material as ShaderMaterial
-		check_true("%s ground is shaded by the grid shader" % id, mat != null)
-		if mat == null:
-			circuit.free()
-			continue
-
-		var theme := SceneryTheme.for_track(id)
-		var tint: float = SkyPreset.for_track(id)["ground_tint"]
-		var got: Color = mat.get_shader_parameter("base_color")
-		check_true("%s ground is its theme at its hour (%s)" % [id, got],
-			got.is_equal_approx((theme["ground"] as Color) * tint))
-		colours[got] = true
-		circuit.free()
-
-	# Four circuits, four grounds. A bug collapsing theme or tint would pass every
-	# check above and fail this one.
-	check_true("the circuits stand on different ground (%d)" % colours.size(),
-		colours.size() >= 3)
-
-	# The specific thing that was wrong: an hour dark enough to need track
-	# lighting has to darken the ground, or the grass glows at midnight.
-	for name in SkyPreset.PRESETS:
-		var preset: Dictionary = SkyPreset.PRESETS[name]
-		if float(preset.get("key_energy", 0.0)) >= 0.7:
-			check_true("%s darkens the ground (%.2f)" % [name, preset["ground_tint"]],
-				preset["ground_tint"] < 0.55)
-
-	# And themes vary how much grows, which is the other half of a place.
-	var densities := {}
-	for name in SceneryTheme.THEMES:
-		densities[SceneryTheme.THEMES[name]["tree_chance"]] = true
-	check_true("themes differ in how much grows (%d densities)" % densities.size(),
-		densities.size() >= 3)
-
-## Markers down the verges, close enough together to read as speed.
-##
-## "Density is speed" (`docs/ideas.md`): pace is sold by a lot of things streaming
-## past at the edge of vision, not by a bigger number on the speedometer. Trees
-## are too far out and too sparse to do it.
-func test_roadside_markers_are_dense_enough_to_read_as_speed() -> void:
-	for entry in GameState.TRACKS:
-		var id: String = entry["id"]
-		var circuit: Node3D = load(entry["scene"]).instantiate()
-		var found := circuit.find_children("Markers", "MultiMeshInstance3D", true, false)
-		check_true("%s has roadside markers" % id, not found.is_empty())
-		if found.is_empty():
-			circuit.free()
-			continue
-
-		var mm: MultiMesh = (found[0] as MultiMeshInstance3D).multimesh
-		var theme := SceneryTheme.for_track(id)
-		var lap: float = TrackBuilder.new().measure(
-			_layout_for(id)
-		).length if _layout_for(id).size() > 0 else 0.0
-
-		# Both verges, at the theme's spacing, so a lap should carry roughly twice
-		# the lap length over the step. Loose bounds: the clearance test drops
-		# markers wherever the circuit doubles back on itself.
-		var step: float = float(theme["marker_step"]) * TrackBuilder.SCALE
-		var expected := 2.0 * lap / step
-		check_true("%s carries a marker every few metres (%d for %.0f m)"
-			% [id, mm.instance_count, lap],
-			mm.instance_count > expected * 0.4)
-
-		# One draw call, and never a shadow caster: a few hundred small props
-		# casting shadows would swamp the atlas the car's own shadow needs.
-		check("%s markers cast no shadow" % id,
-			(found[0] as MultiMeshInstance3D).cast_shadow,
-			GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
-		circuit.free()
-
-	# Themes differ in what stands beside the road and how often, or every place
-	# looks the same at speed however different its ground is.
-	var props := {}
-	var steps := {}
-	for name in SceneryTheme.THEMES:
-		props[SceneryTheme.THEMES[name]["marker"]] = true
-		steps[SceneryTheme.THEMES[name]["marker_step"]] = true
-	check_true("themes use different markers (%d)" % props.size(), props.size() >= 2)
-	check_true("at different spacings (%d)" % steps.size(), steps.size() >= 3)
-
 func _layout_for(id: String) -> Array:
 	var src: GDScript = load("res://tools/build_track.gd")
 	match id:
@@ -857,322 +1173,6 @@ func _layout_for(id: String) -> Array:
 		"suzuka":
 			return src.SUZUKA
 	return []
-
-## Weather is a **colour treatment**, and specifically not a grip change.
-##
-## `docs/ideas.md` notes that lowering grip is what would make weather a gameplay
-## variant rather than a filter — and that is exactly why it is not done here.
-## Grip belongs to the surface, records are keyed on `track|car|surface`, and
-## changing grip without engaging that key would make every lap on the circuit
-## quietly incomparable with every other. M17 has the key to do it properly.
-##
-## This pins that decision, so a later change cannot make weather affect pace
-## without someone deliberately removing this test.
-func test_weather_changes_the_look_and_not_the_lap() -> void:
-	var wet := []
-	for name in SkyPreset.PRESETS:
-		# The weather hours are the ones that shorten how far you can see.
-		if float(SkyPreset.PRESETS[name]["fog_begin"]) <= 150.0:
-			wet.append(name)
-	check_true("some hour is weather (%s)" % wet, wet.size() > 0)
-
-	for name in wet:
-		var preset: Dictionary = SkyPreset.PRESETS[name]
-		# The one place this look goes *down* in saturation rather than up.
-		check_true("%s is desaturated (%.2f)" % [name, (preset["grade"] as Vector3).x],
-			(preset["grade"] as Vector3).x < 1.0)
-		check_true("%s has heavy cloud (%.2f)" % [name, preset["cloud_amount"]],
-			float(preset["cloud_amount"]) > 0.8)
-
-	# And the lap it produces is the same lap. Par comes from the circuit and the
-	# car, and nothing else — a circuit raced in a storm is judged exactly as it
-	# would be in sunshine, because nothing about the car has changed.
-	for entry in GameState.TRACKS:
-		var id: String = entry["id"]
-		var layout := _layout_for(id)
-		if layout.is_empty():
-			continue
-		var builder := TrackBuilder.new()
-		builder.measure(layout)
-		for spec in GameState.cars():
-			check_near("%s par for %s ignores the weather" % [id, spec.id],
-				GameState.par_for(entry, spec.id),
-				ParTime.ideal_lap(builder.centreline, spec), 0.05)
-
-	# The surface a lap is recorded against is still the only one there is, so no
-	# weather has quietly introduced a second.
-	check("laps are still recorded on one surface",
-		GameState.selected_surface, GameState.DEFAULT_SURFACE)
-
-## A player's circuit can be raced at any hour, in any place.
-##
-## Every visual feature built in M16 — the sky, the hours, night with lit columns,
-## the horizon, the themes, the markers, the weather — applied only to the four
-## shipped circuits until this. A drawn circuit was always noon in a meadow, which
-## is exactly the "same field twice" `docs/ideas.md` warns about.
-##
-## One control sets both axes, because choosing an hour and a place separately is
-## a question about lighting rigs rather than about circuits.
-func test_a_drawn_circuit_can_choose_its_look() -> void:
-	var editor: Control = staged_editor
-	if editor == null:
-		return
-
-	var layout := sample_layout()
-	layout.display_name = "Look Test"
-	editor._layout = layout
-	editor._grid.layout = layout
-	editor._refresh_look()
-
-	# Every look in the cycle is reachable, and the cycle comes back round.
-	var seen := {}
-	var start: String = layout.look
-	for _i in CircuitLook.ORDER.size() + 1:
-		editor._cycle_look()
-		seen[layout.look] = true
-		check_true("%s is a real look" % layout.look,
-			CircuitLook.LOOKS.has(layout.look))
-	check("the cycle reaches every look",
-		seen.size(), CircuitLook.ORDER.size())
-
-	# Each look resolves to a real hour and a real place.
-	for name in CircuitLook.LOOKS:
-		var look: Dictionary = CircuitLook.LOOKS[name]
-		check_true("%s names a real hour" % name,
-			SkyPreset.PRESETS.has(look["sky"]))
-		check_true("%s names a real place" % name,
-			SceneryTheme.THEMES.has(look["theme"]))
-		check_true("%s has a label to show" % name,
-			not String(look["label"]).is_empty())
-
-	# It survives being saved and shared, or a circuit arrives somewhere else
-	# looking like something its author never chose.
-	layout.look = "night"
-	var reloaded := TrackLayout.from_dict(layout.to_dict())
-	check("the look is saved with the circuit", reloaded.look, "night")
-	var decoded := ShareCode.decode(ShareCode.encode(layout))
-	check_true("and travels in the share code", decoded.ok)
-	if decoded.ok:
-		check("intact", decoded.layout.look, "night")
-
-	# And the builder actually uses it: a circuit built as night is lit, the same
-	# circuit built as bright is not.
-	var compiled := layout.compile()
-	check_true("the circuit compiles", compiled.ok)
-	if compiled.ok:
-		var at_night := TrackBuilder.new().build(
-			"look_test", compiled.segments, true, "night")
-		check_true("built at night, the circuit is floodlit",
-			at_night.root.get_node_or_null("Floodlight") != null
-			and not at_night.root.find_children(
-				"Mast*", "SpotLight3D", true, false).is_empty())
-		at_night.root.free()
-
-		var by_day := TrackBuilder.new().build(
-			"look_test", compiled.segments, true, "bright")
-		check_true("built bright, it is not",
-			by_day.root.get_node_or_null("Floodlight") == null
-			and by_day.root.find_children(
-				"Mast*", "SpotLight3D", true, false).is_empty())
-		by_day.root.free()
-
-	# Shipped circuits are unaffected: their look is part of what they are.
-	for id in CircuitLook.BY_TRACK:
-		check_true("%s still names its own look" % id,
-			CircuitLook.LOOKS.has(CircuitLook.BY_TRACK[id]))
-
-## The road's own coordinate system, and the rubber that proves it works.
-##
-## M17's first step: both the racing-line rubber and the tyre-track deformation
-## texture need the road to carry how far *along* the lap and how far *across* the
-## road at every point. The tiles cannot — they are shared cached meshes and only
-## the banked and lifted ones are rebuilt — so it lives on a ribbon generated from
-## the centreline, which has both by construction.
-func test_the_road_carries_a_lateral_coordinate() -> void:
-	for entry in GameState.TRACKS:
-		var id: String = entry["id"]
-		var circuit: Node3D = load(entry["scene"]).instantiate()
-		var found := circuit.find_children("RoadOverlay", "MeshInstance3D", true, false)
-		check_true("%s has a road overlay" % id, not found.is_empty())
-		if found.is_empty():
-			circuit.free()
-			continue
-
-		var mesh: Mesh = (found[0] as MeshInstance3D).mesh
-		var arrays: Array = mesh.surface_get_arrays(0)
-		var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
-		var cols: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
-		check_true("%s overlay has vertices" % id, uvs.size() > 100)
-		check("%s overlay carries a colour per vertex" % id, cols.size(), uvs.size())
-
-		# The coordinate: along the lap in x, across the road in y, both 0..1.
-		var min_u := INF
-		var max_u := -INF
-		var min_v := INF
-		var max_v := -INF
-		for uv in uvs:
-			min_u = minf(min_u, uv.x)
-			max_u = maxf(max_u, uv.x)
-			min_v = minf(min_v, uv.y)
-			max_v = maxf(max_v, uv.y)
-		check_true("%s runs the length of the lap (%.2f..%.2f)" % [id, min_u, max_u],
-			min_u < 0.02 and max_u > 0.97)
-		check_true("%s spans the road (%.2f..%.2f)" % [id, min_v, max_v],
-			min_v < 0.01 and max_v > 0.99)
-
-		# The rubber. Baked into vertex alpha from the same racing line the lap
-		# estimate uses, so what is dark on the tarmac is the line the game
-		# thinks is quickest -- and it has to actually vary, or it is a flat wash.
-		var min_a := INF
-		var max_a := -INF
-		for c in cols:
-			min_a = minf(min_a, c.a)
-			max_a = maxf(max_a, c.a)
-		check_true("%s has rubber on the line and none off it (%.2f..%.2f)"
-			% [id, min_a, max_a], min_a < 0.2 and max_a > 0.9)
-
-		# Laid on the road, not floating over it or buried in it.
-		check("%s overlay casts no shadow" % id,
-			(found[0] as MeshInstance3D).cast_shadow,
-			GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
-		circuit.free()
-
-	# The band follows the racing line rather than the centreline, which is the
-	# whole point: on a circuit with corners the two are not the same.
-	var builder := TrackBuilder.new()
-	builder.measure(_layout_for("monte_carlo"))
-	var line := ParTime.racing_line(builder.centreline)
-	var moved := 0
-	var furthest := 0.0
-	for i in line.size():
-		var d := line[i].distance_to(builder.centreline[i])
-		furthest = maxf(furthest, d)
-		if d > 1.0:
-			moved += 1
-	# It leaves the centreline where it matters and stays on it where it does
-	# not, which is why the count is low and the distance is not: a lap is mostly
-	# straight, and a straight has one best line through it.
-	# Measured, not aspired to: on Monte Carlo the line departs by at most about
-	# two metres of the six it is allowed. Relaxation converges on the
-	# *minimum-curvature* line, and a point is held back by its neighbours staying
-	# put, so it is smoother than a truly optimal line and uses less of the road.
-	# That is a known limit of the model rather than a bug — see the tuning
-	# journal, M10.
-	check_true("the racing line leaves the centreline at the corners (%d points, up to %.1f m)"
-		% [moved, furthest], moved > 10 and furthest > 1.5)
-	# And never off the road, which is what the clamp in `racing_line` is for.
-	check_true("but never off the road (%.1f m, limit %.1f)"
-		% [furthest, ParTime.LINE_HALF_WIDTH],
-		furthest <= ParTime.LINE_HALF_WIDTH + 0.01)
-
-## Conditions, and the record key finally doing the job it was built for.
-##
-## The `surface` slot has been in the key since M8, when there was one surface and
-## it looked like over-engineering. This is what it was for: the same circuit in
-## the same car on snow keeps its own record, its own par and its own medal, and
-## none of them can be mistaken for the dry ones.
-func test_conditions_are_a_separate_record_and_a_separate_target() -> void:
-	var was := GameState.selected_surface
-	var track := "test_surfaces"
-
-	# A lap on each surface, all in the same car on the same circuit.
-	var times := {"tarmac": 60.0, "dirt": 66.0, "snow": 72.0}
-	for surface in times:
-		GameState.selected_surface = surface
-		GameState.save_best_lap(track, times[surface], PackedFloat32Array())
-	for surface in times:
-		GameState.selected_surface = surface
-		check_near("%s keeps its own record" % surface,
-			GameState.best_lap_for(track), times[surface], 0.001)
-
-	# Deleting the circuit still takes all of them: one section per track.
-	GameState.clear_best_lap(track)
-	for surface in times:
-		GameState.selected_surface = surface
-		check_near("%s record went with the circuit" % surface,
-			GameState.best_lap_for(track), 0.0, 0.001)
-	GameState.selected_surface = was
-
-	# Grip is the mechanic. The colours make it read as snow; this makes it be
-	# snow, and it composes with the car rather than replacing it.
-	check_near("dry is full grip", RoadSurface.grip_of("tarmac"), 1.0, 0.001)
-	for surface in RoadSurface.ORDER:
-		var grip := RoadSurface.grip_of(surface)
-		check_true("%s grip is usable (%.2f)" % [surface, grip],
-			grip > 0.2 and grip <= 1.0)
-	check_true("snow is the loosest",
-		RoadSurface.grip_of("snow") < RoadSurface.grip_of("dirt")
-		and RoadSurface.grip_of("dirt") < RoadSurface.grip_of("tarmac"))
-
-	# An unknown surface falls back rather than returning nothing, so a save from
-	# a later version cannot make the car undriveable.
-	check_near("an unknown surface is dry", RoadSurface.grip_of("lava"), 1.0, 0.001)
-
-	# And the cycle reaches every one of them.
-	var seen := {}
-	var at := RoadSurface.DEFAULT
-	for _i in RoadSurface.ORDER.size():
-		at = RoadSurface.after(at)
-		seen[at] = true
-	check("the cycle reaches every surface", seen.size(), RoadSurface.ORDER.size())
-
-	# The look, which is the other half of a surface being a surface. Dirt and
-	# snow read as coloured card without relief: they are made of shape, and the
-	# road shader has no shape to give them unless they ask for it. Tarmac really
-	# is flat, so it asking for none is the thing that makes the other two differ.
-	for surface in RoadSurface.ORDER:
-		var spec := RoadSurface.named(surface)
-		for key in ["relief", "relief_scale", "patch", "stones", "sparkle",
-				"field", "field_amount", "mark_depth"]:
-			check_true("%s describes its %s" % [surface, key], spec.has(key))
-	check_near("tarmac is flat", RoadSurface.named("tarmac")["relief"], 0.0, 0.0001)
-	check_true("dirt is not", RoadSurface.named("dirt")["relief"] > 0.5)
-	check_true("nor is snow", RoadSurface.named("snow")["relief"] > 0.5)
-	check_true("dirt breaks up more than snow drifts",
-		RoadSurface.named("dirt")["relief"] > RoadSurface.named("snow")["relief"])
-	check_true("only snow glints", RoadSurface.named("snow")["sparkle"] > 0.0
-		and RoadSurface.named("dirt")["sparkle"] == 0.0
-		and RoadSurface.named("tarmac")["sparkle"] == 0.0)
-	# Only tarmac leaves the outfield alone. Snow that stopped at the kerb read as
-	# a painted road rather than as weather.
-	check_near("dry racing does not repaint the field",
-		RoadSurface.named("tarmac")["field_amount"], 0.0, 0.0001)
-	check_true("snow does", RoadSurface.named("snow")["field_amount"] > 0.5)
-	check_true("and dirt does", RoadSurface.named("dirt")["field_amount"] > 0.2)
-
-## Re-surfacing the road must touch **only the road**.
-##
-## The Kenney kit shares one atlas, and twelve scenery surfaces on a shipped
-## circuit — building aprons, pit garage floors — wear the same material name the
-## tarmac does. `surface_road` matched on that name across the whole scene, so it
-## was re-surfacing buildings as road. Invisible for as long as tarmac was only a
-## colour; the moment the road gained an emission floor for the dark hours it
-## became **glowing buildings**, which is how it was found.
-func test_only_the_road_is_re_surfaced() -> void:
-	var track: Node3D = load("res://scenes/track/track_la_sarthe.tscn").instantiate()
-	TrackBuilder.surface_road(track, "tarmac")
-	var road := 0
-	var elsewhere := 0
-	for node in track.find_children("*", "MeshInstance3D", true, false):
-		var mesh_node := node as MeshInstance3D
-		if mesh_node.mesh == null:
-			continue
-		var under_visuals := false
-		var walk: Node = mesh_node
-		while walk != null:
-			if walk.name == "RoadVisuals":
-				under_visuals = true
-				break
-			walk = walk.get_parent()
-		for i in mesh_node.mesh.get_surface_count():
-			if mesh_node.get_surface_override_material(i) is ShaderMaterial:
-				if under_visuals:
-					road += 1
-				else:
-					elsewhere += 1
-	check_true("the road itself is re-surfaced (%d surfaces)" % road, road > 20)
-	check("and nothing outside it is", elsewhere, 0)
-	track.free()
 
 ## Re-surfacing a built circuit, which happens on load rather than at bake time
 ## and therefore has to be safe to do repeatedly.
@@ -1253,6 +1253,185 @@ func test_surfacing_a_circuit_is_repeatable() -> void:
 	for name in ["base_color", "grit_color", "grain_amount", "base_roughness",
 			"relief", "relief_scale", "patch_amount", "stones", "sparkle"]:
 		check_true("the road shader takes %s" % name, uniforms.has(name))
+
+## Re-surfacing the road must touch **only the road**.
+##
+## The Kenney kit shares one atlas, and twelve scenery surfaces on a shipped
+## circuit — building aprons, pit garage floors — wear the same material name the
+## tarmac does. `surface_road` matched on that name across the whole scene, so it
+## was re-surfacing buildings as road. Invisible for as long as tarmac was only a
+## colour; the moment the road gained an emission floor for the dark hours it
+## became **glowing buildings**, which is how it was found.
+func test_only_the_road_is_re_surfaced() -> void:
+	var track: Node3D = load("res://scenes/track/track_la_sarthe.tscn").instantiate()
+	TrackBuilder.surface_road(track, "tarmac")
+	var road := 0
+	var elsewhere := 0
+	for node in track.find_children("*", "MeshInstance3D", true, false):
+		var mesh_node := node as MeshInstance3D
+		if mesh_node.mesh == null:
+			continue
+		var under_visuals := false
+		var walk: Node = mesh_node
+		while walk != null:
+			if walk.name == "RoadVisuals":
+				under_visuals = true
+				break
+			walk = walk.get_parent()
+		for i in mesh_node.mesh.get_surface_count():
+			if mesh_node.get_surface_override_material(i) is ShaderMaterial:
+				if under_visuals:
+					road += 1
+				else:
+					elsewhere += 1
+	check_true("the road itself is re-surfaced (%d surfaces)" % road, road > 20)
+	check("and nothing outside it is", elsewhere, 0)
+	track.free()
+
+## A player's circuit can be raced at any hour, in any place.
+##
+## Every visual feature built in M16 — the sky, the hours, night with lit columns,
+## the horizon, the themes, the markers, the weather — applied only to the four
+## shipped circuits until this. A drawn circuit was always noon in a meadow, which
+## is exactly the "same field twice" `docs/ideas.md` warns about.
+##
+## One control sets both axes, because choosing an hour and a place separately is
+## a question about lighting rigs rather than about circuits.
+func test_a_drawn_circuit_can_choose_its_look() -> void:
+	var editor: Control = staged_editor
+	if editor == null:
+		return
+
+	var layout := sample_layout()
+	layout.display_name = "Look Test"
+	editor._layout = layout
+	editor._grid.layout = layout
+	editor._refresh_look()
+
+	# Every look in the cycle is reachable, and the cycle comes back round.
+	var seen := {}
+	var start: String = layout.look
+	for _i in CircuitLook.ORDER.size() + 1:
+		editor._cycle_look()
+		seen[layout.look] = true
+		check_true("%s is a real look" % layout.look,
+			CircuitLook.LOOKS.has(layout.look))
+	check("the cycle reaches every look",
+		seen.size(), CircuitLook.ORDER.size())
+
+	# Each look resolves to a real hour and a real place.
+	for name in CircuitLook.LOOKS:
+		var look: Dictionary = CircuitLook.LOOKS[name]
+		check_true("%s names a real hour" % name,
+			SkyPreset.PRESETS.has(look["sky"]))
+		check_true("%s names a real place" % name,
+			SceneryTheme.THEMES.has(look["theme"]))
+		check_true("%s has a label to show" % name,
+			not String(look["label"]).is_empty())
+
+	# It survives being saved and shared, or a circuit arrives somewhere else
+	# looking like something its author never chose.
+	layout.look = "night"
+	var reloaded := TrackLayout.from_dict(layout.to_dict())
+	check("the look is saved with the circuit", reloaded.look, "night")
+	var decoded := ShareCode.decode(ShareCode.encode(layout))
+	check_true("and travels in the share code", decoded.ok)
+	if decoded.ok:
+		check("intact", decoded.layout.look, "night")
+
+	# And the builder actually uses it: a circuit built as night is lit, the same
+	# circuit built as bright is not.
+	var compiled := layout.compile()
+	check_true("the circuit compiles", compiled.ok)
+	if compiled.ok:
+		var at_night := TrackBuilder.new().build(
+			"look_test", compiled.segments, true, "night")
+		check_true("built at night, the circuit is floodlit",
+			at_night.root.get_node_or_null("Floodlight") != null
+			and not at_night.root.find_children(
+				"Mast*", "SpotLight3D", true, false).is_empty())
+		at_night.root.free()
+
+		var by_day := TrackBuilder.new().build(
+			"look_test", compiled.segments, true, "bright")
+		check_true("built bright, it is not",
+			by_day.root.get_node_or_null("Floodlight") == null
+			and by_day.root.find_children(
+				"Mast*", "SpotLight3D", true, false).is_empty())
+		by_day.root.free()
+
+	# Shipped circuits are unaffected: their look is part of what they are.
+	for id in CircuitLook.BY_TRACK:
+		check_true("%s still names its own look" % id,
+			CircuitLook.LOOKS.has(CircuitLook.BY_TRACK[id]))
+
+## A lit lens has to still be its own colour *after* tonemapping.
+##
+## The scene is graded with ACES at a white point of 2.1, and an **unshaded
+## albedo is not exempt from that** — it is a whole-frame post-process. Lens
+## colours were multiplied by 3.2 on the reasoning that a lamp should be pushed
+## above 1 to read as a lamp, which does the opposite: everything past the white
+## point compresses toward white. The red came out pale orange and the green came
+## out near-white, and the lamps were described, accurately, as "yellow and
+## white".
+##
+## Modelled here through the same curve, because the alternative is looking at it
+## — and looking at it is exactly what did not happen.
+func test_the_start_lamps_keep_their_colour() -> void:
+	for entry in [["red", StartLights.LENS_RED], ["green", StartLights.LENS_GREEN]]:
+		var name: String = entry[0]
+		var lit: Color = (entry[1] as Color) * StartLights.LENS_GLOW
+		var out := _tonemapped(lit)
+		var top := maxf(out.r, maxf(out.g, out.b))
+		var low := minf(out.r, minf(out.g, out.b))
+		var saturation := (top - low) / maxf(top, 0.0001)
+		check_true("%s survives the grade as %s (saturation %.2f)"
+			% [name, "itself" if saturation > 0.8 else "something paler", saturation],
+			saturation > 0.8)
+		# And it still has to be bright, or the fix for one problem is the other.
+		check_true("%s is still a lamp (%.2f)" % [name, top], top > 0.5)
+
+	# The unlit lens stays dark, which is what the lit ones are read against —
+	# contrast with the housing is what makes a lens look lit, not magnitude.
+	check_true("an unlit lens is dark (%.2f)"
+		% StartLights.LENS_DARK.get_luminance(),
+		StartLights.LENS_DARK.get_luminance() < 0.15)
+
+## The ACES curve Godot grades the frame with, at the environment's white point.
+func _tonemapped(colour: Color) -> Color:
+	var out := Color.BLACK
+	for i in 3:
+		var x: float = colour[i] / 2.1
+		out[i] = clampf(
+			(x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0
+		)
+	return out
+
+## HUD text has to be readable against the sky.
+##
+## The HUD panels are translucent on purpose — a solid block would punch a hole in
+## the road — so what is behind them shows through, and what is behind them at the
+## top of the screen is a big graphic sky running to near-white at the horizon.
+## Pale text on a pale sky is unreadable at exactly the moment a lap time appears.
+##
+## An outline rather than a darker panel: one draw pass, works over any background
+## including ones added later, and it leaves the panels the weight they were
+## designed with.
+func test_hud_text_reads_against_the_sky() -> void:
+	var theme: Theme = load("res://resources/ui_theme.tres")
+	check_true("the theme loads", theme != null)
+	if theme == null:
+		return
+	check_true("labels carry an outline",
+		theme.get_constant("outline_size", "Label") > 0)
+	var outline := theme.get_color("font_outline_color", "Label")
+	check_true("in something dark (%.2f)" % outline.get_luminance(),
+		outline.get_luminance() < 0.2)
+	check_true("and opaque enough to matter (%.2f)" % outline.a, outline.a > 0.5)
+	# The outline has to be the *default* for Label rather than a variation, or
+	# every label added later has to remember to ask for it.
+	check_true("as the default, not a variation",
+		theme.has_constant("outline_size", "Label"))
 
 ## Every preset has to be complete. They are dictionaries, so a missing key is a
 ## crash at bake time rather than a compile error, and the one that gets forgotten
@@ -4261,7 +4440,7 @@ func _grades(line: Array[Vector3], lo: int, hi: int) -> Array[float]:
 ## with a vertex at every centreline sample, so on a 1-in-11 ramp it legitimately
 ## supplies a point five metres uphill and half a metre higher — a true fact about
 ## a slope, and nothing to do with whether the tiles sit on the ribbon.
-const NOT_ROAD := ["Scenery", "Horizon", "RoadOverlay", "LightPools", "Tunnel",
+const NOT_ROAD := ["Scenery", "Horizon", "RoadOverlay", "Tunnel", "StartLights",
 	"Markers", "LightPosts", "Trees", "TreesSmall"]
 
 func _road_vertices(n: Node, so_far: Transform3D, root_node: Node,
@@ -6036,6 +6215,20 @@ func test_road_surface_follows_elevation() -> void:
 func _physics_process(_delta: float) -> bool:
 	frame += 1
 	if frame == 1:
+		# Let the car off the grid. The start sequence runs on wall-clock time
+		# through `_process`, and a headless suite runs physics frames as fast as
+		# the machine allows — so how far into the lights it happened to be when
+		# it reached a driving test would depend on how busy that machine was.
+		# The sequence itself is tested deliberately, in
+		# `test_the_race_starts_on_the_lights`.
+		#
+		# Here rather than in `_initialize`: a node added to `root` before the
+		# tree's first frame has **not run `_ready` yet**, so the track does not
+		# exist to search and the car is not in its group. Measured — the release
+		# silently found nothing, and the first driving test read an engine force
+		# of zero from a car still held on the brakes.
+		for node in root.find_children("StartLights", "Node3D", true, false):
+			(node as StartLights).force_release()
 		tracker = get_first_node_in_group("lap_tracker")
 		var cps: Array = get_nodes_in_group("checkpoint")
 		gates.resize(cps.size())
@@ -6104,6 +6297,9 @@ func _physics_process(_delta: float) -> bool:
 		test_a_share_code_can_carry_a_ghost_but_does_not_by_default()
 		test_audio_resources_match_their_source()
 		test_the_engine_is_a_pulse_train()
+		test_the_race_starts_on_the_lights()
+		test_hud_text_reads_against_the_sky()
+		test_the_start_lamps_keep_their_colour()
 		test_the_dark_hours_are_lit()
 		test_every_hour_lights_its_track()
 		test_the_car_lights_its_own_way()

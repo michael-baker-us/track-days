@@ -457,6 +457,13 @@ const GRID_POLE_ACROSS := 0.1725
 ## grid. The arch is symmetric about the tile midpoint and did not move; the
 ## stripe did, from 0.905..0.954 to 1.046..1.095, so the trigger moves with it and
 ## keeps the same relationship to both.
+## The start lights on the gantry: how high they hang, how far apart, and how big.
+const LIGHTS_HEIGHT := 7.4
+const LIGHTS_SPAN := 5.4
+const LIGHTS_SIZE := 1.15
+const LIGHTS_COUNT := 3
+const LIGHTS_HOUSING := Color(0.08, 0.08, 0.09)
+
 const START_LINE_ALONG := 2.0 + 1.04
 const START_LINE_ARC := START_LINE_ALONG * SCALE
 
@@ -789,6 +796,7 @@ func build(
 			_build_wall_collision(root_node)
 		_build_road_collision(root_node)
 		_build_checkpoints(root_node)
+		_build_start_lights(root_node)
 		_build_ground(root_node, track_name)
 		_build_lighting(root_node, track_name)
 		_build_scenery(root_node, track_name)
@@ -1537,6 +1545,72 @@ func _build_road_collision(root_node: Node3D) -> void:
 	col.shape = shape
 	body.add_child(col)
 	_triangles = faces.size() / 3
+
+## The start lights, on the gantry the grid sits under.
+##
+## A race used to simply *begin* — the scene loaded and the car was already free,
+## which is the one moment of a race that every driver looks at and there was
+## nothing there. Five lights that come on one at a time and then go out together
+## is the whole grammar of a motor race start, and it costs one row of boxes.
+##
+## Mounted on the arch of the `roadStart` tile, which is why they are placed off
+## `START_LINE_ARC` rather than off the spawn: the car sits *behind* the line in
+## the pole box, and lights hung over the car would be behind the driver.
+##
+## The housings are lit geometry; each lens is its own node so it can glow on its
+## own. `start_lights.gd` runs the countdown and swaps the lens materials.
+func _build_start_lights(root_node: Node3D) -> void:
+	if centreline.size() < 4:
+		return
+	var sample := _point_at_arc(START_LINE_ARC)
+	if sample.is_empty():
+		return
+	var at: Vector3 = sample[0]
+	var tan: Vector2 = sample[1]
+
+	var rig := Node3D.new()
+	rig.name = "StartLights"
+	rig.set_script(load("res://scripts/track/start_lights.gd"))
+	rig.position = at + Vector3.UP * LIGHTS_HEIGHT
+	rig.rotation.y = _yaw_along(tan)
+	root_node.add_child(rig)
+
+	var housings := SurfaceTool.new()
+	housings.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# One lamp per node rather than one mesh for the row, because they light **in
+	# sequence** — three going on one at a time as the count runs down, then all
+	# three turning green together. A single shared material can only be all on or
+	# all off, which is a set of traffic lights rather than a countdown.
+	var span := LIGHTS_SPAN - LIGHTS_SIZE
+	for i in LIGHTS_COUNT:
+		var across := (float(i) / float(LIGHTS_COUNT - 1) - 0.5) * span
+		_box(housings, Vector3(across, 0.0, 0.0),
+			Vector3(LIGHTS_SIZE * 1.3, LIGHTS_SIZE * 1.3, LIGHTS_SIZE * 0.5))
+
+		var lens_shape := SurfaceTool.new()
+		lens_shape.begin(Mesh.PRIMITIVE_TRIANGLES)
+		# Proud of the housing on the face the grid can see. The grid is behind
+		# the line, and `_yaw_along` puts local +Z down the circuit, so that face
+		# is local -Z.
+		_box(lens_shape, Vector3(across, 0.0, -LIGHTS_SIZE * 0.3),
+			Vector3(LIGHTS_SIZE, LIGHTS_SIZE, LIGHTS_SIZE * 0.3))
+		lens_shape.generate_normals()
+		var lens := MeshInstance3D.new()
+		lens.name = "Lens%d" % i
+		lens.mesh = lens_shape.commit()
+		lens.material_override = StartLights.lens_material(StartLights.LENS_DARK)
+		rig.add_child(lens)
+
+	housings.generate_normals()
+	var housing_mesh: ArrayMesh = housings.commit()
+	var dark := StandardMaterial3D.new()
+	dark.albedo_color = LIGHTS_HOUSING
+	dark.roughness = 0.8
+	housing_mesh.surface_set_material(0, dark)
+	var frame := MeshInstance3D.new()
+	frame.name = "Housings"
+	frame.mesh = housing_mesh
+	rig.add_child(frame)
 
 func _build_checkpoints(root_node: Node3D) -> void:
 	var holder := Node3D.new()

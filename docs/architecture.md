@@ -1159,6 +1159,73 @@ Two things about how they are built:
 > `TyreMarks` both use it, so the tyres and the marks they leave can never
 > disagree about where the circuit is.
 
+### The start of a race
+
+**3 — 2 — 1 — GO**, as a number in the middle of the screen, with three lamps on
+the gantry lighting one at a time and turning green together.
+
+> **The first attempt was a real Formula 1 start** — five columns of two, a second
+> apart, extinguishing together — and it is the correct grammar for a motor race
+> and the wrong one for this game. A Formula 1 start asks you to *interpret*
+> lights: the signal is the moment they go **out**, which you only read if you
+> already know that is the rule. An arcade racer wants the opposite. The number is
+> the instruction and the lamps are decoration, which is why the lamps count *up*
+> as the number counts down — three lit means "about to go" at a glance, without
+> looking at the thing you were told to look at.
+
+Three decisions behind it:
+
+- **The lights own the sequence, not `race.gd`.** The race needs one fact — am I
+  held — and the rest is presentation. A circuit with no gantry asks the question,
+  gets "no", and races immediately rather than waiting on a node that is not
+  there.
+- **Not a coroutine.** An `await` chain runs on the scene tree's own timing and
+  keeps counting while the game is paused, so pausing on the grid would start the
+  race behind the pause menu. Counting in `_process` stops when the tree stops.
+- **One node per lamp.** They light in sequence, and a single shared material can
+  only be all on or all off — which is a set of traffic lights rather than a
+  countdown.
+
+> **The car is held on the brakes, never `freeze`d.** `freeze` takes a
+> `RigidBody3D` out of the simulation entirely: its suspension never compresses,
+> its wheels never find the road, and the moment it is unfrozen the whole car
+> falls onto its springs. Every race start visibly **dropped the car onto the
+> track**. Held through the controller instead — engine force zero, brakes on,
+> steering centred — the physics runs the whole time, the car settles on its
+> springs while the count runs, and at the release nothing moves that was not
+> already moving. `LEAD_IN` is long enough that the settle finishes before "3".
+
+> **A lit lens has to survive the grade.** The lens colours were multiplied by
+> 3.2, on the reasoning that a lamp should be pushed above 1 so it reads as a lamp
+> rather than as paint. It does the opposite. The scene is tonemapped with ACES at
+> a white point of 2.1, and **an unshaded albedo is not exempt from that** — it is
+> a whole-frame post-process. Everything past the white point compresses toward
+> white, so the red came out pale orange and the green came out near-white: the
+> lamps were described, accurately, as "yellow and white". At x3.2 the green lens
+> keeps barely half its saturation; at x1.35 it keeps three quarters. What makes a
+> lens read as lit is **contrast with a dark housing**, not magnitude — blowing
+> past the white point only trades the colour away for brightness the tonemapper
+> then takes back. The suite models the same curve, because the alternative is
+> looking at it, and looking at it is exactly what did not happen.
+
+> A node added to `root` **before the tree's first frame has not run `_ready`**.
+> The suite released the car in `_initialize`, found nothing to release because
+> the track did not exist yet, and the first driving test then read an engine
+> force of zero from a car still sitting on its brakes. It releases on frame 1.
+
+### HUD text over a bright sky
+
+Every `Label` carries a dark outline, set as the **default** for the type rather
+than as a variation something has to opt into.
+
+The HUD panels are translucent on purpose — a solid block would punch a hole in
+the road — so whatever is behind them comes through, and what is behind them at
+the top of the screen is a big graphic sky that runs to near-white at the horizon.
+Pale text on a pale sky is unreadable at exactly the moment a lap time appears. An
+outline costs one draw pass, works over any background including ones added later,
+and leaves the panels the weight they were designed with. Menus sit over dark
+surfaces, where it is invisible.
+
 ### Lighting the track
 
 Two things light a circuit here, and a third stops it going black.

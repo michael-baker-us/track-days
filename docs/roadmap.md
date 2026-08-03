@@ -507,133 +507,59 @@ columns already being placed trackside. Then horizon silhouettes, denser roadsid
 objects, a lower and closer camera pass, a rim light on the car, a blob shadow
 under it, scenery themes, and weather as a colour treatment.
 
-**Status: sky, hours and a real lighting rig built.**
+**Status: sky, hours, a real lighting rig, and a start to the race.**
 
-The dark hours were unreadable, because the whole night rig was additive discs
-painted on the tarmac — which light the road and *only* the road. Each hour now
-carries five numbers instead of one flag: real `SpotLight3D` lamps on the
-trackside columns (what lights everything that is not the road), the painted pools
-kept for the graphic hard edge, an emission floor on the road material so the
-racing line never drops below readable, headlights on the car, and a lamp colour
-shared between the light and its pool. `distance_fade` answers the count — 27
-lamps on La Sarthe, only the handful near the car ever live, shadows off.
+Two things light a circuit: a shadow-casting **key light**, which is what makes
+floodlighting *even* the way a real circuit is; and **floodlight masts** — actual
+fixtures at the verge on alternating sides, 21 m tall with lit headframes, each
+throwing its cone about 50 m down the track so the pools land as long ellipses
+that overlap end to end. A small emission floor on the road stops pure black
+between them, the car's headlights sit below the key light, and ambient comes
+*down*, because every unit of ambient is contrast the lights do not get to make.
 
-Five things caught in the doing, all recorded in `docs/architecture.md`. The
-lamps were anchored on the column line 13.3 m out, where their cones could not
-reach the road at any energy. They then inherited the columns' 70 m spacing, so a
-17 m pool every 70 m left the car's headlights as the only continuously lit thing
-— **no amount of energy fixes a gap**, and floodlighting is now walked at its own
-28 m spacing with 22 m masts. Even correctly spaced, the *falloff* was wrong: `spot_range` set to just clear the
-work put the road at the bottom of Godot's curve, so the far edge of each cone —
-where consecutive masts overlap — got 9% of what fell directly under the mast, and
-the circuit still read as discs with dark between. Range is now far past the work
-and the curve is flat where the light is used. The headlights themselves sat
-*inside* the bodywork, lighting the front bumper. And scene brightness **cannot**
-decide when they come on, because dusk carries a higher ambient than noon on
-purpose.
+Measured the way the renderer computes it — inside-the-cone, distance falloff
+times angular falloff — **no point of the road is unlit and no point depends on a
+single cone**, on every hour, on a circuit built from scratch.
 
-The energies then had nothing to be measured against and came out at **33x the
-moonlight of the hour they were lighting**; they are now set against the noon
-sun, and the headlights against the masts, compared as light *delivered* rather
-than as raw `light_energy` — the two sit at very different distances from what
-they light. And `surface_road` matched Kenney's shared `"road"` material name
-across the whole scene, so twelve scenery surfaces per circuit were being
-re-surfaced as tarmac; harmless while tarmac was a colour, **glowing buildings**
-once the road gained an emission floor.
+> **The painted light pools are gone.** Flat additive discs on the tarmac,
+> defended here for a long time as the graphic statement. What they looked like,
+> said three times by the person playing it, was *yellow glow spots*. A disc of
+> colour added to the road is not light: it does not move with the eye, it does
+> not fall on the car, and its edge is a circle from every angle.
 
-Every hour is now checked on a circuit built from scratch rather than only the two
-shipped ones that happen to be dark: `evening` was found carrying no track
-lighting at all, which left Monte Carlo unlit, and now runs its masts at a
-fraction of night energy — the hour a circuit's floodlights come on while the sky
-is still bright.
- The shader replaces `ProceduralSkyMaterial`, and
-four presets are attached one per shipped circuit — noon, sunset, dusk, overcast.
-`SkyPreset` keeps each hour as one struct because sun, sky, fog and grade are not
-independent; changing one without the others is nearly always wrong.
+Six ways this was wrong before, all written up in `docs/architecture.md`: lamps
+anchored where their cones could not reach the road; spacing inherited from
+scenery, leaving gaps no energy can fill; `spot_angle` read as a full angle when
+it is the half-angle; `light_energy` compared between lights at different
+distances; energies set with nothing to measure against, landing at 33x the
+moonlight of the hour; and `surface_road` matching Kenney's shared `"road"`
+material name across the whole scene, which re-surfaced buildings and made them
+glow. Plus one that hid in a *measurement* rather than the code:
+`look_at_from_position` silently does nothing outside the tree, and a circuit is
+built detached.
 
-**Night is built, and La Sarthe races under it.** The blocker was real — the
-trackside columns had never emitted anything — and it is closed with flat
-additive light pools rather than point lights: twenty-odd omni lights is a lot to
-ask of the Compatibility renderer, and a real light's falloff gradient is the
-thing this look avoids everywhere else. Pools are 24 m across against 70 m
-spacing, so the dark between them survives.
+**The race also has a start:** 3 - 2 - 1 - GO, a number in the middle of the
+screen, with three gantry lamps lighting one at a time and turning green together.
 
-**Horizon silhouettes are in.** A ring of distant land at 1.2 km, generated per
-circuit from a seed so each has its own skyline, unshaded and coloured by the
-hour. Deliberately inside the fog rather than beyond it: fog runs to 2.6 km, so
-at that range the ridge comes through about a quarter hazed — present, and
-clearly far away. Past the fog end it would be invisible; much closer it would
-read as scenery the car might reach.
+The first attempt was a real Formula 1 sequence — five columns of two,
+extinguishing together — and it was rejected on sight. It is the correct grammar
+for a motor race and the wrong one here, because it asks you to *interpret*
+lights: the signal is the moment they go out, which you only read if you already
+know the rule. The number is the instruction; the lamps count *up* as it counts
+down, so three lit means "about to go" without looking at the number at all.
 
-**One trap it cost, worth recording:** a shader uniform set through
-`set_shader_parameter` is used as **linear radiance** and converts nothing, while
-the `ProceduralSkyMaterial` it replaced took the same `Color` and converted sRGB
-internally. Handing it the old numbers rendered the sky at roughly twice its
-intended brightness and washed the whole distance white. Presets stay authored in
-sRGB; `srgb_to_linear()` is applied once at the boundary.
+The lights own the sequence, so a circuit without a gantry races immediately
+rather than waiting on a node that is not there.
 
-**The car's blob shadow is in.** The sun's shadow only lands on the road — the
-ground plane is unshaded and receives nothing — so off-road the car had no shadow
-and floated. Placed by raycast onto whatever is actually beneath it, so it works
-on climbs, on banking and under Suzuka's bridge, and `top_level` so it does not
-roll with the body.
+The car is **held on its brakes, not `freeze`d**. `freeze` takes a body out of the
+simulation, so its suspension never compresses and unfreezing drops the whole car
+onto its springs: every race start visibly dropped the car onto the track. Held
+through the controller, the physics runs the whole time and the release moves
+nothing.
 
-**The car's rim light is in.** A fresnel edge tinted to the circuit's own sky,
-as `EMISSION` so it shows on the shaded side where the silhouette is hardest to
-read. The car's material became a shader to carry it; everything the standard
-material did it still does.
-
-**Scenery themes are in** — forest, coastal, parkland, meadow — kept separate
-from the hours, so four places and four hours make sixteen looks rather than
-four. The kit has two pieces of vegetation, so a theme varies colour and density
-rather than a prop table, which is most of the effect anyway.
-
-They also carried the fix for a bug night introduced: the ground plane is
-`unshaded` and receives no light, so La Sarthe had **noon-bright green grass
-under a midnight sky** until the hour supplied a tint. That is a shape rather
-than a one-off — every unshaded surface is outside the lighting model and needs
-its own answer for the hour, and the ground, the horizon ring, the light pools
-and the car's rim have each needed one separately.
-
-**Roadside markers are in** — small flags down both verges a few metres apart,
-themed per circuit. "Density is speed": pace is sold by a lot of things streaming
-past at the edge of vision, not by a bigger number on the speedometer, and the
-trees were always too far out and too sparse to do it. At 160 km/h they arrive
-about twenty a second.
-
-They cast no shadow, and that is now an option on the multimesh helper rather
-than a property of markers: anything placed in the hundreds would crowd the
-directional light's atlas, which the **car's** shadow needs and which is the one
-shadow that matters.
-
-**Weather is in, as a colour treatment.** Suzuka races under `storm`: heavy dark
-cloud, the closest fog of any hour, and the one grade in the game that goes
-*down* in saturation rather than up.
-
-**Deliberately not a grip change**, though `ideas.md` notes that is what would
-make it a gameplay variant rather than a filter. Grip belongs to the surface, and
-records are keyed on `track|car|surface` — lowering it here would make every lap
-on the circuit quietly incomparable with every other. **M17 has the key to do it
-properly**, and a test pins the decision so it cannot be undone by accident.
-
-**A drawn circuit can now choose its look.** One button in the editor cycles six
-pairings of hour and place, saved with the layout and carried in its share code —
-so every visual feature in this milestone reaches player circuits rather than only
-the four shipped ones.
-
-**Still not done: the camera pass.** Deliberately last — it is a *feel* change,
-the numbers are already parameterised in `CarTuning`, and it wants driving rather
-than guessing. The concrete proposal, when someone can judge it: lower and nearer
-than the current 1.4 m up and 4.2 m back, a wider base FOV, and a slight camera
-yaw leading the corner, which the chase camera does not do at all today.
-
-And **none of the hours or places have been looked at.** The suite asserts each
-circuit carries its own and that the presets are complete, which is not the same
-as it looking good.
-
-**Not doing, and the reversal is deliberate:** clearcoat paint, sky reflections,
-road wear, a fully lit ground plane, SSAO. Those are realism tools and this is not
-a realism target. `ground_grid.gdshader` stays `unshaded`.
+**And HUD text is outlined.** The panels are translucent so as not to punch a hole
+in the road, which means a near-white horizon came straight through them and the
+lap time was unreadable at the moment it appeared.
 
 ---
 

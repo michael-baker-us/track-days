@@ -80,10 +80,34 @@ func _surface_grip() -> float:
 ## geometry does not have.
 const OFF_ROAD_GRIP := 0.55
 
+## Held on the grid until the start lights go out.
+##
+## **Not `freeze`.** A frozen `RigidBody3D` is removed from the simulation
+## entirely, so its suspension never compresses and its wheels never find the
+## road — and the moment it is unfrozen the whole car falls onto its springs. The
+## car was visibly dropped onto the track at every race start. Held this way the
+## physics runs normally the whole time: the car settles on its suspension while
+## the lights are counting, exactly as it would if someone were sitting on the
+## brakes, and at the release nothing moves that was not already moving.
+var held := false
+
 func _physics_process(delta: float) -> void:
 	# One probe a frame, read by both the anti-roll bar and the tyres. It has to
 	# come first: everything below it asks how much grip there is.
 	_probe_surface()
+
+	if held:
+		# Everything below still runs: the suspension settles, the anti-roll bar
+		# levels the car on its banking, and drag does nothing at a standstill.
+		engine_force = 0.0
+		brake = tuning.handbrake_force
+		steering = 0.0
+		for wheel in _rear_wheels:
+			wheel.wheel_friction_slip = tuning.handbrake_rear_friction * _surface_grip()
+		_apply_drag()
+		_apply_antiroll()
+		return
+
 	var steer_input := _curve(Input.get_axis("steer_left", "steer_right"))
 	var throttle := _pedal(&"accelerate")
 	var braking := _pedal(&"brake")

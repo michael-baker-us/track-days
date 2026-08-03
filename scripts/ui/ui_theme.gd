@@ -76,6 +76,21 @@ static func build() -> Theme:
 static func _labels(theme: Theme) -> void:
 	theme.set_color("font_color", "Label", TEXT)
 	theme.set_font_size("font_size", "Label", FONT_M)
+	# **Outlined, because half of these labels are read against the sky.**
+	#
+	# The HUD panels are translucent on purpose — a solid block would punch a hole
+	# in the road — so whatever is behind them comes through, and what is behind
+	# them at the top of the screen is a big graphic sky that runs to near-white
+	# at the horizon. Pale text on a pale sky is unreadable at exactly the moment
+	# a lap time appears.
+	#
+	# An outline rather than a darker panel: it costs one draw pass, it works over
+	# any background including the ones added later, and it leaves the panels the
+	# weight they were designed with. Menus sit over dark surfaces where it is
+	# invisible, so this can be the default for every Label rather than a
+	# variation something has to remember to opt into.
+	theme.set_color("font_outline_color", "Label", _fade(Color.BLACK, 0.85))
+	theme.set_constant("outline_size", "Label", 6)
 
 	# The wordmark is letterspaced by hand — see `title_screen.gd`. Godot only
 	# offers glyph spacing through a FontVariation, which would mean shipping a
@@ -277,7 +292,7 @@ static func _panels(theme: Theme) -> void:
 	# readout away from the screen edge it is anchored to. The speed panel ran off
 	# the right of the screen exactly that way.
 	theme.set_type_variation(V_HUD, "PanelContainer")
-	var hud := _flat(_fade(SURFACE, 0.72), _fade(LINE, 0.6),
+	var hud := _flat(_fade(SURFACE, 0.82), _fade(LINE, 0.6),
 		{"left": 0.0, "right": 0.0, "top": 0.0, "bottom": 0.0})
 	theme.set_stylebox("panel", V_HUD, hud)
 

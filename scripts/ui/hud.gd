@@ -10,6 +10,7 @@ extends CanvasLayer
 @onready var _lap_panel: PanelContainer = $Root/LapPanel
 @onready var _speed_panel: PanelContainer = $Root/SpeedPanel
 @onready var _touch: Control = $Root/TouchControls
+@onready var _countdown: Label = $Root/Countdown
 
 ## Where the banner sits under the top edge. Landscape has 1280 units of width,
 ## so the centred banner and the right-hand lap panel share a line with room to
@@ -35,8 +36,31 @@ var _speed_home: float = 0.0
 ## Last colour written to the delta row, so an unchanged one is not rewritten.
 var _delta_colour := Color(0, 0, 0, 0)
 
+## Shows the pre-race count: 3, 2, 1, then GO, and -1 for nothing.
+##
+## The number is the instruction and the lamps on the gantry are decoration —
+## which is the whole difference between this and the Formula 1 sequence it
+## replaced, where the signal was the moment the lights went *out* and you had to
+## already know that to read it.
+##
+## Colour rather than motion: green on GO against white counting down, because a
+## label that scales has to be told how big the screen is and this one is
+## anchored to all of it.
+func show_count(number: int) -> void:
+	if _countdown == null:
+		return
+	if number < 0:
+		_countdown.text = ""
+	elif number == 0:
+		_countdown.text = "GO!"
+	else:
+		_countdown.text = str(number)
+	_countdown.add_theme_color_override("font_color",
+		UiTheme.GREEN if number == 0 else UiTheme.TEXT)
+
 func _ready() -> void:
 	_banner.text = ""
+	_countdown.text = ""
 	_speed_home = _speed_panel.position.y
 	_reflow()
 	get_window().size_changed.connect(_reflow)
