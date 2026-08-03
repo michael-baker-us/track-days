@@ -1434,6 +1434,34 @@ func test_the_railing_stands_on_the_deck() -> void:
 		# can see is the thing that stops you.
 		check_true("%s puts the rail out at the road edge (%.2f m)" % [id, furthest],
 			furthest >= TrackBuilder.RIBBON_HALF - 0.05)
+
+		# **And none of it folds across the road.**
+		#
+		# A curve offset inward by more than its own radius folds back through
+		# itself, and the quads between consecutive stations come out crossed —
+		# on the inside of a size-1 corner the centreline radius is 7 m and the
+		# rail sat 8.4 m in, so it inverted and tied itself in a bow at every
+		# tight corner. A fold puts rail vertices at or past the apex, so the
+		# closest any of them comes to the centreline is what catches it.
+		var closest := INF
+		for name in ["BarrierLeft", "BarrierRight"]:
+			var rails: Array = circuit.find_children(name, "MeshInstance3D", true, false)
+			if rails.is_empty():
+				continue
+			var rail_verts: PackedVector3Array = ((rails[0] as MeshInstance3D).mesh
+				.surface_get_arrays(0))[Mesh.ARRAY_VERTEX]
+			var stride := maxi(1, rail_verts.size() / 400)
+			var k := 0
+			while k < rail_verts.size():
+				var v: Vector3 = rail_verts[k]
+				var near := INF
+				for i in line.size():
+					near = minf(near,
+						Vector2(line[i].x - v.x, line[i].z - v.z).length_squared())
+				closest = minf(closest, sqrt(near))
+				k += stride
+		check_true("%s keeps the rail off the tarmac (%.2f m)" % [id, closest],
+			closest >= TrackBuilder.ROAD_HALF - 0.05)
 		circuit.free()
 
 ## **A tyre looks the same on every circuit.**

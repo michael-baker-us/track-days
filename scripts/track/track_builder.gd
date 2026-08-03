@@ -228,7 +228,7 @@ const RAIL_CLEARANCE := 0.55
 ## How far the railing will step in from the road edge, in metres, looking for
 ## somewhere it fits before giving up on that stretch entirely. See
 ## `_scenery_barrier`.
-const RAIL_PULL_IN := [0.0, 1.4, 2.8]
+const RAIL_PULL_IN := [0.0, 0.8, 1.6, 2.4, 3.2, 4.0, 4.8, 5.6]
 ## How much of its own lap a railing point ignores when asking whether it is clear
 ## of the road. Comfortably more than the road is wide, so the leg it is lining
 ## never rejects it, and far less than the distance to any other leg.
@@ -269,7 +269,19 @@ const BARRIER_COLOR := Color(0.86, 0.87, 0.89)
 ## following it point for point would bake tens of thousands of triangles of
 ## flat wall into every circuit file.
 const BARRIER_MIN_TURN := 0.03
-const BARRIER_MAX_SPAN := 6.0 * SCALE
+## The longest single length of railing between two stations.
+##
+## Was 6 tiles — **84 metres of rail as one flat quad**. A station is also kept
+## wherever the road turns by more than `BARRIER_MIN_TURN` or changes height, so
+## on paper a straight is the only place a span that long can happen; in practice
+## it means any stretch the turn test reads as straight is drawn as a single chord
+## between its ends, and a chord across even a gentle curve stands visibly off the
+## road it is meant to be lining.
+##
+## One tile is short enough that the rail follows the road everywhere, at a few
+## thousand more vertices per circuit — which is nothing against the tile meshes
+## already in the scene.
+const BARRIER_MAX_SPAN := 1.0 * SCALE
 
 ## Distant scenery keeps full tile scale on purpose: a grandstand or a tree is
 ## meant to tower, and shrinking those to match the car would make the whole
@@ -2444,10 +2456,29 @@ func _scenery_barrier(scenery: Node3D, road: Dictionary) -> void:
 			var fitted := false
 			for pull in RAIL_PULL_IN:
 				here = _barrier_station(i, side, pull)
-				if _clear_of_road(road, here["inner"], RAIL_CLEARANCE * SCALE,
+				if not _clear_of_road(road, here["inner"], RAIL_CLEARANCE * SCALE,
 						i, RAIL_OWN_SPAN):
-					fitted = true
-					break
+					continue
+				# **And it must still be going forwards.**
+				#
+				# A curve offset inward by more than its own radius folds back
+				# through itself — the classic parallel-curve failure — and the
+				# quads between consecutive stations come out crossed. On the
+				# inside of a size-1 corner the centreline radius is 7 m and the
+				# rail sits 8.4 m in, so it inverts, and what you see is the rail
+				# tying itself in a bow at every tight corner.
+				#
+				# Rather than work out which side of the turn is the inside and
+				# clamp against a computed radius — two sign conventions to get
+				# wrong — the fold is detected where it shows: if the step from
+				# the last station to this one points *against* the road, this
+				# offset is impossible here and a tighter one is tried.
+				if not prev.is_empty():
+					var step: Vector3 = (here["inner"] as Vector3) - (prev["inner"] as Vector3)
+					if step.dot(_tangent_at(i)) <= 0.0:
+						continue
+				fitted = true
+				break
 			if not fitted:
 				prev = {}
 				continue
@@ -2489,6 +2520,13 @@ func _barrier_vertices() -> PackedInt32Array:
 			last_dir = flat
 	keep.append(centreline.size() - 1)
 	return keep
+
+## Which way the road is going at a point, flattened.
+func _tangent_at(i: int) -> Vector3:
+	var a := centreline[maxi(i - 1, 0)]
+	var b := centreline[mini(i + 1, centreline.size() - 1)]
+	var t := Vector3(b.x - a.x, 0.0, b.z - a.z)
+	return t.normalized() if t.length() > 0.0001 else Vector3.FORWARD
 
 ## Where the barrier's foot sits at one centreline point, and which way is out.
 func _barrier_station(i: int, side: float, pull: float = 0.0) -> Dictionary:

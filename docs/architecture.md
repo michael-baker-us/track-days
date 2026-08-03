@@ -1175,6 +1175,20 @@ its outer face sat at 8.9 m against a deck edge at 7. The rail follows the deck
 edge now, and **so do the collision walls**, so the thing you can see and the thing
 that stops you still coincide.
 
+> **A curve offset inward by more than its own radius folds back through
+> itself.** That is the classic parallel-curve failure, and it is what tied the
+> railing in a bow at every tight corner: a size-1 corner has a 7 m centreline
+> radius and the rail sat 8.4 m in, so the offset inverted and the quads between
+> consecutive stations came out crossed.
+>
+> The fold is detected **where it shows** rather than predicted: if the step from
+> the last station to this one points *against* the road, this offset is
+> impossible here and a tighter one is tried. The alternative — computing the
+> local radius and clamping against it — needs two sign conventions (which way the
+> road turns, and which side of it this rail is on) and gets one of them wrong.
+> Measured after: no rail vertex on any circuit comes closer than 7.00 m to the
+> centreline, which is exactly the tarmac edge.
+
 > **The clearance rule culled both rails and left neither.** A railing point that
 > lands on another leg's tarmac has to go, and the old rule dropped it on the
 > reasoning that "the barrier already standing between them serves both". Where
