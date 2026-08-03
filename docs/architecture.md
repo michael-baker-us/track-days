@@ -1699,6 +1699,28 @@ when the car enters the tree rather than baked into the car scene, because one c
 scene serves every condition. A squeal on snow was the loudest wrong note in the
 old mix once surfaces existed.
 
+### The countdown has a voice
+
+Two one-shot tones, a fifth apart: one on each number, a longer and higher one on
+GO. A silent wait is indistinguishable from a game that has not started — the
+number on screen says *what* is happening and the tone says it is happening
+**now**, which is the part a driver takes their eyes off the HUD for. The interval
+is what makes GO read as a different event rather than as a fourth number.
+
+Plain `AudioStreamPlayer`s on the HUD rather than the 3D kind: a start signal is
+not coming from a place in the world, and a positional one would fade as the chase
+camera drifted back.
+
+> **They start from silence.** A tone at full amplitude on sample zero is a step,
+> and a step is a click — audible as a tick in front of the note, which on a
+> countdown reads as a fault rather than as percussion. Four milliseconds of
+> attack is enough, and the suite checks the first sample against the loudest one
+> in the opening.
+
+These are the only streams in the game that must **not** loop, alongside the
+impact, and none of the looping rules elsewhere in this section apply to them: a
+tone that ends in silence has nothing to meet at its own start.
+
 ### Impacts, now that there is something to hit
 
 The barriers became solid in the same pass that took grip off the grass, and

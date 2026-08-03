@@ -1079,6 +1079,53 @@ it is the honest consequence of uniform grip scaling.
 Recovery never failed at 0.5 grip. That was the open question and the answer is
 no, the car does not become uncatchable.
 
+### M14 revisited — the garage, measured
+
+The prototype's figures were written down rather than measured, which the roadmap
+called "a guess wearing measured clothes". The M1/M2 sweeps were run against both
+cars on the flat plane.
+
+| | Top speed | Lateral | Braking | 0-100 | Stop from 100 |
+|---|---|---|---|---|---|
+| `race` measured | 164.9 km/h | 3.69 g | 1.62 g | 6.65 s | 24.2 m |
+| `race` spec | 164.9 | 3.65 | 1.62 | — | — |
+| `race_future` measured | 186.2 km/h | 4.08 g | 1.66 g | 6.02 s | 23.7 m |
+| `race_future` spec | 186.2 | 4.04 | 1.65 | — | — |
+
+**The prototype's stated figures were right.** Top speed to the decimal, lateral
+and braking within 1%. The baseline reproducing its own spec exactly is what makes
+that believable rather than lucky — it validates the rig before the rig is used to
+judge anything.
+
+**`launch_accel` was wrong on both cars, by about a factor of two, and it had been
+wrong since M10.**
+
+`ParTime` integrates `a = launch * (1 - (v/v_max)^2)` forward between corners, so
+the value that belongs there is the one making *that model* reproduce the car's
+real acceleration. Fitted against the measured 0-100 it is **4.84** for `race` and
+**5.16** for the prototype. They carried 9.56 and 10.11, which predict a 3.4 s
+0-100 against a measured 6.65 s.
+
+So par accelerated roughly twice as hard as the car can out of every corner, and
+**every medal in the game was that much too hard to win**. Par is now 10% slower
+across the board: Ardennes dry goes 47.75 s to 52.23 s, La Sarthe 59.01 s to
+65.05 s.
+
+Measured *directly* off the line the car pulls 6.73 m/s^2, between the fitted
+value and the old one — the car accelerates harder early and falls off faster than
+a single constant can describe. A one-parameter model cannot follow a curve the
+car does not follow, so the constant is chosen for what it is **used** for, and
+`CarSpec` now says so where the number is.
+
+> **The bare plane stopped being a valid measurement surface and nothing said so.**
+> `track_01.tscn` is kept precisely for physics measurements, and off-road grip
+> (M17) means anything not on the drivable ribbon runs at 0.55 of the car's grip —
+> which the plane, having no ribbon, now is. The first run of this sweep returned
+> 2.14 g lateral and 38.0 m braking for a car whose journal figures are 3.65 g and
+> 24.2 m, and the numbers looked plausible enough to write down. The rig now lays
+> a road-layer slab under the plane. **Any future measurement on `track_01` must
+> do the same.**
+
 ### Still open, from M17
 
 - **Longitudinal drive does not degrade with the surface**, per the measurement

@@ -15,4 +15,4 @@ mass = 1150.0
 top_speed_kmh = 186.2
 lateral_g = 4.04
 braking_g = 1.65
-launch_accel = 10.11
+launch_accel = 5.16

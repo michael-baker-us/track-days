@@ -11,6 +11,8 @@ extends CanvasLayer
 @onready var _speed_panel: PanelContainer = $Root/SpeedPanel
 @onready var _touch: Control = $Root/TouchControls
 @onready var _countdown: Label = $Root/Countdown
+@onready var _count_beep: AudioStreamPlayer = $CountBeep
+@onready var _go_beep: AudioStreamPlayer = $GoBeep
 
 ## Where the banner sits under the top edge. Landscape has 1280 units of width,
 ## so the centred banner and the right-hand lap panel share a line with room to
@@ -57,6 +59,18 @@ func show_count(number: int) -> void:
 		_countdown.text = str(number)
 	_countdown.add_theme_color_override("font_color",
 		UiTheme.GREEN if number == 0 else UiTheme.TEXT)
+
+	# The number says what is happening; the tone says it is happening **now**,
+	# which is the part a driver takes their eyes off the HUD for. Gated on the
+	# same switch as everything else, and skipped headless where the audio driver
+	# is a stub that never mixes.
+	if number < 0 or not GameState.audio_enabled():
+		return
+	if DisplayServer.get_name() == "headless":
+		return
+	var beep := _go_beep if number == 0 else _count_beep
+	if beep != null and beep.stream != null:
+		beep.play()
 
 func _ready() -> void:
 	_banner.text = ""

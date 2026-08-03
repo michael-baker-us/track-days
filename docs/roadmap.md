@@ -263,7 +263,13 @@ Three of the four things named above now exist.
 
 Six streams, 100 KB, about 1% of the web `.pck`.
 
-**Not done: kerbs, the start-light sequence, and UI sound.** And the default is
+4. **The countdown has a voice.** Two one-shot tones a fifth apart — one on each
+   number, a longer and higher one on GO. A silent wait is indistinguishable from
+   a game that has not started, and the interval is what makes GO read as a
+   different event rather than as a fourth number. Non-positional, because a start
+   signal does not come from a place in the world.
+
+**Not done: kerbs and UI sound.** And the default is
 **still off**, which is the honest position — every claim above is a measurement,
 and the thing that condemned the last version was a person listening to it. The
 constant is `GameState.audio_enabled`; flipping it is one line, and it should be
@@ -444,10 +450,21 @@ That is the composite-key decision from M8 paying for itself.
 of the same size and all four candidate models use a 0.3 m wheel, so nothing
 forces it yet. A kart or a truck would, and that is when it has to be settled.
 
-**Not done:** the prototype's tuning is a plausible starting point, not a
-measured one — the same sweeps M1 and M2 ran (top speed, braking, corner speeds)
-have to be run for it, or it is a guess wearing measured clothes. And the pit
-lane is untouched.
+**The prototype is measured now, and its figures were right** — top speed to the
+decimal, lateral and braking within 1%. The baseline reproducing its own spec
+exactly in the same run is what makes that believable rather than lucky.
+
+**But the sweep found `launch_accel` wrong on both cars by about 2x**, and it had
+been since M10. `ParTime` integrates `a = launch * (1 - (v/v_max)^2)` between
+corners, so the value belonging there is the one that makes *that model* reproduce
+the real car: 4.84 and 5.16, against the 9.56 and 10.11 they carried — which
+predict a 3.4 s 0-100 against a measured 6.65 s. Par accelerated twice as hard as
+the car can out of every corner, so **every medal was that much too hard to win**.
+Par is now 10% slower across the board. Written up in the tuning journal, along
+with the trap that nearly buried it: off-road grip quietly made the bare
+measurement plane an invalid surface.
+
+**Not done:** the pit lane is untouched.
 
 ---
 

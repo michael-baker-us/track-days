@@ -25,28 +25,28 @@ static var records_path: String = RECORDS_PATH
 const TRACKS := [
 	{
 		"id": "ardennes",
-		"par": {"race|tarmac": 47.75, "race|dirt": 52.76, "race|snow": 59.73, "race_future|tarmac": 45.25, "race_future|dirt": 50.25, "race_future|snow": 57.20},
+		"par": {"race|tarmac": 52.23, "race|dirt": 57.41, "race|snow": 64.33, "race_future|tarmac": 49.50, "race_future|dirt": 54.63, "race_future|snow": 61.48},
 		"name": "Ardennes",
 		"blurb": "A hairpin, a long climb, fast sweepers",
 		"scene": "res://scenes/track/track_ardennes.tscn",
 	},
 	{
 		"id": "monte_carlo",
-		"par": {"race|tarmac": 38.15, "race|dirt": 42.40, "race|snow": 48.14, "race_future|tarmac": 36.35, "race_future|dirt": 40.57, "race_future|snow": 46.26},
+		"par": {"race|tarmac": 42.28, "race|dirt": 46.48, "race|snow": 52.24, "race_future|tarmac": 40.26, "race_future|dirt": 44.40, "race_future|snow": 50.04},
 		"name": "Monte Carlo",
 		"blurb": "Fourteen tight corners, not one banked",
 		"scene": "res://scenes/track/track_monte_carlo.tscn",
 	},
 	{
 		"id": "la_sarthe",
-		"par": {"race|tarmac": 59.01, "race|dirt": 65.12, "race|snow": 73.41, "race_future|tarmac": 56.09, "race_future|dirt": 62.17, "race_future|snow": 70.42},
+		"par": {"race|tarmac": 65.05, "race|dirt": 71.59, "race|snow": 80.10, "race_future|tarmac": 61.85, "race_future|dirt": 68.29, "race_future|snow": 76.65},
 		"name": "La Sarthe",
 		"blurb": "Huge straights, chicanes, one big sweeper",
 		"scene": "res://scenes/track/track_la_sarthe.tscn",
 	},
 	{
 		"id": "suzuka",
-		"par": {"race|tarmac": 34.43, "race|dirt": 37.36, "race|snow": 41.38, "race_future|tarmac": 32.78, "race_future|dirt": 35.77, "race_future|snow": 39.84},
+		"par": {"race|tarmac": 38.96, "race|dirt": 42.24, "race|snow": 46.47, "race_future|tarmac": 37.10, "race_future|dirt": 40.37, "race_future|snow": 44.59},
 		"name": "Suzuka",
 		"blurb": "A figure of eight - the lap bridges over itself",
 		"scene": "res://scenes/track/track_suzuka.tscn",

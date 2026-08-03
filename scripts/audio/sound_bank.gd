@@ -229,6 +229,56 @@ static func impact() -> AudioStreamWAV:
 	wav.loop_mode = AudioStreamWAV.LOOP_DISABLED
 	return wav
 
+## The countdown, as two tones: one for each number, one for GO.
+##
+## The start sequence is the one moment the game asks the player to *wait*, and a
+## silent wait is indistinguishable from a game that has not started. The number
+## on screen says what is happening; the tone says it is happening **now**, which
+## is the part a driver takes their eyes off the HUD for.
+##
+## A fifth apart, and the GO tone is longer and lower-harmonic — the interval is
+## what makes the last one read as a different event rather than as a fourth
+## number. Nothing here is a chord: two tones a fifth apart in sequence is a
+## signal, and three notes at once is a jingle.
+##
+## One-shots, so unlike everything else in this file they must **not** loop, and
+## none of the looping rules apply — a tone that ends in silence has nothing to
+## meet at its own start.
+const COUNT_HZ := 660.0
+const GO_HZ := 990.0
+const COUNT_FRAMES := 4410   # 0.20 s
+const GO_FRAMES := 11025     # 0.50 s
+
+static func count_tone() -> AudioStreamWAV:
+	return _tone(COUNT_HZ, COUNT_FRAMES, 22.0, 0.35, 0.66)
+
+static func go_tone() -> AudioStreamWAV:
+	# Slower decay and less edge: it is an answer, not another question.
+	return _tone(GO_HZ, GO_FRAMES, 7.0, 0.18, 0.8)
+
+## One pitched blip: a fundamental with a little harmonic edge, under an
+## exponential decay with a few milliseconds of attack.
+##
+## The attack matters more than it looks. A tone starting at full amplitude on
+## sample zero is a step, and a step is a click — audible as a tick in front of
+## the note, which on a countdown reads as a fault rather than as percussion.
+static func _tone(
+	hz: float, frames: int, decay: float, edge: float, peak: float
+) -> AudioStreamWAV:
+	var samples := PackedFloat32Array()
+	samples.resize(frames)
+	var attack := 0.004
+	for i in frames:
+		var t := float(i) / float(MIX_RATE)
+		var env: float = exp(-t * decay) * minf(1.0, t / attack)
+		var v := sin(TAU * hz * t)
+		v += edge * sin(TAU * hz * 2.0 * t)
+		v += edge * 0.4 * sin(TAU * hz * 3.0 * t)
+		samples[i] = v * env
+	var wav := _to_wav(_normalised(samples, peak))
+	wav.loop_mode = AudioStreamWAV.LOOP_DISABLED
+	return wav
+
 ## A fixed field of white noise, exactly the buffer's length.
 ##
 ## Indexed modulo that length it is periodic, so it loops seamlessly — the

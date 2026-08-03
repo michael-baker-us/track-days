@@ -1924,6 +1924,8 @@ func test_audio_resources_match_their_source() -> void:
 	var built := [
 		["engine_load", SoundBank.engine_load()],
 		["engine_overrun", SoundBank.engine_overrun()],
+		["count", SoundBank.count_tone()],
+		["go", SoundBank.go_tone()],
 	]
 	for surface in SoundBank.TYRE_VOICES.keys():
 		built.append(["tyre_%s" % surface, SoundBank.tyre(surface)])
@@ -1939,8 +1941,15 @@ func test_audio_resources_match_their_source() -> void:
 			committed.data.size(), fresh.data.size())
 		check("%s is byte-for-byte the built one" % pair[0],
 			committed.data, fresh.data)
-		check("%s loops" % pair[0],
-			committed.loop_mode, AudioStreamWAV.LOOP_FORWARD)
+		# The countdown tones are one-shots and must **not** loop — a tone that
+		# ends in silence has nothing to meet at its own start, and one that
+		# looped would repeat under the race.
+		var one_shot: bool = String(pair[0]) in ["count", "go"]
+		check("%s loops as it should" % pair[0], committed.loop_mode,
+			AudioStreamWAV.LOOP_DISABLED if one_shot
+			else AudioStreamWAV.LOOP_FORWARD)
+		if one_shot:
+			continue
 		# The loop must cover the whole buffer. A loop end short of the data is
 		# the classic way a generated tone develops a tick.
 		check("%s loops over all of itself" % pair[0],
@@ -2022,6 +2031,52 @@ func test_the_engine_has_two_voices() -> void:
 	check_true("the loaded engine rings on (%.2f) more than the overrun (%.2f)"
 		% [tail["engine_load"], tail["engine_overrun"]],
 		float(tail["engine_load"]) > float(tail["engine_overrun"]) * 1.15)
+
+## The countdown has a voice, because a silent wait is indistinguishable from a
+## game that has not started.
+##
+## The number on screen says what is happening; the tone says it is happening
+## **now**, which is the part a driver takes their eyes off the HUD for. The two
+## are a fifth apart so GO reads as a different event rather than as a fourth
+## number.
+func test_the_countdown_is_audible() -> void:
+	var count: AudioStreamWAV = load("res://resources/audio/count.tres")
+	var go: AudioStreamWAV = load("res://resources/audio/go.tres")
+	check_true("both tones exist", count != null and go != null)
+	if count == null or go == null:
+		return
+	check_true("GO is the longer of the two (%d vs %d frames)"
+		% [go.data.size() / 2, count.data.size() / 2],
+		go.data.size() > count.data.size())
+	check_true("and a fifth above it",
+		SoundBank.GO_HZ > SoundBank.COUNT_HZ * 1.4
+		and SoundBank.GO_HZ < SoundBank.COUNT_HZ * 1.6)
+
+	# **They start from silence.** A tone at full amplitude on sample zero is a
+	# step, and a step is a click — audible as a tick in front of the note, which
+	# on a countdown reads as a fault rather than as percussion.
+	for pair in [["count", count], ["go", go]]:
+		var wav: AudioStreamWAV = pair[1]
+		var first := absi(wav.data.decode_s16(0))
+		var loudest := 0
+		for i in mini(wav.data.size() / 2, 2000):
+			loudest = maxi(loudest, absi(wav.data.decode_s16(i * 2)))
+		check_true("%s opens on an attack, not a step (%d vs %d)"
+			% [pair[0], first, loudest],
+			first < maxi(loudest / 8, 1))
+
+	# And the HUD carries the players that speak them.
+	var car: Node = get_first_node_in_group("player_car")
+	var race: Node = car.get_parent() if car != null else null
+	var hud: Node = race.get_node_or_null("HUD") if race != null else null
+	check_true("the HUD can sound the countdown",
+		hud != null and hud.get_node_or_null("CountBeep") != null
+		and hud.get_node_or_null("GoBeep") != null)
+	if hud != null:
+		# Not positional: a start signal is not coming from a place in the world,
+		# and a 3D player would fade as the chase camera drifted back.
+		check_true("from a non-positional player",
+			hud.get_node("CountBeep") is AudioStreamPlayer)
 
 ## Hitting a barrier makes a noise, and driving does not.
 ##
@@ -6463,6 +6518,7 @@ func _physics_process(_delta: float) -> bool:
 		test_the_car_lights_its_own_way()
 		test_the_engine_has_two_voices()
 		test_hitting_something_is_audible()
+		test_the_countdown_is_audible()
 		test_generated_loops_meet_their_own_start()
 		test_sound_is_off_until_asked_for()
 		test_the_car_is_silent_when_sound_is_off()

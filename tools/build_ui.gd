@@ -84,6 +84,16 @@ func _initialize() -> void:
 	countdown.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root_ctrl.add_child(countdown)
 
+	# The countdown's voice. Plain `AudioStreamPlayer`s, not the 3D kind: a start
+	# signal is not coming from a place in the world, and a positional one would
+	# get quieter as the chase camera drifted back.
+	for pair in [["CountBeep", "res://resources/audio/count.tres"],
+			["GoBeep", "res://resources/audio/go.tres"]]:
+		var beep := AudioStreamPlayer.new()
+		beep.name = pair[0]
+		beep.stream = load(pair[1])
+		layer.add_child(beep)
+
 	root_ctrl.add_child(_touch_controls())
 
 	# The touch route out of a race. Escape and the pad's Start do the same job

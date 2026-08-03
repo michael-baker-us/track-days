@@ -65,7 +65,7 @@ const G := 9.81
 const LATERAL_G := 3.65
 const BRAKING_G := 1.62
 const TOP_SPEED := 45.8      ## m/s, 164.9 km/h
-const LAUNCH_ACCEL := 9.56   ## m/s^2 at a standstill
+const LAUNCH_ACCEL := 4.84   ## m/s^2 at a standstill
 
 ## The centreline is sampled unevenly — eight steps around a corner arc, one per
 ## tile down a straight — so it is resampled to a fixed step before anything is

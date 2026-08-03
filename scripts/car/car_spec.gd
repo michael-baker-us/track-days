@@ -79,8 +79,17 @@ const TYRE_RIM_POWER := 5.0
 @export var top_speed_kmh: float = 164.9
 @export var lateral_g: float = 3.65
 @export var braking_g: float = 1.62
-## Acceleration at a standstill, fitted to the measured 0-100 time through
-## `A * (1 - (v/v_max)^2)`. See `ParTime`.
+## Acceleration in `A * (1 - (v/v_max)^2)`, **fitted to the measured 0-100 time**
+## rather than measured off the line. See `ParTime`, which integrates exactly that
+## model forward between corners.
+##
+## The distinction is the whole of it, and getting it wrong cost every medal in
+## the game. Measured directly off the line this car pulls 6.7 m/s^2; the value
+## that makes the *model* reproduce its real 0-100 is 4.84. It carried 9.56, which
+## predicts a 3.4 s 0-100 against a measured 6.65 s — so par accelerated roughly
+## twice as hard as the car can out of every corner, and every medal was that much
+## too hard to win. A single constant cannot describe a curve the car does not
+## follow, so it is chosen for what it is *used* for.
 @export var launch_accel: float = 9.56
 
 ## Where the built scene goes, and where the game loads it from.
