@@ -1062,7 +1062,15 @@ func test_every_hour_lights_its_track() -> void:
 		if key == null:
 			track.free()
 			continue
-		check_true("%s casts shadows from it" % look, key.shadow_enabled)
+		# Shadows come from the *brighter* of the two directional lights, not
+		# always from the key: at sunset the sun is still the light and the masts
+		# are only just switching on. Only one may cast — two shadow maps over the
+		# same geometry is what made the car's wheels band, and band differently
+		# on every circuit. Pinned properly in `test_one_light_casts_the_shadows`.
+		var sun_light := track.get_node_or_null("Sun") as DirectionalLight3D
+		check_true("%s casts shadows from its brighter light" % look,
+			key.shadow_enabled
+			== (sun_light == null or key.light_energy >= sun_light.light_energy))
 		# In the same order as daylight. Set from geometry alone an earlier rig
 		# reached 33 times the moonlight of the hour it was lighting, and every
 		# surface within reach blew out to white.
@@ -1364,6 +1372,154 @@ func test_a_drawn_circuit_can_choose_its_look() -> void:
 	for id in CircuitLook.BY_TRACK:
 		check_true("%s still names its own look" % id,
 			CircuitLook.LOOKS.has(CircuitLook.BY_TRACK[id]))
+
+## **A tyre looks the same on every circuit.**
+##
+## The wheels shared the bodywork's material, and that material carries a fresnel
+## rim light which `race.gd` tints to the *sky of the circuit being raced on* — so
+## the car reads as belonging to the scene it is in. On the bodywork that is a
+## bright line along the silhouette, which is the whole point of it. On a wheel it
+## is the entire wheel: fresnel covers almost all of a small round object seen
+## from outside, and a tyre is black, so the rim emission is the only colour
+## there. The tyres came out **red at Monte Carlo and blue at Ardennes** — they
+## were reporting the horizon.
+func test_tyres_do_not_change_colour() -> void:
+	var car: Node3D = load("res://scenes/car/race.tscn").instantiate()
+	var body := car.get_node_or_null("body") as MeshInstance3D
+	check_true("the car has bodywork", body != null)
+	if body == null:
+		car.free()
+		return
+
+	var tyres: Array[ShaderMaterial] = []
+	for node in car.find_children("*", "MeshInstance3D", true, false):
+		if String(node.name).begins_with("wheel"):
+			var mesh: Mesh = (node as MeshInstance3D).mesh
+			if mesh != null:
+				tyres.append(mesh.surface_get_material(0) as ShaderMaterial)
+	check("all four wheels are materialised", tyres.size(), 4)
+
+	# A rim of its own: **fixed, neutral and tight**. Killing it outright left a
+	# black tyre on dark tarmac, which is the opposite problem — the wheels
+	# disappeared into the road, and the car's shadow decal underneath takes what
+	# contrast was left. It is set explicitly rather than left to the shader
+	# default, because the default is what the *bodywork* wants.
+	for tyre in tyres:
+		check_true("a tyre has an edge to read against the road (%.2f)"
+			% float(tyre.get_shader_parameter("rim_strength")),
+			float(tyre.get_shader_parameter("rim_strength")) > 0.0)
+		var edge: Color = tyre.get_shader_parameter("rim_color")
+		check_true("in a neutral grey, not a colour (%.2f, %.2f, %.2f)"
+			% [edge.r, edge.g, edge.b],
+			maxf(edge.r, maxf(edge.g, edge.b))
+				- minf(edge.r, minf(edge.g, edge.b)) < 0.2)
+		check_true("bright enough to separate it from tarmac (%.2f)"
+			% edge.get_luminance(), edge.get_luminance() > 0.4)
+		# Tighter than the bodywork's, so it hugs the silhouette instead of
+		# washing the whole wheel — which is what let a sky-tinted rim swallow a
+		# tyre in the first place.
+		check_true("and tight to the edge (%.1f)"
+			% float(tyre.get_shader_parameter("rim_power")),
+			float(tyre.get_shader_parameter("rim_power")) > 3.5)
+	# And the body still has one, or the fix removed the effect entirely. `null`
+	# here means "unset, so the shader's own default", which is non-zero.
+	var body_rim = (body.mesh.surface_get_material(0) as ShaderMaterial) \
+		.get_shader_parameter("rim_strength")
+	check_true("the bodywork keeps its rim",
+		body_rim == null or float(body_rim) > 0.0)
+
+	# Driven through the real per-circuit tint, on the two hours furthest apart:
+	# Ardennes is a pale blue noon horizon and Monte Carlo a red sunset one.
+	#
+	# > **Put back afterwards.** `PackedScene.instantiate()` *shares* sub-resources
+	# > rather than copying them, so these materials are the same objects the car
+	# > being raced by this suite is using — tinting them here repainted that car
+	# > too, and the test that checks its rim matches its own circuit failed five
+	# > times over. The same trap `surface_road` carries a note about.
+	var restore: Color = (body.mesh.surface_get_material(0) as ShaderMaterial) \
+		.get_shader_parameter("rim_color")
+	var seen := {}
+	# **Through `race.gd`'s own tint**, not a copy of it. A copy would have to
+	# repeat the rule that skips the tyre material, and a test that repeats the
+	# rule it is checking passes whether or not the game has it.
+	var race: Node = get_first_node_in_group("player_car").get_parent()
+	check_true("the race scene is reachable to tint through",
+		race != null and race.has_method("_tint_car_rim"))
+	if race == null or not race.has_method("_tint_car_rim"):
+		car.free()
+		return
+	for id in ["ardennes", "monte_carlo"]:
+		race._tint_car_rim(car, id)
+		seen[id] = tyres[0].get_shader_parameter("rim_color") as Color
+		check_true("on %s a tyre keeps its own edge (%.2f, %.2f, %.2f)"
+			% [id, (seen[id] as Color).r, (seen[id] as Color).g, (seen[id] as Color).b],
+			(seen[id] as Color).is_equal_approx(CarSpec.TYRE_RIM))
+
+	check_true("and it is the same edge on both",
+		(seen["ardennes"] as Color).is_equal_approx(seen["monte_carlo"] as Color))
+
+	# The circuits really are different, or the check above proves nothing.
+	check_true("the two circuits ask for different rims",
+		not (SkyPreset.for_track("ardennes")["horizon"] as Color).is_equal_approx(
+			SkyPreset.for_track("monte_carlo")["horizon"] as Color))
+
+	for node in car.find_children("*", "MeshInstance3D", true, false):
+		var mesh: Mesh = (node as MeshInstance3D).mesh
+		if mesh == null:
+			continue
+		var mat := mesh.surface_get_material(0) as ShaderMaterial
+		if mat != null:
+			mat.set_shader_parameter("rim_color", restore)
+	car.free()
+
+## **Exactly one directional light casts shadows**, and it is the brighter one.
+##
+## Both the sun and the floodlight key cast until this was found, and two
+## directional shadow maps over the same geometry is what made the car's wheels
+## look wrong — and look wrong *differently on every circuit*, because only the
+## lit hours carried a second light and its angle and strength changed with the
+## hour. A small curved object shadowed twice from two directions is all banding.
+##
+## The brighter light wins rather than the key one always: at sunset the sun is
+## still the light and the masts are only just switching on. A moon at 0.28
+## casting shadows at night was wrong on its own terms as well.
+func test_one_light_casts_the_shadows() -> void:
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var casters := []
+		var brightest := 0.0
+		var brightest_casts := false
+		for node in circuit.find_children("*", "DirectionalLight3D", true, false):
+			var light := node as DirectionalLight3D
+			if light.shadow_enabled:
+				casters.append(String(light.name))
+			if light.light_energy > brightest:
+				brightest = light.light_energy
+				brightest_casts = light.shadow_enabled
+		check("%s has exactly one shadow caster (%s)" % [id, str(casters)],
+			casters.size(), 1)
+		check_true("%s casts from its brightest light (%.2f)" % [id, brightest],
+			brightest_casts)
+		circuit.free()
+
+	# And on a circuit built from scratch, at every hour — the pairing only exists
+	# at the hours that have a key light at all.
+	var layout := TrackLayout.new()
+	layout.cells.assign(TrackShape.cells_from_corners([
+		Vector2i(0, 0), Vector2i(9, 0), Vector2i(9, 7), Vector2i(0, 7)
+	]))
+	var segments: Array = layout.compile().segments
+	for look in CircuitLook.ORDER:
+		var built := TrackBuilder.new().build("shadow_%s" % look, segments, true, look)
+		if built == null or built.root == null:
+			continue
+		var lit := 0
+		for node in built.root.find_children("*", "DirectionalLight3D", true, false):
+			if (node as DirectionalLight3D).shadow_enabled:
+				lit += 1
+		check("%s casts from one light only" % look, lit, 1)
+		built.root.free()
 
 ## A lit lens has to still be its own colour *after* tonemapping.
 ##
@@ -6300,6 +6456,8 @@ func _physics_process(_delta: float) -> bool:
 		test_the_race_starts_on_the_lights()
 		test_hud_text_reads_against_the_sky()
 		test_the_start_lamps_keep_their_colour()
+		test_one_light_casts_the_shadows()
+		test_tyres_do_not_change_colour()
 		test_the_dark_hours_are_lit()
 		test_every_hour_lights_its_track()
 		test_the_car_lights_its_own_way()

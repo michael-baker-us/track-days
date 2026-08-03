@@ -94,8 +94,17 @@ func _tint_car_rim(car: Node, track_id: String) -> void:
 			continue
 		for i in mesh.get_surface_count():
 			var mat := mesh.surface_get_material(i) as ShaderMaterial
-			if mat != null:
-				mat.set_shader_parameter("rim_color", rim.srgb_to_linear())
+			if mat == null:
+				continue
+			# **The tyres keep their own.** The rim is what makes the car belong
+			# to the scene it is in, and on bodywork it is a line along the
+			# silhouette — but a wheel is small, round and black, so fresnel
+			# covers nearly all of it and the rim becomes the only colour there.
+			# Tinted, the tyres came out red at Monte Carlo and blue at Ardennes.
+			# Theirs is a fixed cool grey that separates them from the road.
+			if mat.resource_name == CarSpec.TYRE_MATERIAL:
+				continue
+			mat.set_shader_parameter("rim_color", rim.srgb_to_linear())
 
 ## The recorded best lap, if there is one, as a translucent car to chase.
 ##

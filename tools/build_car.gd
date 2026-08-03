@@ -48,6 +48,8 @@ func _initialize() -> void:
 func _bake(spec: CarSpec) -> bool:
 	var source: Node3D = load(spec.source).instantiate()
 	var mat := _material()
+	# Shared by all four wheels, and rim-free: see `_wheel_material`.
+	var tyre_mat := _wheel_material()
 
 	var car := VehicleBody3D.new()
 	car.name = "Car"
@@ -120,7 +122,7 @@ func _bake(spec: CarSpec) -> bool:
 
 		# Parented to the wheel, not the body, so it turns with the steering and
 		# rises with the suspension travel.
-		var mi := _mesh_copy(source, mesh_name, mat)
+		var mi := _mesh_copy(source, mesh_name, tyre_mat)
 		mi.name = mesh_name
 		wheel.add_child(mi)
 
@@ -286,6 +288,41 @@ func _material() -> ShaderMaterial:
 	mat.resource_name = "colormap"
 	mat.shader = load(BODY_SHADER)
 	mat.set_shader_parameter("albedo_texture", load(COLORMAP))
+	return mat
+
+## The wheels get their own material, and the only thing different about it is
+## that it has **no rim light**.
+##
+## The rim is a fresnel edge tinted towards the sky, and `race.gd` sets that
+## colour per circuit so the car reads as belonging to the scene it is in. On the
+## bodywork that is a bright line along the silhouette. On a wheel it is the whole
+## wheel: fresnel covers almost all of a small round object seen from outside, and
+## a tyre is black, so the rim emission is the only colour on it. The tyres came
+## out **red at Monte Carlo and blue at Ardennes** — they were reporting the
+## horizon.
+##
+## A tyre is the one part of this car that should look the same everywhere.
+##
+## ## But it still needs an edge
+##
+## Killing the rim outright left a black tyre on dark tarmac, which is the
+## opposite problem: the wheels disappeared into the road, and the car's own
+## shadow decal underneath them takes what contrast was left. So the rim comes
+## back — **fixed and neutral**, a tight cool-grey line that separates a tyre from
+## the road at any hour, and `race.gd` leaves this material alone when it tints
+## the car to the sky.
+##
+## Tighter than the bodywork's, too: `rim_power` hugs the silhouette instead of
+## washing the whole wheel, which is what made a sky-tinted rim swallow a tyre in
+## the first place.
+## The figures live on `CarSpec`, because `race.gd` has to know which material to
+## leave alone when it tints the car to the sky.
+func _wheel_material() -> ShaderMaterial:
+	var mat := _material()
+	mat.resource_name = CarSpec.TYRE_MATERIAL
+	mat.set_shader_parameter("rim_color", CarSpec.TYRE_RIM)
+	mat.set_shader_parameter("rim_strength", CarSpec.TYRE_RIM_STRENGTH)
+	mat.set_shader_parameter("rim_power", CarSpec.TYRE_RIM_POWER)
 	return mat
 
 ## Copies a mesh out of the imported GLB and detaches it from it. `duplicate`

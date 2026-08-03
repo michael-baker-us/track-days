@@ -1195,6 +1195,33 @@ Three decisions behind it:
 > springs while the count runs, and at the release nothing moves that was not
 > already moving. `LEAD_IN` is long enough that the settle finishes before "3".
 
+> **The wheels get their own material, with a rim of their own.** The bodywork's
+> rim is a fresnel edge tinted to the *sky of the circuit being raced*, which is
+> what makes the car read as belonging to the scene it is in. On bodywork that is
+> a line along the silhouette. On a wheel it is the entire wheel — fresnel covers
+> almost all of a small round object seen from outside, and a tyre is black, so
+> the rim emission is the only colour on it. The tyres came out **red at Monte
+> Carlo and blue at Ardennes**: they were reporting the horizon.
+>
+> Removing the rim outright was the obvious fix and the wrong one — a black tyre
+> on dark tarmac disappears into the road, and the car's own shadow decal
+> underneath takes what contrast was left. What a tyre wants is an edge that does
+> not move: a fixed cool grey, tighter to the silhouette than the bodywork's
+> (`rim_power` 5 against 3.5) so it draws a line rather than washing the wheel.
+> The figures live on `CarSpec`, because three places have to agree — the builder
+> that makes the material, `race.gd`, which must leave this one material alone
+> when it tints the rest, and the suite that checks they have not drifted.
+
+> **Exactly one directional light may cast shadows.** Both the sun and the
+> floodlight key cast until this was found, and two directional shadow maps over
+> the same geometry is what made the car's **wheels** look wrong — and look wrong
+> *differently on every circuit*, because only the lit hours carried a second
+> light, and its angle and strength changed with the hour. A small curved object
+> shadowed twice from two directions is all banding. The **brighter** light casts,
+> rather than the key always: at sunset the sun is still the light and the masts
+> are only just switching on. A moon at 0.28 casting shadows at night was wrong on
+> its own terms as well.
+
 > **A lit lens has to survive the grade.** The lens colours were multiplied by
 > 3.2, on the reasoning that a lamp should be pushed above 1 so it reads as a lamp
 > rather than as paint. It does the opposite. The scene is tonemapped with ACES at

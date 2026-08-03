@@ -30,6 +30,27 @@ extends Resource
 ## It is deferred rather than answered: every car shipped so far is within 12% of
 ## the same size, so nothing here forces it. A kart or a truck would.
 
+## What a tyre looks like, which is deliberately **not** per car and not per
+## circuit.
+##
+## Lives here rather than in `tools/build_car.gd` because three places need to
+## agree about it: the builder that makes the material, `race.gd` — which tints
+## every *other* material on the car to the sky and must leave this one alone —
+## and the suite that checks the two have not drifted. A constant duplicated
+## across a tool and a runtime script is the kind that goes stale silently.
+##
+## The wheels used to share the bodywork's material, whose rim light is tinted to
+## the sky of the circuit being raced. On bodywork that is a line along the
+## silhouette; on a small round black object fresnel covers nearly all of it, so
+## the rim became the only colour there and **the tyres came out red at Monte
+## Carlo and blue at Ardennes**. Removing the rim outright then left black tyres
+## on dark tarmac, which is the opposite problem. This is the middle: a fixed cool
+## grey, tight to the silhouette, the same at every hour.
+const TYRE_MATERIAL := "colormap_tyre"
+const TYRE_RIM := Color(0.72, 0.76, 0.82)
+const TYRE_RIM_STRENGTH := 0.30
+const TYRE_RIM_POWER := 5.0
+
 @export var id: String = "race"
 ## Shown on the title screen, so it stays inside the built-in font — the web
 ## export has no system fallback and prints a tofu box for anything else.

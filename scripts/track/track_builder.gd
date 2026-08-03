@@ -1878,7 +1878,9 @@ func _build_lighting(root_node: Node3D, track_name: String = "") -> void:
 	sun.rotation_degrees = preset["sun_angle"]
 	sun.light_color = preset["sun_color"]
 	sun.light_energy = preset["sun_energy"]
-	sun.shadow_enabled = true
+	# Whether it casts is decided below, once the key light exists: **only one
+	# directional light in the scene may cast shadows.**
+	sun.shadow_enabled = false
 	# The default 0.1 leaves the car's own shadow detached from its tyres at this
 	# scale, which reads as the car hovering.
 	sun.shadow_normal_bias = 0.5
@@ -1922,12 +1924,27 @@ func _build_lighting(root_node: Node3D, track_name: String = "") -> void:
 		key.rotation_degrees = preset.get("key_angle", Vector3(-72.0, 20.0, 0.0))
 		key.light_color = preset.get("key_color", Color.WHITE)
 		key.light_energy = preset["key_energy"]
-		# The point of it. Without shadows this is a brightness multiplier rather
-		# than lighting, and a night circuit reads as flat whatever its energy.
-		key.shadow_enabled = true
 		key.shadow_normal_bias = 0.5
 		key.directional_shadow_max_distance = 220.0
 		root_node.add_child(key)
+
+		# **Exactly one caster, and it is the brighter light.**
+		#
+		# Both of these cast until now, and two directional shadow maps over the
+		# same geometry is what made the wheels look wrong — and look wrong
+		# *differently on every circuit*, because only the lit hours had a second
+		# light and its angle and strength changed with the hour. A small curved
+		# object shadowed twice from two directions is all banding.
+		#
+		# The brighter one wins rather than the key one always, because at sunset
+		# the sun is still the light and the masts are only just switching on. A
+		# moon at 0.28 casting shadows at night was wrong on its own terms too.
+		var key_leads: bool = key.light_energy >= sun.light_energy
+		key.shadow_enabled = key_leads
+		sun.shadow_enabled = not key_leads
+	else:
+		# Nothing else to defer to.
+		sun.shadow_enabled = true
 
 	var we := WorldEnvironment.new()
 	we.name = "WorldEnvironment"

@@ -527,7 +527,7 @@ single cone**, on every hour, on a circuit built from scratch.
 > colour added to the road is not light: it does not move with the eye, it does
 > not fall on the car, and its edge is a circle from every angle.
 
-Six ways this was wrong before, all written up in `docs/architecture.md`: lamps
+Seven ways this was wrong before, all written up in `docs/architecture.md`: lamps
 anchored where their cones could not reach the road; spacing inherited from
 scenery, leaving gaps no energy can fill; `spot_angle` read as a full angle when
 it is the half-angle; `light_energy` compared between lights at different
@@ -536,7 +536,9 @@ moonlight of the hour; and `surface_road` matching Kenney's shared `"road"`
 material name across the whole scene, which re-surfaced buildings and made them
 glow. Plus one that hid in a *measurement* rather than the code:
 `look_at_from_position` silently does nothing outside the tree, and a circuit is
-built detached.
+built detached. And one that showed up on the *car* rather than the circuit: the
+sun and the key light both cast shadows, so every lit hour double-shadowed the
+car and its wheels banded differently on every track.
 
 **The race also has a start:** 3 - 2 - 1 - GO, a number in the middle of the
 screen, with three gantry lamps lighting one at a time and turning green together.
