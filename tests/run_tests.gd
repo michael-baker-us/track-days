@@ -1464,6 +1464,39 @@ func test_the_railing_stands_on_the_deck() -> void:
 			closest >= TrackBuilder.ROAD_HALF - 0.05)
 		circuit.free()
 
+## **A ghost does not carry the car's shadow.**
+##
+## `car_shadow.gdshader` draws a soft contact patch, and all of that softness is
+## in the shader — the mesh under it is a 2 x 3.6 m rectangle. The ghost copies
+## every mesh off the car and repaints it in translucent green, so it copied that
+## one too, and what slid along the road under the ghost was a glowing rectangle.
+##
+## Skipped rather than kept with its own material: a ghost is a replay of a lap,
+## not a second car, and a contact shadow under it would claim it is really there.
+func test_the_ghost_has_no_shadow() -> void:
+	var car: Node = load("res://scenes/car/race.tscn").instantiate()
+	var shadow := car.get_node_or_null(GhostCar.SHADOW_NODE) as MeshInstance3D
+	check_true("the car has a shadow decal to leave behind", shadow != null)
+	var ghost := GhostCar.build_visual_from(car)
+	check_true("the ghost is built", ghost != null)
+	if ghost == null or shadow == null:
+		car.free()
+		return
+
+	var copied: Array = ghost.find_children("*", "MeshInstance3D", true, false)
+	check_true("and has bodywork of its own (%d meshes)" % copied.size(),
+		copied.size() > 0)
+	var carries_shadow := false
+	for node in copied:
+		if (node as MeshInstance3D).mesh == shadow.mesh:
+			carries_shadow = true
+	check_true("but not the car's shadow", not carries_shadow)
+	# One fewer mesh than the car has, which is the shadow and nothing else.
+	var on_car: Array = car.find_children("*", "MeshInstance3D", true, false)
+	check("exactly one mesh left behind", on_car.size() - copied.size(), 1)
+	ghost.free()
+	car.free()
+
 ## **A tyre looks the same on every circuit.**
 ##
 ## The wheels shared the bodywork's material, and that material carries a fresnel
@@ -6604,6 +6637,7 @@ func _physics_process(_delta: float) -> bool:
 		test_the_start_lamps_keep_their_colour()
 		test_one_light_casts_the_shadows()
 		test_tyres_do_not_change_colour()
+		test_the_ghost_has_no_shadow()
 		test_the_railing_stands_on_the_deck()
 		test_the_dark_hours_are_lit()
 		test_every_hour_lights_its_track()

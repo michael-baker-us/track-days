@@ -1249,6 +1249,14 @@ Three decisions behind it:
 > springs while the count runs, and at the release nothing moves that was not
 > already moving. `LEAD_IN` is long enough that the settle finishes before "3".
 
+> **The ghost must not copy the car's shadow.** `car_shadow.gdshader` draws a soft
+> contact patch, and all of that softness is in the shader — the mesh under it is
+> a plain 2 x 3.6 m rectangle. `GhostCar` copies every mesh off the car and
+> repaints it in translucent green, so it copied that one too, and what slid along
+> the road under the ghost was a **glowing rectangle**. It is skipped rather than
+> kept with its own material: a ghost is a replay of a lap, not a second car, and
+> a contact shadow under it would claim it is really there.
+
 > **The wheels get their own material, with a rim of their own.** The bodywork's
 > rim is a fresnel edge tinted to the *sky of the circuit being raced*, which is
 > what makes the car read as belonging to the scene it is in. On bodywork that is

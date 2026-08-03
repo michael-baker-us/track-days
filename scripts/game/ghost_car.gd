@@ -62,6 +62,10 @@ func _physics_process(_delta: float) -> void:
 ## `VehicleBody3D` parent to sit under. The wheels therefore do not steer or
 ## spin. At the distance and opacity a ghost is seen at that is not worth a
 ## physics body to fix.
+## The car's own contact-shadow decal, which a ghost must not copy. Named to match
+## `tools/build_car.gd`.
+const SHADOW_NODE := "Shadow"
+
 static func build_visual_from(car: Node) -> Node3D:
 	var holder := Node3D.new()
 	holder.name = "GhostBody"
@@ -95,6 +99,19 @@ static func _collect(
 		var here := so_far
 		if child is Node3D:
 			here = so_far * (child as Node3D).transform
+		# **Not the car's shadow.**
+		#
+		# `car_shadow.gdshader` draws a soft contact patch on a flat quad under
+		# the car, and its softness is entirely in that shader — the mesh itself
+		# is a 2 x 3.6 m rectangle. Copied like any other mesh and repainted in
+		# translucent ghost green, it stopped being a shadow and became a glowing
+		# rectangle sliding along the road under the ghost.
+		#
+		# Skipped rather than special-cased into keeping its own material: a ghost
+		# is a replay of a lap, not a second car, and a contact shadow under it
+		# would claim it is really there.
+		if String(child.name) == SHADOW_NODE:
+			continue
 		if child is MeshInstance3D:
 			var copy := MeshInstance3D.new()
 			copy.mesh = (child as MeshInstance3D).mesh
