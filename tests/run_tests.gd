@@ -468,6 +468,30 @@ func test_the_race_starts_on_the_lights() -> void:
 	# so lamps hung over the car would be behind the driver.
 	check_true("the lamps hang above the road (%.1f m)" % lights.position.y,
 		lights.position.y > 4.0)
+
+	# **Hung from the gantry, not at a guessed height.** They sat at a constant
+	# 7.4 m while the `roadStart` arch tops out below 5.65 — a metre and a half of
+	# clear air between the lights and the structure they are bolted to. The arch
+	# is measured out of the built scene now, so a taller or shorter start tile
+	# carries them with it.
+	var arch := 0.0
+	var visuals := track.get_node_or_null("RoadVisuals")
+	if visuals != null:
+		for mesh_node in TrackBuilder._mesh_instances(visuals):
+			if mesh_node.mesh == null:
+				continue
+			var where := TrackBuilder._relative_transform(mesh_node, track)
+			var box := mesh_node.mesh.get_aabb()
+			var mid: Vector3 = where * (box.position + box.size * 0.5)
+			if Vector2(mid.x - lights.position.x,
+					mid.z - lights.position.z).length() > TrackBuilder.LIGHTS_REACH:
+				continue
+			arch = maxf(arch, (where * (box.position + box.size)).y)
+	check_true("something is standing over the start line (%.2f m)" % arch,
+		arch > 2.0)
+	check_true("and the lamps hang under it, not above it (%.2f vs %.2f)"
+		% [lights.position.y, arch],
+		lights.position.y <= arch)
 	check_true("with housings", lights.get_node_or_null("Housings") != null)
 	# One node per lamp, because they light **in sequence**: a single shared
 	# material can only be all on or all off, which is a set of traffic lights

@@ -1240,6 +1240,14 @@ Three decisions behind it:
   only be all on or all off — which is a set of traffic lights rather than a
   countdown.
 
+> **The lamps are hung from the gantry, not placed at a guessed height.** They sat
+> at a constant 7.4 m while the `roadStart` arch tops out below 5.65 — a metre and
+> a half of clear air between the lights and the structure they are supposed to be
+> bolted to. A constant cannot know how tall a Kenney tile is, so the arch is
+> measured out of the scene that was just built and the bar hangs a fixed drop
+> below it. A circuit whose start tile cannot be measured falls back to the old
+> constant rather than putting the lights on the road.
+
 > **The car is held on the brakes, never `freeze`d.** `freeze` takes a
 > `RigidBody3D` out of the simulation entirely: its suspension never compresses,
 > its wheels never find the road, and the moment it is unfrozen the whole car

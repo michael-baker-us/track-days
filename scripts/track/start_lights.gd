@@ -68,7 +68,7 @@ const COUNT_FROM := 3
 const LENS_RED := Color(1.0, 0.04, 0.02)
 const LENS_GREEN := Color(0.05, 1.0, 0.12)
 const LENS_DARK := Color(0.10, 0.10, 0.11)
-const LENS_GLOW := 1.35
+const LENS_GLOW := 1.6
 
 var _elapsed := 0.0
 var _shown := -1

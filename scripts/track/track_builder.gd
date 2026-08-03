@@ -478,9 +478,18 @@ const GRID_POLE_ACROSS := 0.1725
 ## stripe did, from 0.905..0.954 to 1.046..1.095, so the trigger moves with it and
 ## keeps the same relationship to both.
 ## The start lights on the gantry: how high they hang, how far apart, and how big.
+## Fallback only, for a circuit whose start tile could not be measured.
 const LIGHTS_HEIGHT := 7.4
-const LIGHTS_SPAN := 5.4
-const LIGHTS_SIZE := 1.15
+## How far the lights hang below the underside of the arch, and how far around the
+## start line to look for it.
+const LIGHTS_DROP := 1.15
+const LIGHTS_REACH := 12.0
+## Anything shorter than this near the line is the road, not the arch.
+const GANTRY_MIN_H := 2.0
+## How far the panel stands off the face it is mounted on.
+const LIGHTS_PROUD := 0.12
+const LIGHTS_SPAN := 3.4
+const LIGHTS_SIZE := 0.9
 const LIGHTS_COUNT := 3
 const LIGHTS_HOUSING := Color(0.08, 0.08, 0.09)
 
@@ -1583,6 +1592,57 @@ func _build_road_collision(root_node: Node3D) -> void:
 	body.add_child(col)
 	_triangles = faces.size() / 3
 
+## How high anything built so far stands over a point, or 0 if nothing does.
+##
+## Used to find the start gantry's arch, which is a Kenney tile and knows its own
+## height far better than a constant here does.
+func _height_over(root_node: Node3D, point: Vector3, radius: float) -> float:
+	return _gantry(root_node, point, radius, Vector3.ZERO).x
+
+## The start gantry, measured out of the scene that was just built: how tall it
+## stands over `point`, and how far its **front face** is from that point back
+## towards the grid.
+##
+## The face is the number that matters. The arch straddles the start line, so a
+## panel placed at the line itself sits inside the structure, halfway through its
+## depth — which is what "in the middle of the fixture rather than placed on it"
+## looks like. A sign goes *on* a wall.
+##
+## Only the parts of the tile that are actually arch are measured: anything below
+## `GANTRY_MIN_H` is the road it is standing on, and including that would put the
+## face at the end of the tile rather than at the front of the structure.
+func _gantry(
+	root_node: Node3D, point: Vector3, radius: float, along: Vector3
+) -> Vector2:
+	var top := 0.0
+	var face := 0.0
+	var visuals := root_node.get_node_or_null("RoadVisuals")
+	if visuals == null:
+		return Vector2.ZERO
+	for mi in _mesh_instances(visuals):
+		if mi.mesh == null:
+			continue
+		var where := _relative_transform(mi, root_node)
+		var box := mi.mesh.get_aabb()
+		var centre: Vector3 = where * (box.position + box.size * 0.5)
+		if Vector2(centre.x - point.x, centre.z - point.z).length() > radius:
+			continue
+		var high: float = (where * (box.position + box.size)).y - point.y
+		if high < GANTRY_MIN_H:
+			continue
+		top = maxf(top, high)
+		if along == Vector3.ZERO:
+			continue
+		# How far back along the road this piece reaches, taking every corner of
+		# its box so a rotated tile is measured honestly.
+		for cx in [0.0, 1.0]:
+			for cz in [0.0, 1.0]:
+				for cy in [0.0, 1.0]:
+					var corner: Vector3 = where * (box.position
+						+ Vector3(box.size.x * cx, box.size.y * cy, box.size.z * cz))
+					face = minf(face, (corner - point).dot(along))
+	return Vector2(top, face)
+
 ## The start lights, on the gantry the grid sits under.
 ##
 ## A race used to simply *begin* — the scene loaded and the car was already free,
@@ -1608,12 +1668,39 @@ func _build_start_lights(root_node: Node3D) -> void:
 	var rig := Node3D.new()
 	rig.name = "StartLights"
 	rig.set_script(load("res://scripts/track/start_lights.gd"))
-	rig.position = at + Vector3.UP * LIGHTS_HEIGHT
+	# **Hung from the gantry, not floating at a guessed height.**
+	#
+	# `LIGHTS_HEIGHT` was a constant, and a constant cannot know how tall the
+	# `roadStart` arch actually is — so the lights hovered above the structure
+	# they are supposed to be bolted to. The arch is measured out of the scene
+	# that was just built, and the bar hangs a fixed drop below its underside.
+	var found := _gantry(root_node, at, LIGHTS_REACH, Vector3.ZERO)
+	var hang: float = (found.x - LIGHTS_DROP) if found.x > 0.0 else LIGHTS_HEIGHT
+	rig.position = at + Vector3.UP * clampf(hang, 4.5, 12.0)
+
+	# > **Mounting it on the *face* of the arch is not done, and it is the thing
+	# > that would make it read as fitted.** The panel sits at the start line,
+	# > which is the middle of the arch's depth, so it is inside the structure
+	# > rather than on it — a sign hung through a wall instead of on it.
+	# >
+	# > `_gantry` will report the front face when given a direction along the
+	# > road, and it was tried: it moved the panel 0.12 m, because measuring
+	# > "furthest back" across the arch's own mesh boxes does not find the face
+	# > the grid sees. What that needs is the `roadStart` piece's own geometry
+	# > understood — which corner of which sub-mesh is the front — rather than an
+	# > extent taken over the lot.
 	rig.rotation.y = _yaw_along(tan)
 	root_node.add_child(rig)
 
 	var housings := SurfaceTool.new()
 	housings.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# A dark backing board behind the lamps, which is what a real gantry panel is
+	# and what makes the lamps *read*. Tucked under the arch they are seen against
+	# whatever the sky is doing beyond it, and a lit lens against a bright sky is
+	# a smaller contrast than the same lens against black.
+	_box(housings, Vector3(0.0, 0.0, LIGHTS_SIZE * 0.2),
+		Vector3(LIGHTS_SPAN + LIGHTS_SIZE * 0.85, LIGHTS_SIZE * 1.6,
+			LIGHTS_SIZE * 0.18))
 	# One lamp per node rather than one mesh for the row, because they light **in
 	# sequence** — three going on one at a time as the count runs down, then all
 	# three turning green together. A single shared material can only be all on or
