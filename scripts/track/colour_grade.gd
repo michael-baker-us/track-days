@@ -50,15 +50,18 @@ extends RefCounted
 ##
 ## ## Authored and derived grades
 ##
-## `GRADES` holds the looks that have been **art-directed**. Everything else is
-## *derived* from the `SkyPreset` scalars it used to be graded by, and the
-## conversion is exact — `slope = brightness * contrast`, `offset = 0.5 *
-## (1 - contrast)`, which is Godot's own brightness-then-contrast arithmetic
-## rearranged. So a look nobody has graded yet renders **pixel-identical** to how
-## it rendered before this file existed, and the suite asserts it.
+## `GRADES` holds the looks that have been **art-directed**, which is now all six
+## of them. Anything absent is *derived* from the `SkyPreset` scalars it would
+## otherwise be graded by, and the conversion is exact — `slope = brightness *
+## contrast`, `offset = 0.5 * (1 - contrast)`, which is Godot's own
+## brightness-then-contrast arithmetic rearranged.
 ##
-## That is what makes the migration safe to do in one commit and the art
-## direction safe to do one look at a time.
+## That fallback is what let the six be graded **one at a time**: an ungraded look
+## rendered pixel-identical to how it did before this file existed, so the grading
+## system could land in one commit and the art direction in the next. It stays
+## because it is still the right answer for a *new* look — a seventh hour renders
+## as its scalars say until someone sits down with it — and because the suite
+## checks the arithmetic either way.
 
 ## Cube resolution. 16 is the low end of what film LUTs use (17 and 33 are the
 ## common sizes) and it is chosen for the web build: 16 cubed is 4096 texels and
@@ -67,7 +70,11 @@ extends RefCounted
 ## without banding. Revisit only if a grade gains a sharp knee.
 const SIZE := 16
 
-## Art-directed looks. Anything absent is derived; see the class comment.
+## The six looks, art-directed, in the order the day runs — the same order
+## `CircuitLook.ORDER` cycles them in, so this file reads as noon to midnight.
+##
+## Nothing is derived any more. `of()` still falls back to `from_bcs` for a look
+## that has none, which is what a *new* look gets before anyone grades it.
 const GRADES := {
 	# Ardennes at noon. Crisp and sunny without going grimy: the offset crushes
 	# red and green further than blue, so the shade under the trees goes cool,
@@ -79,6 +86,71 @@ const GRADES := {
 		"offset": Vector3(-0.055, -0.045, -0.02),
 		"power": Vector3(1.0, 1.0, 1.0),
 		"saturation": 1.38,
+	},
+	# Flat light, and **the one grade here that the three scalars could not have
+	# expressed at all.** Overcast has no blacks: light arrives from the whole
+	# sky, so nothing is in shadow of anything. That is a *positive* offset — the
+	# bottom of the range lifted while the top stays where it is — and contrast
+	# below 1 is not the same move, because it drags the highlights down with it
+	# and turns an overcast day into a foggy one.
+	#
+	# So the shadows go milky, the slope comes down a hair to close the range from
+	# the other end, and saturation drops below neutral. The tint is the faintest
+	# cool, strongest in the lifted shadows, which is the sky being the only light
+	# there is. It is the flattest of the six on purpose: it is what the other five
+	# are read against.
+	"overcast": {
+		"slope": Vector3(0.98, 0.985, 1.00),
+		"offset": Vector3(0.028, 0.030, 0.036),
+		"power": Vector3(1.0, 1.0, 1.0),
+		"saturation": 0.94,
+	},
+	# Suzuka under weather. **Deliberately not a split** — the only look here with
+	# no warmth anywhere, because a storm has no warm light source in it. Blue
+	# leads the slope and red is crushed hardest by the offset, so both ends of the
+	# range go cool and the image reads one cold colour rather than two.
+	#
+	# The power is what makes it heavy: above 1 it darkens the midtones while black
+	# and white stay pinned, so the mass of the frame sinks without the road going
+	# to mud or the kit losing its white. Saturation sits well under neutral —
+	# already true of the hour it replaces, and the one part of that grade worth
+	# keeping.
+	"storm": {
+		"slope": Vector3(1.03, 1.05, 1.065),
+		"offset": Vector3(-0.035, -0.032, -0.026),
+		"power": Vector3(1.06, 1.05, 1.04),
+		"saturation": 0.86,
+	},
+	# Monte Carlo at sunset, and the widest split of the daylight hours. Warm light
+	# from a low sun against shade lit only by the sky, so the slope *drops* blue
+	# below 1 rather than lifting red: the sunset sky already has its red channel
+	# at the top of the range, and lifting further would only flatten the gradient
+	# it is made of. Warming from the other end costs nothing and keeps the sky.
+	#
+	# Blue is left almost uncrushed at the bottom, so the crossover lands at about
+	# a fifth of the range — everything darker than the road surface goes cool,
+	# everything lighter goes warm. Saturation comes **down** from the 1.45 this
+	# hour used to carry: at that height the split had nothing left to do, the
+	# stands went fluorescent and the white kit went pink.
+	"evening": {
+		"slope": Vector3(1.12, 1.05, 0.92),
+		"offset": Vector3(-0.045, -0.038, -0.005),
+		"power": Vector3(1.0, 1.0, 1.0),
+		"saturation": 1.26,
+	},
+	# The blue hour, and the same shape as `night` an hour early. The sun is gone
+	# but the sky is still the brightest thing in frame, so the split is centred on
+	# **mid grey**: below it everything is sky-lit and cool, above it is the last
+	# warm light and the first of the lamps. Green is carried near red rather than
+	# left to lag, which is what stops the white kit going magenta under a violet
+	# sky. The shadows are lifted well clear of where this hour used to crush them
+	# — parkland at dusk that reads as one black shape is not a look, it is a
+	# missing one.
+	"dusk": {
+		"slope": Vector3(1.14, 1.12, 1.08),
+		"offset": Vector3(-0.05, -0.048, -0.02),
+		"power": Vector3(1.0, 1.0, 1.0),
+		"saturation": 1.18,
 	},
 	# La Sarthe in the small hours, and the strongest statement of the six. The
 	# circuit is lit by warm sodium and sits in a deep blue night, so the split is

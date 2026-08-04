@@ -1072,10 +1072,36 @@ the same two dials under different names.
 brightness-then-contrast arithmetic is `colour * brightness`, then
 `mix(0.5, colour, contrast)`, which expands to a slope of `brightness * contrast`
 and an offset of `0.5 * (1 - contrast)`. So a look nobody has art-directed yet
-renders pixel-identical to how it rendered before the file existed. `GRADES`
-holds the looks that *have* been art-directed — `bright` and `night` — and
-everything else is derived. That is what let the grading system and the art
-direction change in one commit: four of the six looks are provably untouched.
+renders pixel-identical to how it rendered before the file existed.
+
+That fallback is what let the six looks be graded **one at a time**: the grading
+system landed in one commit with `bright` and `night` authored and the other four
+provably untouched, and the remaining four followed in the next. All six are
+authored now, so the conversion is checked directly against Godot's own
+arithmetic rather than through an unauthored look. It stays because it is still
+the right answer for a *seventh* hour — a new look renders as its scalars say
+until someone sits down with it.
+
+> **The six are not all split the same way, and two are not split at all.**
+> `bright`, `evening`, `dusk` and `night` are the hours with a sun in them and all
+> carry cool shadows against warm highlights, at increasing strength. `storm` is
+> cool at *both* ends on purpose — a storm has no warm light source in it — and
+> leans on `power` above 1 to sink the midtones while black and white stay pinned.
+>
+> `overcast` is the one that could not have been expressed by the three scalars at
+> all: its offset is **positive**. Flat light casts nothing, so the shadows are
+> lifted rather than crushed, and a low contrast is not the same move — it drags
+> the highlights down with the shadows up, which is a fog rather than an overcast
+> day. The suite pins the sign, because it is the whole look.
+>
+> Two things learned tuning these by eye. **Global saturation above about 1.3
+> starts colouring the white kit**, which is the kit the whole palette is read
+> against — the hour it used to sit at 1.45 had pink grandstands and lavender
+> guardrails, and pulling it down to 1.26 while widening the per-channel split
+> gave a warmer picture with the whites intact. And **warming an hour whose sky is
+> already at the top of the range is done by dropping blue, not lifting red**:
+> sunset's red channel is near 1.0 across the whole sky, so a red slope only
+> flattens the gradient the sky is made of.
 
 > **Two traps, both found by the suite.**
 >
@@ -1102,6 +1128,21 @@ volumetric fog, SSIL, SDFGI and depth of field are not.
 > An ungraded frame is a **plausible** frame — merely flatter than it should be —
 > so nothing catches this failing by looking at it. `tests/run_tests.gd` asserts
 > the LUT reaches the scene the player actually gets.
+
+**The Compatibility renderer samples the table, and that was checked rather than
+assumed.** Running the game under `--rendering-method gl_compatibility` and
+comparing region means against the Forward+ render puts every graded region within
+one or two of 255, in the same direction and by the same amount. The renderers do
+differ — the white kit sits about ten points brighter under Compatibility — but
+that difference is present in the *ungraded* frame too, so it is ambient and
+tonemapping, not the grade. This mattered enough to check first: if grading had
+not survived the platform, most of M18 would have needed rethinking.
+
+> A throwaway `SceneTree` script that builds one layout under each look, frames it
+> from the chase camera and a high wide shot, and saves a PNG per look per
+> renderer — the same `_diag_*.gd` pattern the handling measurements used. Grades
+> are data and the LUT is built at load, so the loop is edit, run, look, with no
+> rebake in it. Deleted once the looks were settled.
 
 ### Tyre marks: what shape, where, and for how long
 

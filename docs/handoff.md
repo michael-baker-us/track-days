@@ -11,7 +11,7 @@ Paste this into a fresh session:
 > update the handoff before you finish.
 
 Swap the next action for a specific step if you want a different one — e.g.
-"…continue M18, but do the wind step (3) rather than grade tuning."
+"…continue M18, but do the particles step (5) rather than wind."
 
 Read `docs/roadmap.md` M18 for the *why*; this is only the state of play and the
 next action. Everything below assumes:
@@ -24,62 +24,89 @@ GODOT=/Users/michael.baker/Downloads/Godot.app/Contents/MacOS/Godot
 
 ## Where things stand
 
-**Step 1 (colour grade) is done and the suite is green — 1900 checks.**
+**Steps 1 and 2 (the grade) are done and the suite is green — 1919 checks.**
 
-| File | What it is |
+Step 1 shipped as `39e465b`. Step 2 is the working diff: `scripts/track/colour_grade.gd`
+and `tests/run_tests.gd`, plus the two docs.
+
+| File | What changed in step 2 |
 | --- | --- |
-| `scripts/track/colour_grade.gd` | New. ASC CDL grades, the LUT builder, the cache. Start here. |
-| `scripts/track/circuit_look.gd` | Gained `name_of()` — the look's *key*, which `resolve()` cannot give back. |
-| `scripts/track/track_builder.gd` | BCS scalars pinned neutral; `set_meta("look", ...)`; new static `grade_scene()` beside `surface_road`. |
-| `scripts/game/race.gd` | Calls `TrackBuilder.grade_scene(track)` on load. |
-| `tests/run_tests.gd` | Four new tests; `test_shipped_circuits_carry_their_own_hour` updated for neutral scalars. |
-| `scenes/track/*.tscn` | Rebaked — the environment is baked in, so a builder change needs `tools/build_track.gd`. |
+| `scripts/track/colour_grade.gd` | `GRADES` now holds **all six** looks, in `CircuitLook.ORDER` so it reads as a day. `from_bcs` is kept as the fallback for a *future* look. |
+| `tests/run_tests.gd` | `test_the_grade_migration_is_exact` → `test_the_bcs_conversion_is_exact` (checks the conversion directly, since there is no unauthored look left to check through). Split test extended to the four sunlit hours. New `test_the_sunless_hours_are_authored_flat`. |
 
-### The one thing not yet verified
+**No rebake was needed and none is needed for a grade change.** Grades are data,
+the LUT is built at load, and the `.tscn` files carry only the look's *name*. The
+loop is: edit `GRADES`, run, look.
 
-**Nobody has looked at it.** The suite proves the LUT is correct and reaches the
-scene; it cannot prove the grade looks good, and it cannot prove the
-Compatibility renderer samples a `Texture3D` LUT the way Forward+ does. Both need
-eyes:
+### Verified this pass
+
+- **All six looked at**, chase framing and a high wide shot, against both the
+  ungraded frame and the derived grade each look used to have.
+- **The Compatibility renderer samples the table.** Same frames under
+  `--rendering-method gl_compatibility` land within 1–2 of 255 of the Forward+
+  versions, in the same direction. The renderers do differ — the white kit is
+  ~10 points brighter under Compatibility — but that gap is in the *ungraded*
+  frame too, so it is ambient and tonemapping, not the grade. **This closes step
+  1's open risk:** grading survives the platform, so the rest of M18 can lean on
+  it.
+
+### The one thing still not checked
+
+**Nobody has seen it in an actual browser.** The web export builds clean, but the
+Chrome available in this environment reports `WebGL2 - Check web browser
+configuration and hardware support` before Godot starts, so the page never ran.
+That is the browser, not the build.
 
 ```bash
-"$GODOT" --path .                      # desktop, Forward+
 "$GODOT" --headless --path . --export-release "Web" build/web/index.html
-cd build/web && python3 -m http.server 8777    # then compare in a browser
+cd build/web && python3 -m http.server 8777    # then open localhost:8777
 ```
 
-Ardennes is `bright`, La Sarthe is `night` — the two authored looks. Monte Carlo,
-Suzuka and the other two are derived and should look **exactly** as they did
-before; if any of them shifted, the migration is wrong and that is a bug, not a
-taste question.
-
-If the web build renders ungraded, the fallback is a 1D `GradientTexture1D` or
-folding the grade back into the three scalars for web only. Do not discover this
-late — it decides how much of M18 depends on grading.
+Worth five minutes next time someone is at a machine with a working WebGL2
+context. The residual risk is small — Compatibility is the same Godot renderer
+the web build uses, and the only web-specific unknown left is WebGL2's `sampler3D`
+— but it is not zero.
 
 ---
 
 ## Next action
 
-**Tune `bright` and `night` by eye, then author the remaining four.**
+**Step 3: wind.** One vertex shader on trees, flags, banners and roadside grass,
+phase driven by world position so nothing moves in lockstep. It survives the trees
+being `MultiMesh` because the displacement is per-vertex in world space and never
+touches the instance transform.
 
-Grades are data in `ColourGrade.GRADES`. Editing them needs no rebake — the LUT
-is built at load — so the loop is: edit, run the game, look.
+The cheapest large win left in the milestone, and the one that changes what the
+game *is* rather than what it looks like: a static tree reads as a prop, a moving
+one reads as a place.
 
-- `slope` colours the **highlights** (multiply, leaves black alone).
-- `offset` colours the **shadows** (add, washes out toward white).
-- `power` moves the **midtones** only. Currently `Vector3.ONE` everywhere; note
-  that leaving it at ONE is what keeps derived grades bit-exact, so only authored
-  grades should touch it.
-- `saturation` last, about a flat channel mean.
+---
 
-Moving a look out of "derived" and into `GRADES` is what removes it from
-`test_the_grade_migration_is_exact`. That is fine and expected — but the test
-asserts at least one derived look remains, so if all six get authored, retire the
-test rather than leave it passing vacuously.
+## How to look at a visual change without a person in the room
 
-Then continue down M18: **wind** (step 2) is the next item and is the cheapest
-large win in the milestone.
+Grading was tuned this way and it worked well enough to write down. A throwaway
+`_diag_*.gd` `SceneTree` script — the same pattern the handling measurements used
+— that:
+
+1. builds **one** layout under each look, so the look is the only variable;
+2. frames it from two fixed poses (the chase camera's own offsets, and a high wide
+   shot where sky and ground read against each other);
+3. renders each frame in several variants — graded, the previous grade, ungraded —
+   so the change is visible rather than merely present;
+4. saves a PNG per combination, which can then be read directly.
+
+Two things it needs. **Run it windowed** — no `--headless`, there is no rendering
+server to read back from — and `await RenderingServer.frame_post_draw` before
+`root.get_texture().get_image()`, after ~8 frames for shadows and sky to settle.
+Passing the output directory as a `-- <dir>` user arg is what lets the same script
+be re-run under `--rendering-method gl_compatibility` and the two compared.
+
+A second tiny script that prints region means from those PNGs is worth the ten
+lines: "the whites went from 220/198/194 to 221/190/167" is a decision, "it looks
+warmer" is not.
+
+Delete both when the step closes — they are throwaway, and they get packed into
+the web export if they are still sitting in the project root when it runs.
 
 ---
 
@@ -88,7 +115,8 @@ large win in the milestone.
 Each is independently shippable, suite-green, and a clean place to clear context.
 
 1. ~~Colour grade — the LUT system + two authored looks.~~ **Done.**
-2. **Grade tuning** — the other four looks authored, all six checked on web.
+2. ~~Grade tuning — the other four authored, all six checked, Compatibility
+   verified.~~ **Done.**
 3. **Wind** — one vertex shader on trees, flags, banners, roadside grass.
    Phase from world position so nothing moves in lockstep. Survives `MultiMesh`
    because displacement is per-vertex and never touches the instance transform.
@@ -101,9 +129,12 @@ Each is independently shippable, suite-green, and a clean place to clear context
 7. **Crowd** — billboard spectators in the stands that are currently empty.
 8. **Marker boards** — braking and apex markers placed from `Compiled.corners`.
 
-Palette consolidation (a look owning the colours `SceneryTheme`, `SkyPreset` and
-`RoadSurface` each pick separately) is unscheduled and belongs before the looks
-multiply.
+**Palette consolidation** — a look owning the colours `SceneryTheme`, `SkyPreset`
+and `RoadSurface` each pick separately — is still unscheduled, and grading the six
+made the case for it stronger. `evening` is the clearest: the ground stays a flat
+olive under a sunset sky because `SceneryTheme` chose it without knowing the hour,
+and no grade can fix one object's albedo without moving the whole frame. It
+belongs before the looks multiply.
 
 ---
 
@@ -120,3 +151,18 @@ multiply.
 - **Godot clamps nothing between contrast and saturation.** Clamping there costs
   about 0.03 in the shadows and breaks the exact migration. Found by the suite,
   written up in `docs/architecture.md`.
+
+## What tuning by eye taught, in step 2
+
+- **Global saturation above about 1.3 starts colouring the white kit**, which is
+  what the rest of the palette is read against. `evening` sat at 1.45 and had pink
+  grandstands and lavender guardrails; 1.26 with a wider per-channel split is
+  warmer *and* keeps the whites.
+- **To warm an hour whose sky is already at the top of the range, drop blue rather
+  than lift red.** Sunset's red channel is near 1.0 across the whole sky, so a red
+  slope only flattens the gradient the sky is made of.
+- **A negative offset cannot be undone by anything downstream.** Several looks
+  crush the tarmac to pure black, and `overcast`'s positive offset only lifts it
+  to about 8/255 because the road's albedo is genuinely near zero. If the road
+  needs to hold detail in the dark hours that is a material change, not a grade
+  change — which is M19's road detail pass, not this one.

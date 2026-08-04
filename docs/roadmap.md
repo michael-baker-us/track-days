@@ -799,7 +799,7 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > cheap work and the identity-forming work turned out to be the same work.**
 > Realism is not the axis this game gets better along.
 
-**Status: step 1 done — the grading system and two authored looks.**
+**Status: steps 1 and 2 done — the grading system, and all six looks authored.**
 
 1. **A colour grade per look, as a real LUT.** `CircuitLook` already pairs an hour
    with a place; it gains a third thing, and that thing is the signature.
@@ -811,21 +811,37 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > and a slope that lifts it.
 >
 > **The migration is exact and the suite proves it.** Godot's
-> brightness-then-contrast arithmetic rearranges into a slope and an offset, so
-> the four looks nobody has art-directed render pixel-identical to how they did
-> when the grade was three `Environment` scalars. That is what allowed the
-> grading system and the art direction to change in one commit.
+> brightness-then-contrast arithmetic rearranges into a slope and an offset, so a
+> look nobody has art-directed renders pixel-identical to how it did when the
+> grade was three `Environment` scalars. That is what allowed the grading system
+> and the art direction to change in one commit — and then the remaining four
+> looks to be graded in the next, against a baseline that had provably not moved.
 >
-> `bright` and `night` are authored; `evening`, `dusk`, `storm` and `overcast`
-> are still derived and are the next tuning pass. The full write-up, including the
-> two traps the suite caught, is in `docs/architecture.md` under "The colour
-> grade".
+> **All six are authored.** The full write-up, including the two traps the suite
+> caught and what tuning them by eye taught, is in `docs/architecture.md` under
+> "The colour grade".
 >
 > **Not done: the palette consolidation.** Ground colour still lives in
 > `SceneryTheme`, sky and fog in `SkyPreset`, road in `RoadSurface`, and none of
 > the three consults the others. Deliberately left out of this step — it is a
 > refactor with no visual output, and mixing it into the change that carried a
-> provable migration would have made both harder to review.
+> provable migration would have made both harder to review. It is now the thing
+> most visibly holding the looks back: `evening`'s ground stays a flat olive under
+> a sunset sky because `SceneryTheme` picked it without knowing what hour it is.
+
+2. **The remaining four looks, art-directed.** `evening`, `dusk`, `storm` and
+   `overcast` off the derived fallback and into `GRADES`.
+
+> **Done, and the six do not all take the same shape.** Four hours have a sun in
+> them and split their tones; `storm` is cold at both ends because a storm has no
+> warm light in it; `overcast` **lifts its shadows with a positive offset**, which
+> is the one grade here the three scalars could not have expressed at all.
+>
+> **Grading survives the Compatibility renderer, and that is now checked rather
+> than assumed** — the same frames rendered under `--rendering-method
+> gl_compatibility` land within one or two of 255 of the Forward+ versions. This
+> was the open risk of step 1: if the table had not been sampled on the web
+> renderer, most of this milestone would have needed rethinking.
 
 > `ideas.md` left this open — "a global saturation push, or a hand-authored LUT
 > per circuit? The second is much stronger and is also the point at which someone
@@ -847,7 +863,7 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > assembled rather than authored. A look should **own a palette** those three draw
 > from.
 
-2. **Wind.** One vertex shader, applied to trees, flags, banners and the roadside
+3. **Wind.** One vertex shader, applied to trees, flags, banners and the roadside
    grass, phase driven by world position so nothing moves in lockstep.
 
 > The highest ratio of *alive* to *complexity* in the entire project. No CPU cost,
@@ -857,7 +873,7 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 >
 > A static tree reads as a prop. A tree that moves reads as a place.
 
-3. **Speed you can feel.** Camera shake that rises with speed and with surface,
+4. **Speed you can feel.** Camera shake that rises with speed and with surface,
    a screen-space speed effect at the frame edges, and roadside density that
    streams.
 
@@ -870,7 +886,7 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > posts, verge lines and lighting columns passing at a rate are most of what sells
 > pace in an arcade racer, and they cost geometry that is already placed.
 
-4. **Particles, from data the game already has.** Tyre spray, dust and grass
+5. **Particles, from data the game already has.** Tyre spray, dust and grass
    clippings off the wheels; colour and behaviour taken from `RoadSurface`.
 
 > `RoadSurface` already answers this question for a different consumer:
@@ -884,7 +900,7 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > unsupported there anyway. This is a case where the constrained path is also the
 > simple one.
 
-5. **Weather that does something.** `storm` is currently an hour with a grey
+6. **Weather that does something.** `storm` is currently an hour with a grey
    grade. It becomes rain: a screen-space droplet layer, spray thrown from the
    wheels, and a wet road — which is a **roughness change**, not a new shader.
 
@@ -894,7 +910,7 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > surface, and `sparkle` already proved that punching roughness holes and letting
 > the real sun answer beats drawing the highlight.
 
-6. **The grandstands are empty, and that reads as abandoned.** Billboard
+7. **The grandstands are empty, and that reads as abandoned.** Billboard
    spectators with a shimmer, and marshal posts with flags.
 
 > Environmental storytelling, and the cheapest kind: an impostor crowd is a
@@ -902,7 +918,7 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > the renderer it runs on. The grandstands are already placed and already lit. A
 > full stand is the difference between a race and a test session.
 
-7. **Boards that make the circuit readable.** Braking markers, apex markers and
+8. **Boards that make the circuit readable.** Braking markers, apex markers and
    corner numbering, placed from the centreline the way everything trackside
    already is.
 

@@ -295,43 +295,44 @@ func _godot_bcs(colour: Color, grade: Vector3) -> Color:
 	v = Vector3(mean, mean, mean).lerp(v, grade.x)
 	return Color(clampf(v.x, 0.0, 1.0), clampf(v.y, 0.0, 1.0), clampf(v.z, 0.0, 1.0))
 
-## **The load-bearing test of the whole change.** A look nobody has art-directed
-## has to render exactly as it did when the grade was three `Environment` dials.
+## **The test the whole change was made safe by.** `from_bcs` claims to be Godot's
+## brightness/contrast/saturation exactly, not approximately, and that claim is
+## what let the grading system land in one commit and the art direction in the
+## next: until a look was authored it rendered pixel-identical to how it had
+## before `ColourGrade` existed.
 ##
-## Without this the migration is a claim. With it, `bright` and `night` can be
-## pushed as far as they need to go while the other four are provably untouched —
-## which is what makes it safe to change the grading system and the art direction
-## in the same commit.
+## All six looks are authored now, so this no longer has an unauthored one to
+## check *through* — it checks the conversion directly instead, against every
+## grade `SkyPreset` carries. That is the same arithmetic and it stays load-bearing
+## for the same reason: a seventh hour added tomorrow renders as its scalars say
+## until someone sits down with it.
 ##
 ## Sampled on a lattice rather than at a handful of hand-picked colours, because
 ## the two implementations diverge in *shadows and highlights* if they diverge at
 ## all — clamping, and the order of the multiply against the lerp — and a mid-grey
 ## test would pass through either mistake.
-func test_the_grade_migration_is_exact() -> void:
-	var ungraded := 0
-	for look in CircuitLook.LOOKS:
-		if ColourGrade.GRADES.has(look):
-			continue
-		ungraded += 1
-		var bcs: Vector3 = SkyPreset.named(
-			String(CircuitLook.named(look)["sky"])
-		)["grade"]
-		var derived := ColourGrade.of(look)
+func test_the_bcs_conversion_is_exact() -> void:
+	for hour in SkyPreset.PRESETS:
+		var bcs: Vector3 = SkyPreset.named(String(hour))["grade"]
+		var converted := ColourGrade.from_bcs(bcs)
 		var worst := 0.0
 		for r in 5:
 			for g in 5:
 				for b in 5:
 					var src := Color(r / 4.0, g / 4.0, b / 4.0)
 					var was := _godot_bcs(src, bcs)
-					var now := ColourGrade.apply(src, derived)
+					var now := ColourGrade.apply(src, converted)
 					worst = maxf(worst, absf(was.r - now.r))
 					worst = maxf(worst, absf(was.g - now.g))
 					worst = maxf(worst, absf(was.b - now.b))
-		check_near("%s grades exactly as it used to" % look, worst, 0.0, 0.0005)
+		check_near("%s converts exactly" % hour, worst, 0.0, 0.0005)
 
-	# If someone art-directs every look, this test stops proving anything and
-	# should be retired rather than left passing vacuously.
-	check_true("there is still an underived look to check", ungraded > 0)
+	# The fallback is for a look nobody has reached yet, and every look that ships
+	# has been reached. A shipped circuit quietly taking the converted scalars
+	# would look plausible and be a lost grade.
+	for look in CircuitLook.LOOKS:
+		check_true("%s is art-directed rather than derived" % look,
+			ColourGrade.GRADES.has(look))
 
 ## The LUT has to *be* the grade, not merely resemble it — and the axis order is
 ## the thing that goes wrong.
@@ -393,13 +394,18 @@ func test_the_race_scene_is_graded() -> void:
 
 ## The authored grades have to actually do the thing they were authored for.
 ##
-## `bright` and `night` exist to put **cool shadows against warm highlights** —
-## the one operation the three scalars they replaced could not express, and the
-## reason this milestone starts here. Asserting the split rather than the
-## numbers: the values will be tuned by eye and should be free to move, but a
-## tuning pass that accidentally flattens the split has undone the point.
+## The four hours with a **sun in them** — noon, sunset, dusk and the lit night —
+## exist to put cool shadows against warm highlights, the one operation the three
+## scalars they replaced could not express and the reason this milestone starts
+## here. Asserting the split rather than the numbers: the values are tuned by eye
+## and should be free to move, but a tuning pass that accidentally flattens the
+## split has undone the point.
+##
+## `overcast` and `storm` are **deliberately absent** and are checked below
+## instead. Both are authored to have no warm end at all, so requiring a split of
+## them would be requiring the wrong picture.
 func test_authored_grades_split_the_tones() -> void:
-	for look in ["bright", "night"]:
+	for look in ["bright", "evening", "dusk", "night"]:
 		check_true("%s is art-directed" % look, ColourGrade.GRADES.has(look))
 		var grade := ColourGrade.of(look)
 		# Saturation off, so what is measured is the tone split and not the
@@ -410,6 +416,39 @@ func test_authored_grades_split_the_tones() -> void:
 		var highlight := ColourGrade.apply(Color(0.88, 0.88, 0.88), flat)
 		check_true("%s shadows go cool" % look, shadow.b > shadow.r)
 		check_true("%s highlights go warm" % look, highlight.r > highlight.b)
+
+## The two hours with no sun in them, which are authored *against* the split.
+##
+## `overcast` is the one grade here that the three scalars could not have
+## expressed either — its shadows are **lifted, not crushed**, because flat light
+## casts nothing. A positive offset is not a low contrast: contrast below 1 pulls
+## the highlights down with the shadows up, which is a fog, not an overcast day.
+## So the sign of the offset is the whole look and is worth pinning.
+##
+## `storm` is cool at *both* ends on purpose — a storm has no warm light source in
+## it — and leans on `power` above 1 to sink the midtones while black and white
+## stay pinned. Both are desaturated, which is what separates them from the four
+## above at a glance.
+func test_the_sunless_hours_are_authored_flat() -> void:
+	var overcast := ColourGrade.of("overcast")
+	var lift: Vector3 = overcast["offset"]
+	check_true("overcast lifts its shadows rather than crushing them",
+		lift.x > 0.0 and lift.y > 0.0 and lift.z > 0.0)
+
+	for look in ["overcast", "storm"]:
+		var grade := ColourGrade.of(look)
+		check_true("%s sits under neutral saturation" % look,
+			float(grade["saturation"]) < 1.0)
+		var flat := grade.duplicate()
+		flat["saturation"] = 1.0
+		var highlight := ColourGrade.apply(Color(0.88, 0.88, 0.88), flat)
+		check_true("%s keeps its highlights cool" % look, highlight.b > highlight.r)
+
+	# Above 1, so the midtones sink. Below 1 would lift them and make the storm
+	# hazy, which is the mistake this is here to catch.
+	var weight: Vector3 = ColourGrade.of("storm")["power"]
+	check_true("storm carries its weight in the midtones",
+		weight.x > 1.0 and weight.y > 1.0 and weight.z > 1.0)
 
 ## Each shipped circuit is baked at **its own hour**, and the whole preset has to
 ## survive the bake — not just the grade.
@@ -6974,10 +7013,11 @@ func _physics_process(_delta: float) -> bool:
 		test_partial_throttle_reaches_the_engine()
 		test_the_steering_curve_leaves_full_lock_alone()
 		test_shipped_circuits_carry_their_own_hour()
-		test_the_grade_migration_is_exact()
+		test_the_bcs_conversion_is_exact()
 		test_the_lut_is_the_grade_sampled()
 		test_the_race_scene_is_graded()
 		test_authored_grades_split_the_tones()
+		test_the_sunless_hours_are_authored_flat()
 		test_every_sky_preset_is_complete()
 		test_circuits_have_a_horizon()
 		test_night_lights_the_columns_it_needs()
