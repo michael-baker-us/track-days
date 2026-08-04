@@ -24,8 +24,9 @@ GODOT=/Users/michael.baker/Downloads/Godot.app/Contents/MacOS/Godot
 
 ## Where things stand
 
-**Steps 1 to 6 are done. The suite is green — 2082 checks. The tyre spray and
-the rain are the working diff; everything before them is committed.**
+**Steps 1 to 6 are done, and step 7 is done apart from its marshal posts. The
+suite is green — 2118 checks. The tyre spray, the rain and the crowd are the
+working diff; everything before them is committed.**
 
 Step 1 (the grading system) shipped as `39e465b`, step 2 (all six looks authored)
 as `bd3d09f`, step 3 (wind) as `5c15be2`, step 4's camera shake as `999d288` and
@@ -41,7 +42,10 @@ its speed lines as `40542ce`.
 | `scripts/game/race.gd` | Hands the number to the spray and the veil, the way it already hands the hour to the headlights. |
 | `tools/build_car.gd`, `tools/build_ui.gd` | An empty `TyreSpray` beside `TyreMarks`; a `RainVeil` between the speed lines and the readouts. |
 | `scenes/car/*.tscn`, `scenes/ui/hud.tscn`, `scenes/race.tscn`, `scenes/track/*.tscn` | Rebaked. |
-| `tests/run_tests.gd` | Two new tests, 50 checks. |
+| `scripts/track/track_builder.gd` | Step 7 as well: `_scenery_crowd`, `spectator_mesh`, `_seat_top`, and the `CROWD_*` table. `_place_prop` now returns whether it placed anything. |
+| `assets/shaders/wind.gdshader` | One line: `* COLOR.rgb`, so a `MultiMesh` instance can carry its own colour. Free for the trees and flags, which have no instance colours. |
+| `scenes/track/*.tscn` | Rebaked again for the crowd. |
+| `tests/run_tests.gd` | Three new tests, 86 checks. |
 
 ### The rebake rule for these two
 
@@ -78,6 +82,19 @@ configure themselves at load. It is the node and the metadata that are baked.
   back onto the wheels, `local_coords` turned on, the contact-patch offset
   removed, tarmac reading `grit` again, the rain lean pinned to its at-rest
   value, and `wetted()` editing the shared table instead of a copy.
+- **The floating spectators are fixed, and the fix came from counting rather than
+  looking.** Reported from play: people in mid-air beside the paddock. Measuring
+  every spectator against the nearest stand found 15 to 21 adrift per circuit, up
+  to 21.9 m out — and *zero* on La Sarthe, whose paddock is straight, which is
+  why three separate renders had looked fine. The road was being sampled once per
+  seat instead of once per stand, so the columns followed the centreline while
+  the stand stayed a rigid box. The suite now asserts it, and the assertion
+  reproduces the bug exactly when the old code is put back.
+- **The crowd was got into the seats by measuring, after two renders of it in the
+  wrong place.** Guessing the rake from the stand's bounding box put it on the
+  roof, then inside the back wall. Reading the model's own vertices per row put it
+  on the tiers. The suite now asserts the height band, which is the check that
+  would have caught either failure without a render at all.
 - **Grep the suite output for `SCRIPT ERROR`, not just the pass line.** A
   malformed `%` in a new check aborted its whole test function and the run still
   printed `PASS` — with a check count *equal* to the previous run, which is what
@@ -138,34 +155,32 @@ configure themselves at load. It is the node and the metadata that are baked.
 
 ## Next action
 
-**Step 7: the grandstands are empty, and that reads as abandoned.** Billboard
-spectators with a shimmer, and marshal posts with flags.
+**Marshal posts, and then step 8's marker boards — together, because they are the
+same placement pass.**
 
-An impostor crowd is a textured quad per spectator with two frames of animation,
-a technique older than the renderer it runs on. The grandstands are already
-placed and already lit, so this is placement against geometry that exists rather
-than new geometry — the same move `_scenery_markers` makes against the
-centreline.
+Step 7 shipped its crowd and not its marshals, deliberately: a flag-waving
+marshal stands at a *corner*, and corners are `Compiled.corners`, which is
+exactly the data step 8's braking and apex boards are placed from. Doing them in
+one pass means writing the corner-placement helper once.
 
-Two things it will run into, worth knowing before starting:
+What is already in hand for both:
 
-- **There are no textures in this project**, and a crowd is the first thing that
-  genuinely wants one. Everything so far is untextured flat colour, and the one
-  textured prop in the kit is `flagCheckersSmall`. A crowd of flat-coloured quads
-  is a wall of confetti; a crowd of *generated* ones is a small `Image` written
-  at load, which is the same move the audio and the LUTs already make. Decide
-  which before writing placement code.
-- **`MultiMesh` under `--headless` loses every instance transform.** Already
-  recorded in `docs/architecture.md`, already bitten once by the barriers. A
-  crowd is a `MultiMesh` or it is a thousand nodes, so it will meet this.
+- **`Compiled.corners`** gives every corner's cell, piece and turn direction, and
+  `_point_at_arc` turns an arc length into a point and a tangent. Every trackside
+  thing in the builder is placed from those two.
+- **A figure mesh exists.** `TrackBuilder.spectator_mesh()` is a person; a marshal
+  is one of those in a bright colour beside a post, which is a `MultiMesh` of the
+  same shape the crowd already uses.
+- **The flag is already in the wind.** `WIND_FLAG` and the marker flags prove the
+  path — `flagRed` and `flagGreen` are in the kit and already used as roadside
+  markers by theme.
 
-The shimmer is what stops a crowd being wallpaper, and the wind shader is the
-obvious source: `assets/shaders/wind.gdshader` already displaces by world
-position and already survives `MultiMesh`, which is exactly the per-instance
-phase a crowd wants.
+Marker boards are the one thing here with a **gameplay** claim rather than a
+visual one: real circuits carry them because a driver reads distance-to-apex off
+them. That makes the placement rule the interesting part — 150, 100 and 50 metres
+before the corner's entry arc — rather than the model.
 
-**Step 8, after it**, is marker boards from `Compiled.corners` — braking and apex
-markers, placed the way everything trackside already is. That one closes M18.
+**That closes M18.** Delete this file when it does.
 
 ---
 
@@ -238,7 +253,8 @@ into the web export if left in the project root.
 6. ~~Rain — screen streaks, wheel spray, and a roughness drop on the road.~~
    **Done.** One number on the hour reaching all three. Grip deliberately
    untouched; see below.
-7. **Crowd** — billboard spectators in the stands that are currently empty.
+7. ~~Crowd — spectators in the stands that were empty.~~ **Done**, and not as
+   billboards; marshal posts are the remainder, and belong with step 8.
 8. **Marker boards** — braking and apex markers placed from `Compiled.corners`.
 
 ### Left out of step 3, on purpose

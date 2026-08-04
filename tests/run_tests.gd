@@ -1338,6 +1338,102 @@ func test_roadside_markers_are_dense_enough_to_read_as_speed() -> void:
 	check_true("themes use different markers (%d)" % props.size(), props.size() >= 2)
 	check_true("at different spacings (%d)" % steps.size(), steps.size() >= 3)
 
+## The stands have people in them, and the people are on the seats.
+##
+## **That last half is the whole test.** Putting a crowd in a grandstand is a
+## transform and a colour; putting it on the *tiers* took three attempts, because
+## the rake was guessed from the bounding box twice — once onto the roof and once
+## inside the back wall — before it was read off the mesh. A spectator floating
+## above the roofline is not subtle from any angle a player sees, and nothing else
+## in the suite would notice it.
+##
+## Read out of `MultiMesh.buffer` rather than through `get_instance_transform`,
+## which does not survive a headless run: this project already has that scar from
+## barriers whose transforms all collapsed to identity, and again from tyre marks
+## whose colours read back opaque.
+func test_the_stands_have_people_on_the_seats() -> void:
+	var stand: Vector3 = (TrackBuilder.new()._prop("grandStand")["mesh"]
+		as ArrayMesh).get_aabb().size * TrackBuilder.SCALE
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var found := circuit.find_children("Crowd", "MultiMeshInstance3D", true, false)
+		check_true("%s has a crowd" % id, not found.is_empty())
+		if found.is_empty():
+			circuit.free()
+			continue
+		var mmi := found[0] as MultiMeshInstance3D
+		var mm := mmi.multimesh
+		check_true("%s seats a few hundred (%d)" % [id, mm.instance_count],
+			mm.instance_count > 120)
+		# Per-instance colour is the difference between a crowd and one person
+		# repeated, and it is why `wind.gdshader` multiplies by `COLOR`.
+		check_true("%s gives every spectator its own colour" % id, mm.use_colors)
+		check("%s writes twelve floats of transform then four of colour" % id,
+			mm.buffer.size(), mm.instance_count * 16)
+
+		var low := INF
+		var high := -INF
+		var shirts := {}
+		for i in mm.instance_count:
+			var at := i * 16
+			low = minf(low, mm.buffer[at + 7])
+			high = maxf(high, mm.buffer[at + 7])
+			shirts[Vector3(mm.buffer[at + 12], mm.buffer[at + 13],
+				mm.buffer[at + 14]).snappedf(0.01)] = true
+		# Between the bottom of the tiers and well under the roofline. A stand is
+		# about 12.5 m tall; the seating occupies roughly 3.4 to 8.8 m of it.
+		check_true("%s seats them on the tiers, not on the roof or the ground"
+			% [id] + " (%.1f to %.1f m of a %.1f m stand)" % [low, high, stand.y],
+			low > stand.y * 0.15 and high < stand.y * 0.8)
+		check_true("%s dresses them in more than one colour (%d)"
+			% [id, shirts.size()], shirts.size() >= 4)
+
+		# **In a stand, not merely at the right height.** The first version asked
+		# the road where each column went, so the crowd followed the centreline
+		# while the stand stayed a rigid box: at the ends of a terrace that curves
+		# away, one spectator in twenty was adrift and the worst was 21 m from any
+		# stand, sitting in mid-air over the grass. The height band above says
+		# nothing about that, and neither did any render of a straight paddock.
+		#
+		# The stands are compared at their *placement* points rather than their
+		# node positions: a placed prop is offset by `_prop`'s centring, which is
+		# 16 m on this model and swamps the thing being measured.
+		var builder := TrackBuilder.new()
+		var seats: Array[Vector3] = []
+		for node in circuit.find_children("grandStand*", "Node3D", true, false):
+			var kind := "grandStandCovered" if String(node.name).begins_with(
+				"grandStandCovered") else "grandStand"
+			seats.append((node as Node3D).position
+				- (node as Node3D).transform.basis * (builder._prop(kind)["offset"] as Vector3))
+		var adrift := 0
+		var furthest := 0.0
+		for i in mm.instance_count:
+			var at := i * 16
+			var apart := INF
+			for seat in seats:
+				apart = minf(apart, Vector2(mm.buffer[at + 3] - seat.x,
+					mm.buffer[at + 11] - seat.z).length())
+			furthest = maxf(furthest, apart)
+			if apart > stand.x * 0.7:
+				adrift += 1
+		check_true("%s seats everyone inside a stand (%d adrift, furthest %.1f m"
+			% [id, adrift, furthest] + " of a %.0f m footprint)" % stand.x,
+			adrift == 0)
+
+		# The same two rules every other MultiMesh here lives by.
+		check("%s crowd casts no shadow" % id, mmi.cast_shadow,
+			GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+		check_true("%s crowd carries its own bounds" % id,
+			mm.custom_aabb.size.length() > 0.0)
+		# And it shimmers, which is what stops a full stand reading as wallpaper.
+		var mat := mm.mesh.surface_get_material(0)
+		check_true("%s crowd is in the wind" % id,
+			mat is ShaderMaterial
+			and (mat as ShaderMaterial).shader.resource_path
+				== TrackBuilder.WIND_SHADER)
+		circuit.free()
+
 ## The scenery that ought to move is in the wind, on every shipped circuit.
 ##
 ## **Nothing catches this by looking at a screenshot**, which is the whole reason
@@ -7610,6 +7706,7 @@ func _physics_process(_delta: float) -> bool:
 		test_night_lights_the_columns_it_needs()
 		test_the_ground_takes_its_theme_and_its_hour()
 		test_roadside_markers_are_dense_enough_to_read_as_speed()
+		test_the_stands_have_people_on_the_seats()
 		test_the_scenery_is_in_the_wind()
 		test_the_wind_carries_the_prop_colour_across()
 		test_flags_and_trees_move_differently()

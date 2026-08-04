@@ -93,7 +93,12 @@ void fragment() {
 	// **Normals are left alone on purpose.** A few centimetres of lean does not
 	// change which way a flat face points by anything the eye can find, and
 	// recomputing them would cost more than the displacement does.
-	ALBEDO = albedo.rgb * texture(albedo_texture, UV).rgb;
+	// `COLOR` is the per-instance colour a `MultiMesh` carries when `use_colors`
+	// is on, and it is what lets one mesh be a crowd rather than four hundred
+	// identical people. Every other user of this shader leaves it off, and a
+	// MultiMesh without instance colours hands white to every vertex, so this
+	// multiplies by 1 for the trees and the flags and costs them nothing.
+	ALBEDO = albedo.rgb * texture(albedo_texture, UV).rgb * COLOR.rgb;
 	ROUGHNESS = 1.0;
 	METALLIC = 0.0;
 }

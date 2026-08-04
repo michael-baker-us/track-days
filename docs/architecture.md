@@ -1206,6 +1206,73 @@ colour grade — a `ShaderMaterial` on a duplicated mesh serialises fine, where 
 > movement, and that neighbouring trees were visibly out of phase, then brought
 > back to 0.07, which is about four degrees.
 
+### The crowd, and why it is not an impostor
+
+An empty grandstand does not read as neutral, it reads as **abandoned** — a test
+session rather than a race. The stands were placed three milestones before
+anything was put in them, so this is the cheapest fix available: the seating is
+built, lit and positioned already, and a spectator is a transform and a colour.
+
+**No texture and no billboard**, and both are the point. The textbook build is an
+impostor — a textured quad per spectator that turns to face the camera — and
+neither half survives contact with this project. *There are no textures here*:
+every surface in the game is flat colour and the one textured prop in the whole
+kit is the chequered marker flag, so a painted crowd would sit in the frame like
+a photograph in a drawing. And a spectator in a stand is facing *the track*,
+which is a fact about where they are sitting rather than about where the camera
+is — billboarding would turn the entire crowd as the car goes past, and it would
+rule out the wind shader, which displaces vertices in world space and cannot be
+composed with a basis rebuilt every frame.
+
+So a spectator is **two boxes**, twenty-four triangles, in the same language the
+rest of the world is written in. Four hundred of them are one `MultiMesh`, one
+draw call, no shadows.
+
+> **The rake has to be read off the mesh, and guessing it failed twice.** The
+> first version derived the seating band from the stand's bounding box and put
+> the crowd on the roof; the corrected guess put it inside the back wall. The
+> stand is 1 x 0.9 x 1 tile with its tiers occupying only the road-side half, and
+> a bounding box cannot tell you that. `_seat_top` samples the model's own
+> vertices at each row's depth and takes the highest, which lands every row on
+> the tier it belongs to and is self-correcting if the kit changes.
+>
+> A related trap sits underneath it: **the stand is extruded, so its vertices
+> exist only at the two side edges.** An early sampler filtered to "the middle of
+> the stand" to avoid the side walls and matched no geometry at all, silently
+> returning a flat profile.
+
+Placed from the **road** rather than from the model's local frame, like
+everything else trackside — the rows run along the tangent and step away from the
+centreline — so the rake is correct whichever way the imported model is authored.
+
+> **The road is sampled once per stand, not once per seat**, and getting that
+> wrong is what put people in mid-air. A stand is a rigid box placed at one arc
+> with one yaw; asking `_point_at_arc` where each *column* goes makes the crowd
+> follow the centreline while the stand does not, so wherever the terrace curves
+> away the two part company. Counted: about one spectator in twenty was adrift,
+> the worst 21 m from any stand — floating over the grass beside the paddock, and
+> visible from the grid. Every seat now comes out of the one frame the stand
+> itself was placed in.
+>
+> Nothing about the height band catches this, and neither did any render of a
+> straight paddock: La Sarthe had no strays at all while the other three each had
+> a dozen or more. The suite now measures every spectator against the nearest
+> stand's *placement point* — not its node position, which carries `_prop`'s 16 m
+> centring offset and swamps what is being measured.
+Occupancy is 0.82 and every seat is jittered, because a full grid of people is a
+spreadsheet and the gaps are what make it read as a crowd that arrived rather
+than one that was placed.
+
+The colours are per instance, which is the whole difference between a crowd and
+one person repeated, and it is why `wind.gdshader` now multiplies by `COLOR`. A
+`MultiMesh` without `use_colors` hands white to every vertex, so that change
+costs the trees and the flags nothing.
+
+**The shimmer is the wind shader**, at a third of a tree's sway and three times
+its speed: people do not sway like a tree or flap like a flag, they shift, and
+what a full stand looks like at racing distance is a texture that is never quite
+still. Anything more legible reads as a crowd doing a wave.
+
 ### Camera shake, which is a rotation and was a translation first
 
 The camera already carried one thing that says *speed* — the FOV kick, scaled

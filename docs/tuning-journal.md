@@ -1327,6 +1327,44 @@ in front of it — the same motes were half-metre boxes floating over the road:
 The lesson is not about particles. **Tune from the pose the player has**, not the
 pose that shows the effect best.
 
+### The crowd, and three renders to get it into the seats
+
+Nothing here was tuned by eye first. The rake was **guessed twice and measured
+once**, and the measurement is the entry worth keeping:
+
+| Attempt | Where the crowd went |
+|---|---|
+| Seating band as 0.14–0.66 of the stand's bounding-box height | On the roof |
+| Corrected to 0.05–0.30 | Inside the back wall, invisible |
+| `_seat_top` sampling the model's own vertices per row | On the tiers |
+
+The profile that settled it, taken across the stand's depth (0 is the far edge,
+1 the road-facing one): the back wall stands at 0.87–0.90 for the first third,
+then the seating ramp descends 0.632, 0.574, 0.458, 0.400, 0.341, 0.283, 0.245.
+The tiers occupy the **road-side half only**, which no bounding box can say.
+
+**And a fourth attempt, after it shipped looking right.** Spectators were seen
+floating in mid-air beside the paddock. Counted rather than hunted — for every
+spectator, the distance to the nearest stand's placement point:
+
+| Circuit | Adrift (over 9 m) | Furthest |
+|---|---|---|
+| Ardennes | 15 of 400 | 21.5 m |
+| Monte Carlo | 16 of 441 | 21.9 m |
+| La Sarthe | **0** of 481 | 8.7 m |
+| Suzuka | 21 of 400 | 20.2 m |
+
+The cause was sampling the road once per *seat* instead of once per *stand*: the
+columns followed the centreline while the stand stayed a rigid box, so a terrace
+that curved away shed its end seats into the field. La Sarthe's paddock is
+straight, which is why it had none and why looking at it proved nothing. After
+the fix, 0 adrift everywhere and the furthest is 8.7 m — inside a 14 m footprint.
+
+Two smaller numbers, both from the same renders: `SPECTATOR_HEIGHT` 0.115 to
+**0.09** tile (1.6 m to 1.25 m — the first pass were standing adults in seats
+sized for people sitting down), and `CROWD_COLUMNS` 6 to **7**, which puts 400
+spectators on a shipped circuit instead of 342.
+
 ### Still open, from M17
 - ~~Grass still grips like tarmac~~ — fixed. Off the ribbon the car keeps 0.55 of
   whatever the surface gives it, and the barriers became solid in the same change,

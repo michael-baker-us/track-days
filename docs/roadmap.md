@@ -987,10 +987,26 @@ on, and the storm actually raining.**
 7. **The grandstands are empty, and that reads as abandoned.** Billboard
    spectators with a shimmer, and marshal posts with flags.
 
-> Environmental storytelling, and the cheapest kind: an impostor crowd is a
-> textured quad per spectator with two frames of animation, a technique older than
-> the renderer it runs on. The grandstands are already placed and already lit. A
-> full stand is the difference between a race and a test session.
+> **Done, and it is not an impostor.** The technique this line proposed — a
+> textured quad per spectator, turned to face the camera — fails twice here.
+> There are no textures in this game, so a painted crowd would be the only
+> sampled surface in the frame; and a spectator in a stand faces *the track*,
+> which is a fact about the seat rather than about the camera, so billboarding
+> would turn four hundred people as the car went past and would rule out the wind
+> shader at the same time. A spectator is two boxes and twenty-four triangles, in
+> the same language as everything else, and four hundred of them are one draw
+> call.
+>
+> **The rake had to be read off the mesh.** Guessed from the stand's bounding box
+> it put the crowd on the roof, and the corrected guess put it inside the back
+> wall — the tiers occupy only the road-side half, which no bounding box can say.
+> Sampling the model's own vertices per row lands every row on its tier and
+> survives a change to the kit. See the tuning journal.
+>
+> **Not done: marshal posts.** The crowd was the substantial half and it is in;
+> flag-waving marshals at the corners are a separate placement pass against
+> `Compiled.corners`, which is the same data step 8 wants. They belong together
+> and they are the remainder of this step, left explicitly rather than quietly.
 
 8. **Boards that make the circuit readable.** Braking markers, apex markers and
    corner numbering, placed from the centreline the way everything trackside

@@ -189,6 +189,58 @@ const WIND_TREE := {"sway": 0.07, "speed": 0.9, "bend": 1.7}
 ## almost linearly because there is no trunk to hold the bottom still.
 const WIND_FLAG := {"sway": 0.10, "speed": 2.4, "bend": 1.25}
 
+## A crowd is neither. People do not sway like a tree and do not flap like a
+## flag; they shift, and they do it in far less time than either. So the movement
+## is the **smallest** here and much the fastest, and `bend` is near 1 because a
+## person moves from the feet rather than from the waist.
+##
+## This is a shimmer rather than a motion: what a full stand looks like at
+## racing distance is a texture that is never quite still, and anything more
+## legible than that reads as a crowd doing a wave.
+const WIND_CROWD := {"sway": 0.035, "speed": 3.1, "bend": 1.1}
+
+## A spectator, in tile units: how tall, and the shoulders and head as fractions
+## of that. Sized against the grandstand rather than against a metre, so a change
+## to `SCALE` moves the crowd with the stands it is sitting in.
+const SPECTATOR_HEIGHT := 0.09
+const SPECTATOR_WIDTH := 0.42
+const SPECTATOR_HEAD := 0.30
+
+## The seating rake, as fractions of the stand's own bounding box rather than as
+## measurements. The kit's grandstand is a tile wide and deep and about nine
+## tenths of one tall, and reading that off the mesh is what keeps the crowd in
+## the seats if the kit or `SCALE` ever changes.
+##
+## `FRONT` and `BACK` are measured from the middle of the stand, negative toward
+## the road, because that is where `_place_prop` centres it.
+const CROWD_ROWS := 7
+const CROWD_COLUMNS := 7
+## How far into the stand the front and back rows sit, in tile units from the
+## road-facing edge. Both stay inside the road-side half, which is where the
+## seating is and where nothing else in the model can be mistaken for it.
+const CROWD_NEAR := 0.06
+const CROWD_DEEP := 0.45
+const CROWD_SPREAD := 0.80
+## Clear of the tier, so a spectator sits on it rather than in it.
+const CROWD_LIFT := 0.012
+## How full the stands are. Not 1.0: a perfect grid of people is a spreadsheet,
+## and the gaps are what make it read as a crowd that arrived rather than one
+## that was placed.
+const CROWD_OCCUPANCY := 0.82
+## How far a spectator is nudged off its seat, as a fraction of the spacing, and
+## how far it may turn away from the road.
+const CROWD_JITTER := 0.3
+const CROWD_TURN := 0.35
+
+## Shirts. Bright and few, because a crowd at distance is colour noise and the
+## kit around it is white, grey and green — a palette drawn from the same range
+## as the circuit would disappear into it.
+const CROWD_COLOURS := [
+	Color(0.86, 0.28, 0.26), Color(0.95, 0.68, 0.22), Color(0.29, 0.45, 0.78),
+	Color(0.35, 0.66, 0.38), Color(0.90, 0.90, 0.92), Color(0.55, 0.35, 0.70),
+	Color(0.20, 0.22, 0.28), Color(0.94, 0.82, 0.55),
+]
+
 const HORIZON_RADIUS := 1200.0
 const HORIZON_MIN := 40.0
 const HORIZON_MAX := 170.0
@@ -3045,11 +3097,16 @@ func _scenery_paddock(scenery: Node3D, road: Dictionary) -> void:
 
 	# Covered stands at the ends and open ones through the middle, so the terrace
 	# has a silhouette instead of being one extruded block.
+	# The arcs a stand actually went to, which is not every slot — a cramped
+	# layout loses buildings one at a time — and is exactly where a crowd may sit.
+	var stands: Array[float] = []
 	for i in slots:
 		var arc := START_LINE_ARC + (PADDOCK_FROM + float(i)) * step
 		var covered: bool = i < 2 or i >= slots - 2 or i % 5 == 0
-		_place_prop(buildings, road,
-			"grandStandCovered" if covered else "grandStand", arc, -1.0, PADDOCK_GAP)
+		if _place_prop(buildings, road,
+				"grandStandCovered" if covered else "grandStand",
+				arc, -1.0, PADDOCK_GAP):
+			stands.append(arc)
 
 	# Pit lane opposite: the office bookends a run of garages.
 	for i in slots:
@@ -3073,6 +3130,195 @@ func _scenery_paddock(scenery: Node3D, road: Dictionary) -> void:
 		TOWER_CLEARANCE)
 	_place_prop(buildings, road, "bannerTowerGreen", START_LINE_ARC, -1.0, 0.9,
 		TOWER_CLEARANCE)
+
+	_scenery_crowd(buildings, road, stands)
+
+## The crowd, in the stands that are already there.
+##
+## An empty grandstand does not read as neutral, it reads as **abandoned** — a
+## test session rather than a race — and the stands were placed three milestones
+## before anything was put in them. This is the cheapest possible fix: the seating
+## is built, lit and positioned already, so a spectator is a transform and a
+## colour.
+##
+## ## No texture, no billboard, and both of those are the point
+##
+## The obvious build is an impostor: a textured quad per spectator that turns to
+## face the camera. Neither half survives contact with this project.
+##
+## **There are no textures here.** Every surface in the game is flat colour, and
+## the one textured prop in the whole kit is the chequered marker flag. A crowd
+## painted onto quads would be the first sampled texture in the frame and would
+## sit in it like a photograph in a drawing. A spectator is instead **two boxes**,
+## which is the same language the rest of the world is written in and costs
+## twenty-four triangles.
+##
+## **They must not billboard.** A spectator in a stand is facing the track, which
+## is a fact about where they are sitting rather than about where the camera is.
+## Turning them to face the camera would make the whole crowd rotate as the car
+## goes past — and it would also rule out the wind shader, which displaces
+## vertices in world space and cannot be composed with a billboard that rebuilds
+## the basis every frame.
+##
+## Placed from the **road** rather than from the stand's own local frame, like
+## everything else trackside: the rows rise going away from the centreline and
+## run along the tangent, so the rake is correct whichever way the imported model
+## happens to be authored.
+##
+## The colours are per-instance, which is what makes it a crowd rather than four
+## hundred identical people, and it is the reason `wind.gdshader` multiplies by
+## `COLOR`.
+func _scenery_crowd(parent: Node3D, road: Dictionary, arcs: Array) -> void:
+	if arcs.is_empty():
+		return
+	# Read off the mesh rather than written down, so the crowd stays in the seats
+	# if the kit or SCALE changes.
+	var box: Vector3 = (_prop("grandStand")["mesh"] as ArrayMesh).get_aabb().size
+	# Fixed seed: a circuit has to bake identically every time, and the suite
+	# compares a committed scene against a fresh build.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 0x0C120D
+
+	var xforms: Array[Transform3D] = []
+	var colours := PackedColorArray()
+	var seat_x := CROWD_SPREAD * SCALE / float(maxi(CROWD_COLUMNS - 1, 1))
+	# Where the tiers actually are, read off the model a row at a time. The first
+	# version guessed the rake from the bounding box and put the crowd on the roof
+	# — twice, in opposite directions.
+	var faces: PackedVector3Array = (_prop("grandStand")["mesh"] as ArrayMesh).get_faces()
+	var rake := []
+	for row in CROWD_ROWS:
+		var t := float(row) / float(maxi(CROWD_ROWS - 1, 1))
+		# Local z, which faces the road: every building in this kit is authored
+		# facing +z (see `_yaw_facing`), and the model spans -1 to 0.
+		var z: float = -lerpf(CROWD_NEAR, CROWD_DEEP, t)
+		rake.append([_seat_top(faces, z, box.z / float(CROWD_ROWS)),
+			-(z + box.z * 0.5)])
+
+	for arc in arcs:
+		# **The road is sampled once per stand, not once per seat.** A stand is a
+		# rigid box placed at one arc and one yaw; asking the road where each
+		# column goes makes the crowd follow the centreline while the stand does
+		# not, and at the ends of a terrace that curves away the two part company.
+		# Measured before it was fixed: about one spectator in twenty was adrift,
+		# the worst of them 21 m from any stand — sitting in mid-air over the
+		# grass, which is exactly what it looked like.
+		var sample := _point_at_arc(float(arc))
+		var tan: Vector2 = sample[1]
+		var outward := Vector3(-tan.y, 0.0, tan.x) * -1.0
+		var along_road := Vector3(tan.x, 0.0, tan.y)
+		var yaw := _yaw_facing(tan, -1.0)
+		for row in CROWD_ROWS:
+			var up: float = rake[row][0] + CROWD_LIFT
+			var back: float = rake[row][1]
+			for col in CROWD_COLUMNS:
+				if rng.randf() > CROWD_OCCUPANCY:
+					continue
+				var along := (float(col) - float(CROWD_COLUMNS - 1) * 0.5) * seat_x
+				along += rng.randf_range(-CROWD_JITTER, CROWD_JITTER) * seat_x
+				var pt: Vector3 = (sample[0] as Vector3) + along_road * along + (
+					outward * ((PADDOCK_GAP + back) * SCALE))
+				pt.y = up * SCALE
+				xforms.append(_prop_xform(
+					pt, yaw + rng.randf_range(-CROWD_TURN, CROWD_TURN),
+					SPECTATOR_HEIGHT * SCALE, Vector3.ZERO))
+				colours.append(CROWD_COLOURS[rng.randi() % CROWD_COLOURS.size()])
+	if xforms.is_empty():
+		return
+
+	var mesh := spectator_mesh()
+	# The shimmer. Applied before the buffer is written, because it reads the
+	# instances to work out how tall the prop ended up.
+	_windy(mesh, xforms, WIND_CROWD)
+
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	# The whole reason this is not `_multimesh`: twelve floats of transform then
+	# four of colour, which is the layout the buffer takes once colours are on.
+	mm.use_colors = true
+	mm.mesh = mesh
+	mm.instance_count = xforms.size()
+	var buf := PackedFloat32Array()
+	buf.resize(xforms.size() * 16)
+	for i in xforms.size():
+		var t := xforms[i]
+		var b := t.basis
+		var at := i * 16
+		buf[at + 0] = b.x.x; buf[at + 1] = b.y.x; buf[at + 2] = b.z.x; buf[at + 3] = t.origin.x
+		buf[at + 4] = b.x.y; buf[at + 5] = b.y.y; buf[at + 6] = b.z.y; buf[at + 7] = t.origin.y
+		buf[at + 8] = b.x.z; buf[at + 9] = b.y.z; buf[at + 10] = b.z.z; buf[at + 11] = t.origin.z
+		buf[at + 12] = colours[i].r; buf[at + 13] = colours[i].g
+		buf[at + 14] = colours[i].b; buf[at + 15] = colours[i].a
+	mm.buffer = buf
+	mm.custom_aabb = _instances_aabb(mesh.get_aabb(), xforms)
+
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "Crowd"
+	mmi.multimesh = mm
+	# No shadows, for the same reason the markers cast none: several hundred small
+	# casters would swamp the atlas the car's own shadow needs.
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mmi)
+
+## The top of the model at one depth into it: the height of the tier a row sits
+## on, in the model's own units.
+##
+## **Read rather than declared.** The rake was guessed from the bounding box
+## first and the crowd came out on the roof, then a corrected guess put it inside
+## the back wall. The stand is extruded from a profile, so its vertices only exist
+## at the two side edges — which is also why nothing here filters on x, and why an
+## early attempt to sample "the middle of the stand" matched no geometry at all.
+static func _seat_top(faces: PackedVector3Array, at: float, slice: float) -> float:
+	var top := 0.0
+	for v in faces:
+		if absf(v.z - at) <= slice * 0.5:
+			top = maxf(top, v.y)
+	return top
+
+## One spectator: a body and a head, authored one unit tall standing on y = 0, so
+## the instance scale is the height in world units and nothing has to know how
+## big a person is twice.
+##
+## Flat-shaded boxes rather than anything cleverer. At the distance a stand is
+## seen from, the silhouette is the whole of what reads, and the kit around it is
+## made of exactly this.
+static func spectator_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Shoulders down to the seat, and slightly deeper than wide, so a row of them
+	# reads as bodies rather than as cards edge-on.
+	_figure_box(st, Vector3(0.0, (1.0 - SPECTATOR_HEAD) * 0.5, 0.0),
+		Vector3(SPECTATOR_WIDTH, 1.0 - SPECTATOR_HEAD, SPECTATOR_WIDTH * 0.8))
+	_figure_box(st, Vector3(0.0, 1.0 - SPECTATOR_HEAD * 0.5, 0.0),
+		Vector3(SPECTATOR_HEAD * 0.72, SPECTATOR_HEAD, SPECTATOR_HEAD * 0.72))
+	st.generate_normals()
+	# White, because the colour is per instance. `vertex_color_use_as_albedo` is
+	# what carries it before `_windy` swaps this for the wind shader, and the
+	# shader multiplies by `COLOR` for the same reason.
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 1.0, 1.0)
+	mat.vertex_color_use_as_albedo = true
+	st.set_material(mat)
+	return st.commit()
+
+## Six quads, wound so the outside faces out.
+static func _figure_box(st: SurfaceTool, centre: Vector3, size: Vector3) -> void:
+	var h := size * 0.5
+	for axis in 3:
+		for sgn in [-1.0, 1.0]:
+			var normal := Vector3.ZERO
+			normal[axis] = sgn
+			var u := Vector3.ZERO
+			var v := Vector3.ZERO
+			u[(axis + 1) % 3] = h[(axis + 1) % 3] * sgn
+			v[(axis + 2) % 3] = h[(axis + 2) % 3]
+			var mid := centre + normal * h[axis]
+			for corner in [
+				[-1.0, -1.0], [1.0, -1.0], [1.0, 1.0],
+				[-1.0, -1.0], [1.0, 1.0], [-1.0, 1.0],
+			]:
+				st.set_uv(Vector2(corner[0] * 0.5 + 0.5, corner[1] * 0.5 + 0.5))
+				st.add_vertex(mid + u * corner[0] + v * corner[1])
 
 ## How many one-unit slots the paddock gets before the road turns out from under
 ## it. Always at least the run behind the line, so the grid keeps its backdrop
@@ -3098,7 +3344,7 @@ func _paddock_slots() -> int:
 func _place_prop(
 	parent: Node3D, road: Dictionary, prop_name: String,
 	arc: float, side: float, gap: float, clearance := PADDOCK_CLEARANCE
-) -> void:
+) -> bool:
 	var sample := _point_at_arc(arc)
 	var tan: Vector2 = sample[1]
 	var outward := Vector3(-tan.y, 0.0, tan.x) * side
@@ -3107,7 +3353,7 @@ func _place_prop(
 	# built rather than climbing with it.
 	pt.y = 0.0
 	if not _clear_of_road(road, pt, clearance * SCALE):
-		return
+		return false
 
 	var inst: Node3D = load("res://assets/kenney/racing_kit/%s.glb" % prop_name).instantiate()
 	var offset: Vector3 = _prop(prop_name)["offset"]
@@ -3120,6 +3366,7 @@ func _place_prop(
 	inst.name = "%s%d" % [prop_name, parent.get_child_count()]
 	inst.transform = Transform3D(basis, pt + basis * offset)
 	parent.add_child(inst)
+	return true
 
 ## Side of the bucket the road index is built in, in tile units. Every clearance
 ## test above is under this, which is what lets a lookup examine only the nine
