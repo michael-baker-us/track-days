@@ -1126,10 +1126,36 @@ car does not follow, so the constant is chosen for what it is **used** for, and
 > a road-layer slab under the plane. **Any future measurement on `track_01` must
 > do the same.**
 
-### Still open, from M17
+### Drive degrades with the surface too — measured
 
-- **Longitudinal drive does not degrade with the surface**, per the measurement
-  above: 406 vs 414 frames to 100 km/h between tarmac and snow.
+The last open item from M17. Drive was left alone when braking was fixed, on the
+reasoning that it already degraded: the rear wheels are traction-limited under
+power, so they spin instead. Measured, that is worth almost nothing.
+
+| Surface | Grip | 0-100 before | 0-100 after |
+|---|---|---|---|
+| Tarmac | 1.00 | 6.62 s | 6.85 s |
+| Dirt | 0.72 | 6.65 s | 9.95 s |
+| Snow | 0.50 | 6.77 s | 19.55 s |
+
+**A 2% spread across a surface with half the grip**, before. `wheel_friction_slip`
+limits how much of `engine_force` reaches the road far less than it looks — the
+same way it never limited `brake` at all. So `engine_force` is scaled by grip like
+everything else, and there is still no second table: the surface scales what a
+tyre can do and it cannot do that differently in one direction than another.
+
+`ParTime` scales `launch_accel` to match, and par on the loose surfaces moved a
+long way — La Sarthe on snow goes 80.10 s to 89.21 s, Ardennes 64.33 s to 71.01 s.
+Tarmac is untouched, since its multiplier is 1.0.
+
+> **Snow is now three times slower to 100 km/h, and that is the number to watch.**
+> Braking on snow came out at 1.67x dry; drive comes out at 2.9x, because drag is
+> quadratic and a halved tractive force loses to it much sooner. It is consistent
+> with how braking and cornering are modelled and it may still be more penalty
+> than the game wants. It is one multiply in `car_controller` if so, and par
+> follows it automatically.
+
+### Still open, from M17
 - ~~Grass still grips like tarmac~~ — fixed. Off the ribbon the car keeps 0.55 of
   whatever the surface gives it, and the barriers became solid in the same change,
   because a penalty for leaving the road with nothing to stop you leaving it is a

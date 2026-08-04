@@ -713,10 +713,14 @@ lap time was unreadable at the moment it appeared.
    `braking_g` to match, because par has to model the car actually being driven.
    Measured both ways round in the tuning journal.
 
-   Acceleration was measured at the same time and **deliberately left alone**:
-   406 vs 414 frames to 100 km/h between tarmac and snow. Making drive
-   surface-aware would move every par time and the whole feel of the car, so it
-   wants its own pass rather than riding along with a braking fix.
+   Acceleration was left alone at the time and has since been done the same way.
+   It measured a **2% spread across a surface with half the grip** — 6.62 s to
+   100 km/h on tarmac against 6.77 s on snow — because `wheel_friction_slip`
+   limits how much of `engine_force` reaches the road far less than it looks, in
+   exactly the way it never limited `brake`. Scaled by grip it is 6.85 / 9.95 /
+   19.55 s, `ParTime` scales `launch_accel` to match, and par on the loose
+   surfaces moved a long way. Snow being 2.9x slower to 100 is the figure to watch
+   if it plays as too much penalty; it is one multiply.
 
 The ribbon parameterisation is what makes step 3 tractable: a 4096 x 128 texture
 covers a 1500 m lap. The world-space equivalent is unallocatable.

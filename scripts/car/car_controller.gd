@@ -55,11 +55,17 @@ func _apply_tuning_to_wheels() -> void:
 ## that halves your cornering and leaves your braking untouched is exactly the
 ## wrong way round.
 ##
-## So the brakes, the handbrake and reverse are scaled by the same number the
-## tyres are. There is deliberately no second table for it: the surface scales
-## what a tyre can do, and it should not be able to do that differently in one
-## direction than another. Drive is left alone because it already degrades — the
-## rear wheels are traction-limited under power, so they spin instead.
+## So the brakes, the handbrake, reverse **and drive** are scaled by the same
+## number the tyres are. There is deliberately no second table for it: the surface
+## scales what a tyre can do, and it should not be able to do that differently in
+## one direction than another.
+##
+## Drive was left alone at first, on the reasoning that it already degraded — the
+## rear wheels are traction-limited under power, so they spin instead. Measured,
+## that is worth almost nothing: 0-100 took 6.62 s on tarmac and 6.77 s on snow,
+## a 2% spread on a surface with half the grip. `wheel_friction_slip` limits how
+## much of `engine_force` reaches the road far less than it looks, in the same way
+## it never limited `brake` at all.
 func _surface_grip() -> float:
 	var road := RoadSurface.grip_of(GameState.selected_surface)
 	return road if _on_road else road * OFF_ROAD_GRIP
@@ -132,7 +138,7 @@ func _physics_process(delta: float) -> void:
 		engine_force = 0.0
 		brake = tuning.handbrake_force * grip
 	elif throttle > 0.0:
-		engine_force = tuning.engine_force * throttle
+		engine_force = tuning.engine_force * throttle * grip
 		brake = 0.0
 	elif braking > 0.0:
 		if forward_speed > 0.5:

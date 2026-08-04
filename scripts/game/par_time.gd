@@ -236,7 +236,10 @@ static func ideal_lap(
 	var grip := RoadSurface.grip_of(surface)
 	var lateral := (spec.lateral_g if spec != null else LATERAL_G) * grip
 	var braking := (spec.braking_g if spec != null else BRAKING_G) * grip
-	var launch := spec.launch_accel if spec != null else LAUNCH_ACCEL
+	# Scaled like the other two, because the car's drive is now scaled as well:
+	# a par that accelerates out of corners at dry-tarmac rate on snow is the
+	# same error that made braking optimistic before M17 measured it.
+	var launch := (spec.launch_accel if spec != null else LAUNCH_ACCEL) * grip
 	var walk := resample(racing_line(centreline), lateral, top)
 	var points: Array[Vector3] = walk[0]
 	var limit: PackedFloat32Array = walk[1]
