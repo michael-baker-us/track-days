@@ -164,6 +164,31 @@ const OVERLAY_LIFT := 0.02
 const OVERLAY_STRENGTH := 0.5
 const OVERLAY_COLOR := Color(0.05, 0.05, 0.06)
 
+## Wind. See `assets/shaders/wind.gdshader` for how it moves and `_windy` for how
+## a prop is put into it.
+const WIND_SHADER := "res://assets/shaders/wind.gdshader"
+
+## **One direction for the whole world**, not one per prop or per circuit. Wind
+## that blows a different way for each tree is not wind, and the moment two props
+## in the same frame disagree the effect stops reading as weather and starts
+## reading as an animation.
+const WIND_DIRECTION := Vector2(0.82, 0.57)
+
+## Trees are tall and stiff. The lean is a small fraction of a fourteen-metre
+## trunk and slow with it, and `bend` well above 1 keeps the movement in the
+## canopy — a tree that sways from the root looks like it is being dragged.
+##
+## `sway` is roughly the tangent of the peak lean, so this is about four degrees.
+## Found by driving it to 0.22 to check the *shape* of the deformation — a subtle
+## wrong bend and a subtle right one look identical, an exaggerated one does not —
+## and then coming back down. At 0.22 the treeline reads as a gale.
+const WIND_TREE := {"sway": 0.07, "speed": 0.9, "bend": 1.7}
+
+## Marker flags are the opposite prop: small, light, and hung on nothing. They
+## flutter nearly three times as fast, move much further for their size, and bend
+## almost linearly because there is no trunk to hold the bottom still.
+const WIND_FLAG := {"sway": 0.10, "speed": 2.4, "bend": 1.25}
+
 const HORIZON_RADIUS := 1200.0
 const HORIZON_MIN := 40.0
 const HORIZON_MAX := 170.0
@@ -2945,7 +2970,7 @@ func _scenery_markers(
 			xforms.append(_prop_xform(
 				pt, _yaw_facing(p[1], side), MARKER_SCALE, prop["offset"]
 			))
-	_multimesh(scenery, "Markers", prop, xforms, false)
+	_multimesh(scenery, "Markers", prop, xforms, false, WIND_FLAG)
 
 ## Trees on the outfield, at a random distance out and skipping the paddock, so
 ## the horizon has something in it without walling the circuit in.
@@ -2985,8 +3010,8 @@ func _scenery_trees(
 			else:
 				small_x.append(Transform3D(basis, pt + basis * (small["offset"] as Vector3)))
 
-	_multimesh(scenery, "TreesLarge", large, large_x)
-	_multimesh(scenery, "TreesSmall", small, small_x)
+	_multimesh(scenery, "TreesLarge", large, large_x, true, WIND_TREE)
+	_multimesh(scenery, "TreesSmall", small, small_x, true, WIND_TREE)
 
 ## The start/finish area: grandstands along the driver's left, the pit buildings
 ## opposite, and a banner tower either side of the line.
@@ -3191,7 +3216,8 @@ static func _yaw_facing(tan: Vector2, side: float) -> float:
 ## one shadow that matters.
 func _multimesh(
 	parent: Node3D, node_name: String, prop: Dictionary,
-	xforms: Array[Transform3D], casts_shadow: bool = true
+	xforms: Array[Transform3D], casts_shadow: bool = true,
+	wind: Dictionary = {}
 ) -> void:
 	if xforms.is_empty():
 		return
@@ -3200,6 +3226,8 @@ func _multimesh(
 		var mat := mesh.surface_get_material(i)
 		if mat != null:
 			mesh.surface_set_material(i, mat.duplicate())
+	if not wind.is_empty():
+		_windy(mesh, xforms, wind)
 
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -3218,6 +3246,63 @@ func _multimesh(
 	if not casts_shadow:
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mmi)
+
+## Puts a prop into the wind, by giving **every** surface of it the wind shader
+## carrying that surface's own colour.
+##
+## Every surface, not the leafy one: a tree is a `grass` canopy and a `bark`
+## trunk, and moving only the canopy detaches it from the tree it is sitting on.
+## The falloff in the shader is what keeps the trunk still — displacement is a
+## power of the height above the prop's base, so at the root it is zero whatever
+## material is there.
+##
+## **The colour is handed over untouched, and that is not the same rule the sky
+## follows.** `_build_environment` converts its colours to linear on the way into
+## `sky.gdshader`; doing the same here renders the forest at about *half* the
+## brightness it was authored at, canopy green (0.64, 0.87, 0.76) arriving as
+## (0.15, 0.65, 0.43). The difference is the shader type, not the `source_color`
+## hint, which both declare: a `spatial` shader's `source_color` uniform is
+## converted for you, so `ground_grid` and `tarmac` also pass their colours raw,
+## while a `sky` shader's output is used directly as radiance and is not. Checked
+## by rendering it both ways rather than reasoned about.
+##
+## `reference_height` is measured rather than declared, because the instances are
+## the only thing that knows how big the prop ended up: the mesh is authored about
+## 1.5 units tall and then scaled by the theme, by `SCALE`, and by a per-instance
+## jitter. It divides in the shader, so a prop whose instances somehow have no
+## height is left alone rather than sent to infinity.
+func _windy(
+	mesh: ArrayMesh, xforms: Array[Transform3D], wind: Dictionary
+) -> void:
+	var scales := 0.0
+	for t in xforms:
+		scales += t.basis.get_scale().y
+	var height := mesh.get_aabb().size.y * scales / float(xforms.size())
+	if height <= 0.0:
+		return
+
+	for i in mesh.get_surface_count():
+		var was := mesh.surface_get_material(i) as StandardMaterial3D
+		# The kit is opaque, flat-shaded, roughness-1 colour with at most an albedo
+		# texture, all of which the wind shader reproduces. A surface doing anything
+		# beyond that would not survive the swap, so it is left as it is — still,
+		# but correct.
+		if was == null or was.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+			continue
+		var mat := ShaderMaterial.new()
+		mat.shader = load(WIND_SHADER)
+		# Kept, so a baked circuit still says which Kenney surface this was.
+		mat.resource_name = was.resource_name
+		mat.set_shader_parameter("albedo", was.albedo_color)
+		# Left unset when there is no texture, so Godot's default opaque white
+		# stands in and the colour comes through unchanged. See the shader.
+		if was.albedo_texture != null:
+			mat.set_shader_parameter("albedo_texture", was.albedo_texture)
+		mat.set_shader_parameter("direction", WIND_DIRECTION)
+		mat.set_shader_parameter("reference_height", height)
+		for key in wind:
+			mat.set_shader_parameter(String(key), wind[key])
+		mesh.surface_set_material(i, mat)
 
 ## Packs instance transforms the way `MultiMesh.buffer` wants them: twelve floats
 ## each, as three rows of a 3x4 matrix.

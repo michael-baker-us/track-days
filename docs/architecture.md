@@ -1144,6 +1144,68 @@ not survived the platform, most of M18 would have needed rethinking.
 > are data and the LUT is built at load, so the loop is edit, run, look, with no
 > rebake in it. Deleted once the looks were settled.
 
+### Wind, and the two things it has to survive
+
+The circuit had exactly one moving thing in it: the car. Everything else was
+nailed down, and a forest that does not move reads as a backdrop rather than a
+place. `assets/shaders/wind.gdshader` is a vertex displacement on the scenery
+that ought to be moving — no CPU cost, no per-frame script, no new nodes, and it
+works under the Compatibility renderer, which rules out most of the alternatives.
+
+**It has to survive `MultiMesh`, and that decides where the phase comes from.**
+The trees are a `MultiMesh` precisely so a forest costs one draw call, which means
+there is no node per tree to hang a phase on. `MODEL_MATRIX[3].xyz` — where the
+instance stands — is the only per-instance identity a vertex has, and it is what
+the phase is built from. The two failures either side of that are both worth
+naming: taking the phase from `VERTEX` gives every vertex of one tree a different
+phase and the tree *shears*, and taking it from nothing at all puts a whole forest
+in lockstep, which reads as the camera moving rather than the trees.
+
+**It has to survive the props being placed at arbitrary yaw**, which is why the
+shader declares `world_vertex_coords`. `VERTEX` then arrives already through the
+model matrix, so the lean is a *world* direction and every prop leans the same
+way. Without it the same `direction` blows a different way for every prop, and
+wind that changes direction per tree is not wind. It also removes the alternative
+— carrying a world offset back through the instance basis, which is either an
+`inverse()` per vertex or an assumption that the scale is uniform.
+
+Height is measured as `VERTEX.y - MODEL_MATRIX[3].y`, not world Y: scenery beside
+a raised section stands on ground of its own, and measuring from zero would bend
+it as though it were buried. The displacement is a power of that height, above 1,
+so the base is still whatever material is on it — which is also why **every**
+surface of a prop goes into the wind and not just the leafy one. A tree is a
+`grass` canopy and a `bark` trunk, and moving one without the other detaches them.
+
+> **The colour trap, which is the opposite of the sky's.** `_windy` hands
+> `albedo_color` to the shader **untouched**, while `_build_environment` converts
+> to linear on the way into `sky.gdshader`. Both uniforms are declared
+> `source_color`; the difference is the shader type. A `spatial` shader's
+> `source_color` uniform is converted for you — `ground_grid` and `tarmac` also
+> pass their colours raw — while a `sky` shader's output is used directly as
+> radiance and is not. Converting first here renders the forest at about *half*
+> its authored brightness, canopy green (0.64, 0.87, 0.76) arriving as
+> (0.15, 0.65, 0.43). It is a plausible forest, so only a comparison finds it.
+
+> **The chequered flag is the surface that nearly got left out.** Almost all of
+> the Kenney kit is untextured flat colour, so an early version skipped any
+> surface carrying a texture — and the one prop that has one is
+> `flagCheckersSmall`, which is the marker the **default** theme uses and
+> therefore the marker on every circuit a player draws. The shader takes an
+> optional albedo texture with no companion `bool` and no branch, because Godot
+> binds opaque white to a `sampler2D` nobody assigned: an untextured prop
+> multiplies its colour by 1 and is unaffected.
+
+Wind settings are baked into the circuit rather than applied on load, unlike the
+colour grade — a `ShaderMaterial` on a duplicated mesh serialises fine, where an
+`ImageTexture3D` does not. A change to `WIND_TREE` or `WIND_FLAG` therefore needs
+`tools/build_track.gd` re-run.
+
+> **Tuned by driving it wrong on purpose.** A subtle wrong bend and a subtle right
+> one are the same picture; an exaggerated one is not. The tree sway was pushed to
+> 0.22 — a gale — to check that trunks stayed planted, that the canopy carried the
+> movement, and that neighbouring trees were visibly out of phase, then brought
+> back to 0.07, which is about four degrees.
+
 ### Tyre marks: what shape, where, and for how long
 
 Three separate rules, each of which has been wrong at some point.

@@ -853,6 +853,104 @@ func test_roadside_markers_are_dense_enough_to_read_as_speed() -> void:
 	check_true("themes use different markers (%d)" % props.size(), props.size() >= 2)
 	check_true("at different spacings (%d)" % steps.size(), steps.size() >= 3)
 
+## The scenery that ought to move is in the wind, on every shipped circuit.
+##
+## **Nothing catches this by looking at a screenshot**, which is the whole reason
+## it is asserted: a still frame of a windy forest and a still frame of a dead one
+## are the same picture. The failure mode is a circuit that bakes with the props
+## still wearing their `StandardMaterial3D` and simply never moves again.
+##
+## Baked rather than applied on load, unlike the colour grade — a `ShaderMaterial`
+## on a duplicated mesh serialises fine, where an `ImageTexture3D` does not.
+func test_the_scenery_is_in_the_wind() -> void:
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		for prop in ["TreesLarge", "TreesSmall", "Markers"]:
+			var found := circuit.find_children(prop, "MultiMeshInstance3D", true, false)
+			if found.is_empty():
+				# A coastal circuit is entitled to almost no trees.
+				continue
+			var mesh: Mesh = (found[0] as MultiMeshInstance3D).multimesh.mesh
+			# **Every** surface, not the leafy one. A tree is a canopy and a trunk,
+			# and moving one without the other detaches them.
+			for i in mesh.get_surface_count():
+				var mat := mesh.surface_get_material(i) as ShaderMaterial
+				check_true("%s %s surface %d moves" % [id, prop, i], mat != null)
+				if mat == null:
+					continue
+				check_true("%s %s surface %d uses the wind shader" % [id, prop, i],
+					mat.shader != null
+					and mat.shader.resource_path == TrackBuilder.WIND_SHADER)
+				# It divides in the shader. A zero would send the displacement to
+				# infinity and throw the geometry off the map.
+				var height: float = mat.get_shader_parameter("reference_height")
+				check_true("%s %s knows how tall it is (%.1f m)" % [id, prop, height],
+					height > 0.5 and height < 60.0)
+		circuit.free()
+
+## The swap into the wind shader has to be **lossless**, and the way it stops
+## being lossless is the colour.
+##
+## `set_shader_parameter` on a `spatial` shader's `source_color` uniform is
+## converted for you. Converting first as well — which is what `sky.gdshader`
+## needs and what this looked like it needed — renders the whole forest at about
+## half its authored brightness, canopy green arriving as a dark bottle green. It
+## is a *plausible* forest, so only a comparison finds it.
+##
+## Checked against the Kenney source rather than against a recorded number, so it
+## still means something after the kit is re-imported.
+func test_the_wind_carries_the_prop_colour_across() -> void:
+	var source: Node3D = load("res://assets/kenney/racing_kit/treeLarge.glb").instantiate()
+	var want := {}
+	for mi in source.find_children("*", "MeshInstance3D", true, false):
+		var mesh: Mesh = (mi as MeshInstance3D).mesh
+		for i in mesh.get_surface_count():
+			var mat := mesh.surface_get_material(i) as StandardMaterial3D
+			if mat != null:
+				want[mat.resource_name] = mat.albedo_color
+	source.free()
+	check_true("the tree has surfaces to check (%d)" % want.size(), want.size() >= 2)
+
+	var circuit: Node3D = load("res://scenes/track/track_ardennes.tscn").instantiate()
+	var found := circuit.find_children("TreesLarge", "MultiMeshInstance3D", true, false)
+	check_true("ardennes has trees", not found.is_empty())
+	if not found.is_empty():
+		var mesh: Mesh = (found[0] as MultiMeshInstance3D).multimesh.mesh
+		for i in mesh.get_surface_count():
+			var mat := mesh.surface_get_material(i) as ShaderMaterial
+			if mat == null:
+				continue
+			# The surface name is kept through the swap, which is what lets this
+			# match a baked surface back to the Kenney material it came from.
+			check_true("the wind keeps the surface name (%s)" % mat.resource_name,
+				want.has(mat.resource_name))
+			if not want.has(mat.resource_name):
+				continue
+			var got: Color = mat.get_shader_parameter("albedo")
+			check_true("%s keeps its colour through the wind (%s)"
+				% [mat.resource_name, got],
+				got.is_equal_approx(want[mat.resource_name]))
+	circuit.free()
+
+## A flag and a tree are not the same thing in wind, and the settings say so.
+##
+## Cheap, but it is the difference between wind and one global wobble applied to
+## everything: a marker flag is small, light and hung on nothing, so it moves much
+## further for its size and much faster than a fourteen-metre trunk does.
+func test_flags_and_trees_move_differently() -> void:
+	check_true("flags flutter faster than trees sway",
+		float(TrackBuilder.WIND_FLAG["speed"]) > float(TrackBuilder.WIND_TREE["speed"]))
+	check_true("and move further for their size",
+		float(TrackBuilder.WIND_FLAG["sway"]) > float(TrackBuilder.WIND_TREE["sway"]))
+	# Above 1 on both, or the prop slides along the ground instead of bending. The
+	# tree is the stiffer of the two because it has a trunk and the flag does not.
+	check_true("both hold their base still",
+		float(TrackBuilder.WIND_TREE["bend"]) > 1.0
+		and float(TrackBuilder.WIND_FLAG["bend"]) > 1.0)
+	check_true("the tree is the stiffer of the two",
+		float(TrackBuilder.WIND_TREE["bend"]) > float(TrackBuilder.WIND_FLAG["bend"]))
+
 ## Weather is a **colour treatment**, and specifically not a grip change.
 ##
 ## `docs/ideas.md` notes that lowering grip is what would make weather a gameplay
@@ -7023,6 +7121,9 @@ func _physics_process(_delta: float) -> bool:
 		test_night_lights_the_columns_it_needs()
 		test_the_ground_takes_its_theme_and_its_hour()
 		test_roadside_markers_are_dense_enough_to_read_as_speed()
+		test_the_scenery_is_in_the_wind()
+		test_the_wind_carries_the_prop_colour_across()
+		test_flags_and_trees_move_differently()
 		test_weather_changes_the_look_and_not_the_lap()
 		test_the_road_carries_a_lateral_coordinate()
 		test_conditions_are_a_separate_record_and_a_separate_target()

@@ -799,7 +799,8 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > cheap work and the identity-forming work turned out to be the same work.**
 > Realism is not the axis this game gets better along.
 
-**Status: steps 1 and 2 done — the grading system, and all six looks authored.**
+**Status: steps 1–3 done — the grading system, all six looks authored, and the
+scenery moving.**
 
 1. **A colour grade per look, as a real LUT.** `CircuitLook` already pairs an hour
    with a place; it gains a third thing, and that thing is the signature.
@@ -866,12 +867,29 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 3. **Wind.** One vertex shader, applied to trees, flags, banners and the roadside
    grass, phase driven by world position so nothing moves in lockstep.
 
-> The highest ratio of *alive* to *complexity* in the entire project. No CPU cost,
-> no per-frame script, no new nodes, works under Compatibility, and it survives
-> the trees being `MultiMesh` instances because the displacement is per-vertex in
-> world space and never touches the instance transform.
+> **Done, on the trees and the roadside marker flags.** The highest ratio of
+> *alive* to *complexity* in the project, as expected: no CPU cost, no per-frame
+> script, no new nodes, and verified working under Compatibility. It survives the
+> trees being `MultiMesh` because the phase comes from `MODEL_MATRIX[3]` — where
+> the instance stands — which is the only per-instance identity a `MultiMesh`
+> vertex has.
 >
 > A static tree reads as a prop. A tree that moves reads as a place.
+>
+> **Not done: banner towers and roadside grass.** The banner towers are the two
+> props at the start line, and they go in through `_place_prop`, which instances
+> the GLB scene directly — so putting them in the wind means either mutating a
+> shared imported resource or a property override on an instanced sub-scene's
+> internal node, and the second is the exact shape of a trap already recorded
+> here. It wants a per-instance mesh duplication of its own and is a separate
+> change. **Roadside grass does not exist**: the kit's entire vegetation list is
+> `treeLarge` and `treeSmall`, so there is no grass prop to move. The roadmap line
+> above was written without checking, and it is left as written with this note
+> rather than quietly narrowed.
+>
+> The full write-up — the `MultiMesh` phase, `world_vertex_coords`, and the two
+> traps this hit — is in `docs/architecture.md` under "Wind, and the two things it
+> has to survive".
 
 4. **Speed you can feel.** Camera shake that rises with speed and with surface,
    a screen-space speed effect at the frame edges, and roadside density that
