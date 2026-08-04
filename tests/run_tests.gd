@@ -279,6 +279,138 @@ func test_the_steering_curve_leaves_full_lock_alone() -> void:
 	check_true("half a stick asks for less than half lock", car._curve(0.5) < 0.5)
 	check_true("and asks in the same direction", car._curve(-0.5) < 0.0)
 
+## Godot's brightness/contrast/saturation, reimplemented here so the migration
+## has something independent to be compared against.
+##
+## Deliberately a *second* copy of the arithmetic rather than a call into
+## `ColourGrade.from_bcs`: a test that converts with the same function it is
+## checking proves only that the function is deterministic. This is the engine's
+## own order — brightness as a multiply from black, contrast as a lerp about 0.5,
+## saturation about a flat channel mean.
+func _godot_bcs(colour: Color, grade: Vector3) -> Color:
+	var v := Vector3(colour.r, colour.g, colour.b)
+	v = v * grade.z
+	v = Vector3(0.5, 0.5, 0.5).lerp(v, grade.y)
+	var mean := (v.x + v.y + v.z) / 3.0
+	v = Vector3(mean, mean, mean).lerp(v, grade.x)
+	return Color(clampf(v.x, 0.0, 1.0), clampf(v.y, 0.0, 1.0), clampf(v.z, 0.0, 1.0))
+
+## **The load-bearing test of the whole change.** A look nobody has art-directed
+## has to render exactly as it did when the grade was three `Environment` dials.
+##
+## Without this the migration is a claim. With it, `bright` and `night` can be
+## pushed as far as they need to go while the other four are provably untouched —
+## which is what makes it safe to change the grading system and the art direction
+## in the same commit.
+##
+## Sampled on a lattice rather than at a handful of hand-picked colours, because
+## the two implementations diverge in *shadows and highlights* if they diverge at
+## all — clamping, and the order of the multiply against the lerp — and a mid-grey
+## test would pass through either mistake.
+func test_the_grade_migration_is_exact() -> void:
+	var ungraded := 0
+	for look in CircuitLook.LOOKS:
+		if ColourGrade.GRADES.has(look):
+			continue
+		ungraded += 1
+		var bcs: Vector3 = SkyPreset.named(
+			String(CircuitLook.named(look)["sky"])
+		)["grade"]
+		var derived := ColourGrade.of(look)
+		var worst := 0.0
+		for r in 5:
+			for g in 5:
+				for b in 5:
+					var src := Color(r / 4.0, g / 4.0, b / 4.0)
+					var was := _godot_bcs(src, bcs)
+					var now := ColourGrade.apply(src, derived)
+					worst = maxf(worst, absf(was.r - now.r))
+					worst = maxf(worst, absf(was.g - now.g))
+					worst = maxf(worst, absf(was.b - now.b))
+		check_near("%s grades exactly as it used to" % look, worst, 0.0, 0.0005)
+
+	# If someone art-directs every look, this test stops proving anything and
+	# should be retired rather than left passing vacuously.
+	check_true("there is still an underived look to check", ungraded > 0)
+
+## The LUT has to *be* the grade, not merely resemble it — and the axis order is
+## the thing that goes wrong.
+##
+## `adjustment_color_correction` feeds the incoming colour in as the texture
+## coordinate, so red is x, green is y and blue is the slice. Swap two of those
+## and the result is still a graded, plausible-looking image, which is a mistake
+## that survives being looked at. Only the corners and a mid-point are checked;
+## the interior is trilinear interpolation between them and is the renderer's job.
+func test_the_lut_is_the_grade_sampled() -> void:
+	var look := "night"
+	var grade := ColourGrade.of(look)
+	var tex := ColourGrade.lut(look)
+	check_true("the table is cubic", tex.get_width() == ColourGrade.SIZE
+		and tex.get_height() == ColourGrade.SIZE
+		and tex.get_depth() == ColourGrade.SIZE)
+
+	# The images on the way in, not `tex.get_data()` — that comes back empty under
+	# `--headless`, where no rendering server is holding the texture.
+	var slices := ColourGrade.slices(look)
+	var last := ColourGrade.SIZE - 1
+	# Asymmetric on purpose: a red-blue swap is invisible on the greyscale
+	# diagonal, so every probe here has three different channel values.
+	var probes := [
+		Vector3i(0, 0, 0), Vector3i(last, 0, 0), Vector3i(0, last, 0),
+		Vector3i(0, 0, last), Vector3i(last, last, 0), Vector3i(last, 0, last),
+		Vector3i(last, last, last), Vector3i(2, 7, 13), Vector3i(13, 2, 7),
+	]
+	var worst := 0.0
+	for p in probes:
+		var src := Color(float(p.x) / last, float(p.y) / last, float(p.z) / last)
+		var want := ColourGrade.apply(src, grade)
+		var got: Color = (slices[p.z] as Image).get_pixel(p.x, p.y)
+		worst = maxf(worst, absf(want.r - got.r))
+		worst = maxf(worst, absf(want.g - got.g))
+		worst = maxf(worst, absf(want.b - got.b))
+	# One 8-bit step is 1/255; the table is quantised and the reference is not.
+	check_near("the table samples the grade on every axis", worst, 0.0, 1.0 / 255.0)
+
+## The grade is attached on **load**, so the only proof it reaches the player is
+## the scene the player actually gets.
+##
+## A runtime `ImageTexture3D` cannot be packed, so this is the failure mode the
+## whole `grade_scene` arrangement exists to avoid — and an ungraded frame looks
+## merely flat rather than broken, so nothing else in the suite would catch it.
+func test_the_race_scene_is_graded() -> void:
+	var track := root.get_node("Race/Track") as Node3D
+	var we := track.get_node_or_null("WorldEnvironment") as WorldEnvironment
+	check_true("the race scene has an environment", we != null)
+	if we == null:
+		return
+	var lut := we.environment.adjustment_color_correction
+	check_true("the race scene carries its grade", lut != null)
+	check_true("and it is a cube, not a gradient strip", lut is Texture3D)
+	# The cache means the same look must hand back the *same* texture, which is
+	# what keeps a race start from rebuilding 4096 texels it already has.
+	check_true("the grade is the one its look asks for",
+		lut == ColourGrade.lut(String(track.get_meta("look"))))
+
+## The authored grades have to actually do the thing they were authored for.
+##
+## `bright` and `night` exist to put **cool shadows against warm highlights** —
+## the one operation the three scalars they replaced could not express, and the
+## reason this milestone starts here. Asserting the split rather than the
+## numbers: the values will be tuned by eye and should be free to move, but a
+## tuning pass that accidentally flattens the split has undone the point.
+func test_authored_grades_split_the_tones() -> void:
+	for look in ["bright", "night"]:
+		check_true("%s is art-directed" % look, ColourGrade.GRADES.has(look))
+		var grade := ColourGrade.of(look)
+		# Saturation off, so what is measured is the tone split and not the
+		# saturation boost sitting on top of it.
+		var flat := grade.duplicate()
+		flat["saturation"] = 1.0
+		var shadow := ColourGrade.apply(Color(0.12, 0.12, 0.12), flat)
+		var highlight := ColourGrade.apply(Color(0.88, 0.88, 0.88), flat)
+		check_true("%s shadows go cool" % look, shadow.b > shadow.r)
+		check_true("%s highlights go warm" % look, highlight.r > highlight.b)
+
 ## Each shipped circuit is baked at **its own hour**, and the whole preset has to
 ## survive the bake — not just the grade.
 ##
@@ -296,11 +428,20 @@ func test_shipped_circuits_carry_their_own_hour() -> void:
 		var env: Environment = (
 			circuit.get_node("WorldEnvironment") as WorldEnvironment
 		).environment
-		var grade: Vector3 = preset["grade"]
+		# `adjustment_enabled` gates the whole adjustment block, colour correction
+		# included, so this staying true is what lets the grade exist at all.
 		check_true("%s is graded" % id, env.adjustment_enabled)
-		check_near("%s saturation" % id, env.adjustment_saturation, grade.x, 0.001)
-		check_near("%s contrast" % id, env.adjustment_contrast, grade.y, 0.001)
-		check_near("%s brightness" % id, env.adjustment_brightness, grade.z, 0.001)
+		# The three scalars are **deliberately neutral**: the grade is a LUT now,
+		# Godot applies these before it, and anything left in them would grade the
+		# image twice. See ColourGrade.
+		check_near("%s saturation is neutral" % id, env.adjustment_saturation, 1.0, 0.001)
+		check_near("%s contrast is neutral" % id, env.adjustment_contrast, 1.0, 0.001)
+		check_near("%s brightness is neutral" % id, env.adjustment_brightness, 1.0, 0.001)
+		# The look has to survive the bake, because it is the only route back to
+		# the grade — `grade_scene` has nothing else to look it up by.
+		check_true("%s remembers its look" % id, circuit.has_meta("look"))
+		check_true("%s look is a real one" % id,
+			CircuitLook.LOOKS.has(String(circuit.get_meta("look"))))
 
 		# Fog is the sky's own horizon colour or it cannot land the 4 km ground
 		# plane into it. They are one edge seen twice, so they come from one
@@ -6833,6 +6974,10 @@ func _physics_process(_delta: float) -> bool:
 		test_partial_throttle_reaches_the_engine()
 		test_the_steering_curve_leaves_full_lock_alone()
 		test_shipped_circuits_carry_their_own_hour()
+		test_the_grade_migration_is_exact()
+		test_the_lut_is_the_grade_sampled()
+		test_the_race_scene_is_graded()
+		test_authored_grades_split_the_tones()
 		test_every_sky_preset_is_complete()
 		test_circuits_have_a_horizon()
 		test_night_lights_the_columns_it_needs()

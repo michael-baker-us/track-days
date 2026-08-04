@@ -54,6 +54,19 @@ static func resolve(track_name: String, chosen: String = "") -> Dictionary:
 		return LOOKS[chosen]
 	return named(String(BY_TRACK.get(track_name, DEFAULT)))
 
+## The *name* of that look rather than its contents.
+##
+## `resolve` hands back the entry, which is what the sky and the scenery want.
+## The colour grade wants the key: a LUT is cached under it and a circuit carries
+## it as metadata, and neither can be recovered from a dictionary of three
+## strings. Same resolution order, so the two can never disagree about which look
+## a circuit has.
+static func name_of(track_name: String, chosen: String = "") -> String:
+	if LOOKS.has(chosen):
+		return chosen
+	var by_track := String(BY_TRACK.get(track_name, DEFAULT))
+	return by_track if LOOKS.has(by_track) else DEFAULT
+
 static func sky_of(track_name: String, chosen: String = "") -> Dictionary:
 	return SkyPreset.named(String(resolve(track_name, chosen)["sky"]))
 

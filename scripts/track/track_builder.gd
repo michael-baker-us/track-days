@@ -2140,11 +2140,25 @@ func _build_lighting(root_node: Node3D, track_name: String = "") -> void:
 	# which is the exact failure ACES was chosen to fix.
 	env.tonemap_white = 2.1
 
-	var grade: Vector3 = preset["grade"]
+	# **Left neutral, because the grade is a LUT now and the LUT subsumes these.**
+	# Godot applies brightness, contrast and saturation *before* the colour
+	# correction texture, so anything left in them would grade the image twice —
+	# once with the three dials the look was authored on and once with the table
+	# built from those same numbers. `ColourGrade.from_bcs` is the conversion, and
+	# it is exact rather than approximate, so neutral here loses nothing.
+	#
+	# `adjustment_enabled` still has to be **true**: it gates the whole block,
+	# colour correction included, so a false here silently disables the grade.
 	env.adjustment_enabled = true
-	env.adjustment_saturation = grade.x
-	env.adjustment_contrast = grade.y
-	env.adjustment_brightness = grade.z
+	env.adjustment_saturation = 1.0
+	env.adjustment_contrast = 1.0
+	env.adjustment_brightness = 1.0
+	# The table itself is attached on load by `grade_scene`, not here. An
+	# `ImageTexture3D` is built at runtime and does not survive `PackedScene.pack`
+	# — the same serialisation limit that keeps `surface_road` out of the builder —
+	# so what the circuit carries is the *name* of its look and the LUT is fetched
+	# through it.
+	root_node.set_meta("look", CircuitLook.name_of(track_name, _look))
 
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
@@ -2162,6 +2176,32 @@ func _build_lighting(root_node: Node3D, track_name: String = "") -> void:
 
 	we.environment = env
 	root_node.add_child(we)
+
+## Attaches the circuit's colour grade to its environment, in place.
+##
+## Called by `race.gd` on the track it is about to show, for the same reason
+## `surface_road` is: an `ImageTexture3D` is built at runtime and a runtime
+## texture does not survive `PackedScene.pack`. Baking the grade into the scene
+## would ship four circuits with an empty `adjustment_color_correction` and no
+## warning, because an ungraded frame is a *plausible* frame — it is merely flatter
+## than it should be, which is exactly the kind of regression nobody notices.
+##
+## So the circuit carries the **name** of its look as metadata and the table is
+## fetched through it here. Idempotent: assigning the same cached texture again
+## costs nothing, which matters because `race.gd` runs this on every race start.
+##
+## Silent when a circuit has no look recorded. That is not defensive coding — the
+## suite builds bare roots to measure geometry on, and the editor's `measure()`
+## path builds without lighting at all.
+static func grade_scene(track_root: Node3D) -> void:
+	if not track_root.has_meta("look"):
+		return
+	var we := track_root.get_node_or_null("WorldEnvironment") as WorldEnvironment
+	if we == null or we.environment == null:
+		return
+	we.environment.adjustment_color_correction = ColourGrade.lut(
+		String(track_root.get_meta("look"))
+	)
 
 ## Re-surfaces the drivable part of every tile as tarmac, in place.
 ##

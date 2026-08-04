@@ -27,6 +27,10 @@ func _ready() -> void:
 	# TrackBuilder.surface_road. Applying it on load treats a shipped circuit and
 	# a player's the same way.
 	TrackBuilder.surface_road(track, GameState.selected_surface)
+	# Likewise done on load rather than in the builder, and for the same
+	# serialisation reason: the grade is a runtime `ImageTexture3D` and would not
+	# survive being packed. See TrackBuilder.grade_scene.
+	TrackBuilder.grade_scene(track)
 	# Ahead of the car so the car keeps rendering order and group lookups work.
 	add_child(track)
 	move_child(track, 0)

@@ -766,6 +766,258 @@ surfaces change that, and that is when the barriers need collision.
 
 ---
 
+## M18 — Identity, and a world in motion
+
+*The point at which the game becomes recognisable at a glance, and stops being
+still.*
+
+M16 gave the circuit a sky, an hour and a real lighting rig; M17 gave the road a
+material that varies. What neither gave it is **a signature** — something that
+makes a screenshot identifiably this game and not any other Godot racer — or
+**motion**, of which the circuit currently has exactly one source: the car.
+Everything else in frame is nailed down. The trees do not move, the flags do not
+move, the grandstands are empty, and the storm is a colour.
+
+Both gaps are cheaper to close than anything in M19, and closing them is worth
+more. That ordering was arrived at the wrong way round and is corrected below.
+
+> **This milestone was originally "Made of something" — a Poly Haven PBR
+> conversion — and was demoted to M19 before any of it was built.** The reasoning
+> it was written under does not survive the standard the project is actually held
+> to: largest visual improvement for the least complexity, and every decision
+> reinforcing one coherent style.
+>
+> A PBR texture pass fails both. **It is the most generic move available**:
+> photoreal asphalt and triplanar concrete are what every asset-store racer is
+> made of, and adopting them spends the one thing this game has — a committed
+> flat-shaded look — to buy something anyone can buy. And its heaviest step,
+> texturing the kit and lighting the ground plane, invalidates the floodlight rig
+> that took three wrong versions to get right, in exchange for barriers that are
+> beige instead of white.
+>
+> Meanwhile a wind shader is fifteen lines and makes an entire forest move. **The
+> cheap work and the identity-forming work turned out to be the same work.**
+> Realism is not the axis this game gets better along.
+
+**Status: step 1 done — the grading system and two authored looks.**
+
+1. **A colour grade per look, as a real LUT.** `CircuitLook` already pairs an hour
+   with a place; it gains a third thing, and that thing is the signature.
+
+> **Done, as ASC CDL.** Per-channel slope, offset and power, then saturation —
+> the film industry's colour decision list rather than anything invented here, and
+> four parameters is exactly enough. Cool shadows against warm highlights turns
+> out to need no dedicated parameters at all: it *is* an offset that crushes red
+> and a slope that lifts it.
+>
+> **The migration is exact and the suite proves it.** Godot's
+> brightness-then-contrast arithmetic rearranges into a slope and an offset, so
+> the four looks nobody has art-directed render pixel-identical to how they did
+> when the grade was three `Environment` scalars. That is what allowed the
+> grading system and the art direction to change in one commit.
+>
+> `bright` and `night` are authored; `evening`, `dusk`, `storm` and `overcast`
+> are still derived and are the next tuning pass. The full write-up, including the
+> two traps the suite caught, is in `docs/architecture.md` under "The colour
+> grade".
+>
+> **Not done: the palette consolidation.** Ground colour still lives in
+> `SceneryTheme`, sky and fog in `SkyPreset`, road in `RoadSurface`, and none of
+> the three consults the others. Deliberately left out of this step — it is a
+> refactor with no visual output, and mixing it into the change that carried a
+> provable migration would have made both harder to review.
+
+> `ideas.md` left this open — "a global saturation push, or a hand-authored LUT
+> per circuit? The second is much stronger and is also the point at which someone
+> has to art-direct three separate looks." It is answered here: **the LUT**, and
+> the art direction is the deliverable rather than the obstacle.
+>
+> Grading is what makes *art of rally*, *Hotshot Racing* and *Horizon Chase* each
+> recognisable in one frame, and none of them is doing it with fidelity. It is
+> also nearly free: `Environment.adjustment_color_correction` takes a `Texture3D`,
+> the environment is already built per circuit in `_build_environment`, and the
+> three `adjustment_*` scalars in use today are the weak version of the same idea.
+>
+> **It works on the web build**, which is the fact that makes it the first step
+> rather than a desktop luxury. `Adjustments` are supported under Compatibility.
+>
+> The palette question comes with it. Ground colour lives in `SceneryTheme`, sky
+> and fog in `SkyPreset`, road in `RoadSurface` — three files that each pick
+> colours without reference to the other two, which is why a circuit reads as
+> assembled rather than authored. A look should **own a palette** those three draw
+> from.
+
+2. **Wind.** One vertex shader, applied to trees, flags, banners and the roadside
+   grass, phase driven by world position so nothing moves in lockstep.
+
+> The highest ratio of *alive* to *complexity* in the entire project. No CPU cost,
+> no per-frame script, no new nodes, works under Compatibility, and it survives
+> the trees being `MultiMesh` instances because the displacement is per-vertex in
+> world space and never touches the instance transform.
+>
+> A static tree reads as a prop. A tree that moves reads as a place.
+
+3. **Speed you can feel.** Camera shake that rises with speed and with surface,
+   a screen-space speed effect at the frame edges, and roadside density that
+   streams.
+
+> **FOV kick already exists** — `chase_camera.gd` scales it against
+> `camera_fov_reference_kmh` per car preset — so this is the rest of the set, not
+> the start of it. Shake belongs with it in `CarTuning` for the same reason
+> framing does: it is part of how a car feels, not a property of the scene.
+>
+> "Density is speed" is already written into the suite's own comments. Marker
+> posts, verge lines and lighting columns passing at a rate are most of what sells
+> pace in an arcade racer, and they cost geometry that is already placed.
+
+4. **Particles, from data the game already has.** Tyre spray, dust and grass
+   clippings off the wheels; colour and behaviour taken from `RoadSurface`.
+
+> `RoadSurface` already answers this question for a different consumer:
+> `mark_always` says whether a tyre displaces material by rolling, `mark` says
+> what colour that material is. A dust plume on dirt, a snow rooster tail, and
+> nothing on dry tarmac until the tyre slides — that is the existing table, read
+> by something new.
+>
+> **`CPUParticles3D` on web.** `GPUParticles3D` under Compatibility throws WebGL
+> errors with a *View Depth* draw order, and particle trails and SDF collision are
+> unsupported there anyway. This is a case where the constrained path is also the
+> simple one.
+
+5. **Weather that does something.** `storm` is currently an hour with a grey
+   grade. It becomes rain: a screen-space droplet layer, spray thrown from the
+   wheels, and a wet road — which is a **roughness change**, not a new shader.
+
+> Wet tarmac is the one place realism pays here, because a low-roughness road
+> reflecting a bright sky is a dramatic image rather than a faithful one. It also
+> composes with what exists: `RoadSurface` already carries `roughness` per
+> surface, and `sparkle` already proved that punching roughness holes and letting
+> the real sun answer beats drawing the highlight.
+
+6. **The grandstands are empty, and that reads as abandoned.** Billboard
+   spectators with a shimmer, and marshal posts with flags.
+
+> Environmental storytelling, and the cheapest kind: an impostor crowd is a
+> textured quad per spectator with two frames of animation, a technique older than
+> the renderer it runs on. The grandstands are already placed and already lit. A
+> full stand is the difference between a race and a test session.
+
+7. **Boards that make the circuit readable.** Braking markers, apex markers and
+   corner numbering, placed from the centreline the way everything trackside
+   already is.
+
+> Real circuits carry these because they *work* — a driver reads distance-to-apex
+> off them — so they are the rare piece of set dressing that improves play and
+> authenticity with one asset. Placement is a function of `Compiled.corners`,
+> which the builder already has.
+
+**Deliberately not here: live time-of-day transition.** It was asked for and it
+does not fit yet. `SkyPreset` is discrete presets resolved at *build* time, with
+`road_glow` and `headlights` baked onto the packed scene as metadata; a
+transition means interpolating whole presets at runtime and re-driving the light
+rig every frame, including which of two directional lights casts the shadow. That
+is a milestone, not a step, and it wants the presets to be interpolatable first.
+The cheap version — a race that starts at dusk and finishes at night — is
+reachable once step 1 makes a look own its palette.
+
+---
+
+## M19 — Made of something
+
+*Materials, scoped to what a stylised game can actually use.*
+
+Everything M18 does is achieved without a texture. This is where the textures
+come in, and the scope is deliberately much smaller than the version that was
+first written: **the two steps with a clear payoff, and not the two without one.**
+
+Assets are **Poly Haven** — CC0, roughly 980 HDRIs and 780 texture sets, no
+attribution required.
+
+> **Poly Haven has no racing geometry, and never will.** The model library is
+> Props, Furniture, Decorative, Industrial, Appliances, Nature, Electronics,
+> Tools, Lighting — about 520 assets, none of them a grandstand, a barrier, a
+> kerb, a gantry, a tyre stack or a car. So "use Poly Haven throughout" cannot
+> mean replacing the Kenney kit; there is nothing to replace it with short of
+> modelling it, which is a different project in a different discipline.
+>
+> The kit keeps its silhouettes. What Poly Haven supplies is **light and
+> surface detail** — and, in Nature and Industrial, the props that make a scenery
+> theme more than a tint.
+
+1. **The asset pipeline, before any asset.** A committed manifest of Poly Haven
+   ids and resolutions, plus `tools/fetch_assets.gd` against their public API,
+   downloading into a gitignored directory. Only the **downsized derivatives the
+   game actually ships** are committed.
+
+> The same split the project makes everywhere else: `tools/` generates, the
+> generated artifact is committed, and the game never depends on `tools/` at
+> runtime. The 4 K source is a builder's input and does not belong in the history
+> any more than a `.blend` would.
+>
+> **The budget is enforced by the suite, not by discipline.** 2 K desktop, 1 K
+> web, ORM-packed, VRAM-compressed. Godot will not downscale per platform on its
+> own, and a budget that lives only in a document erodes exactly the way the
+> `[rendering]` section of `project.godot` has twice.
+
+2. **Image-based lighting.** The HDRI becomes the radiance and reflection source;
+   `SkyPreset` keeps its hours but rebalances ambient against real irradiance.
+
+> `track_builder.gd:2127-2131` sets `ambient_light_source` to a flat colour and
+> `reflected_light_source` to `DISABLED`, with stated reasons: sky irradiance
+> turned the almost entirely white kit **frankly blue**, and sky reflections on
+> roughness-1 materials cost a lot and changed nothing. Both are artefacts of
+> there being no materials and no varying roughness — and M18's wet road supplies
+> the second.
+>
+> **The sky shader stays as the visible background.** The banded gradient and the
+> oversized sun are the graphic statement and they were tuned; the HDRI is wanted
+> for its *light*, not its picture. Whether the two agree at every hour is the
+> open question of this step, and if they cannot, authoring HDRIs *from* the sky
+> shader is the fallback — cheaper, and it keeps the identity.
+
+3. **A detail pass on the road, on the ribbon rather than the tiles.** A normal
+   and roughness map on the overlay ribbon, at low contrast. **Detail, not
+   realism**: enough to break up forty per cent of the frame being dead flat, not
+   enough to turn the road photographic while the barrier beside it is a flat
+   white box.
+
+> **The UV problem is already solved and it was solved for something else.**
+> `tarmac.gdshader` generates its grain from world position precisely because road
+> UVs are inherited from tiles of three different lengths, so a sampled texture
+> seams at every join. That stays true of the tiles.
+>
+> The overlay ribbon from M17 has "how far along" and "how far across" **by
+> construction**. It is the only surface on the circuit with a UV set worth
+> sampling, so it is where this goes.
+
+4. **Scenery themes with a real prop table.** `SceneryTheme` says a theme is "a
+   colour palette plus a prop table" and admits the table is thin — two pieces of
+   vegetation, so a theme varies colour and density and nothing else. Nature and
+   Industrial are the one place Poly Haven's *models* are usable here.
+
+**Cut, and here is why.** *Triplanar PBR across the whole kit* and *a lit ground
+plane* were steps 4 and 5 of the original M18. They are the most expensive work in
+the milestone, they invalidate every measurement behind the floodlight rig — the
+field going dark at night is a *consequence* of the ground plane being `unshaded`
+— and what they buy is a kit that looks like everyone else's. If the flat kit ever
+becomes the thing holding a frame back, it comes back as its own milestone with
+that case made properly. It is not the thing holding the frame back today.
+
+> **And one correction that changes the tiering.** The original step 5 proposed
+> SSAO as a desktop-only luxury. **SSAO is supported under Compatibility** — it is
+> volumetric fog, SSIL, SDFGI and depth of field that are not. So contact shadows
+> are available to the web build, which is where they matter most: a flat-shaded
+> kit has very little to ground its objects to the floor, and ambient occlusion is
+> exactly the cue it is missing. Verified against the Godot renderer support
+> matrix rather than assumed.
+
+**What this breaks, and it is real:** the download. Every texture lands in the
+same `.pck` that has to arrive in a browser, single-threaded, from GitHub Pages.
+This is the first milestone whose primary cost is bytes rather than frames, and
+the budget in step 1 is what decides whether it ships.
+
+---
+
 ## Cross-cutting, every milestone
 
 Non-negotiable per `CLAUDE.md` and the repository philosophy:

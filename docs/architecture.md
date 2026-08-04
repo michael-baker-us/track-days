@@ -1033,10 +1033,75 @@ the editor recompiles on every mouse move and dragging is how it is used.
 
 ## The look
 
-The target is **Horizon Chase**: vivid flat-shaded colour blocking, no textures,
-big graphic skies, bright and readable, never grimy. The Kenney kit is already
-untextured flat-shaded geometry, which is the expensive half of that look done,
-and it survives the compatibility renderer the web build is stuck with.
+The target is **Horizon Chase**: vivid flat-shaded colour blocking, no textures
+on the geometry, big graphic skies, bright and readable, never grimy. The Kenney
+kit is already untextured flat-shaded geometry, which is the expensive half of
+that look done, and it survives the compatibility renderer the web build is stuck
+with.
+
+### The colour grade
+
+Every circuit is seen through a **lookup table**, one per `CircuitLook`, built by
+`scripts/track/colour_grade.gd`. It is the first thing in the frame that is
+authored rather than derived, and it is where the game's visual identity is
+supposed to live.
+
+The model is **ASC CDL** — per-channel slope, offset and power, then saturation.
+Not invented here: it is the colour decision list the film industry standardised
+on, it is four parameters, and it is exactly enough. Slope multiplies, so it
+moves highlights and leaves black alone; offset adds, so it moves shadows and
+washes out toward white. **Cool shadows against warm highlights — the operation
+most responsible for a game looking like itself — is therefore just an offset
+that crushes red and a slope that lifts it.** An earlier draft carried
+`shadow_tint` and `highlight_tint` next to CDL before anyone noticed they were
+the same two dials under different names.
+
+> **Why this replaced three `Environment` dials rather than joining them.**
+> `adjustment_saturation`, `adjustment_contrast` and `adjustment_brightness` were
+> the whole grade until M18, one `Vector3` per hour in `SkyPreset`. They work, but
+> they are three *global scalars*: they can only move the whole image at once, and
+> no combination of them puts warm light in the highlights while leaving the
+> shadows cool.
+>
+> Godot applies all three **before** colour correction, so leaving them set would
+> grade the image twice. They are pinned to 1.0 and `ColourGrade.from_bcs` carries
+> their meaning into the table instead. `adjustment_enabled` still has to be
+> **true** — it gates the whole block, colour correction included.
+
+**The migration is exact, and that is asserted rather than claimed.** Godot's
+brightness-then-contrast arithmetic is `colour * brightness`, then
+`mix(0.5, colour, contrast)`, which expands to a slope of `brightness * contrast`
+and an offset of `0.5 * (1 - contrast)`. So a look nobody has art-directed yet
+renders pixel-identical to how it rendered before the file existed. `GRADES`
+holds the looks that *have* been art-directed — `bright` and `night` — and
+everything else is derived. That is what let the grading system and the art
+direction change in one commit: four of the six looks are provably untouched.
+
+> **Two traps, both found by the suite.**
+>
+> **Do not clamp between the offset and the saturation.** Godot's chain clamps
+> nothing until the framebuffer write, so a dark pixel that an offset takes below
+> zero *stays* below zero and drags the channel mean down with it. Clamping there
+> is a plausible-looking mistake worth about 0.03 in the shadows — small, and
+> right in the range the migration has to be exact in.
+>
+> **Saturation is a flat channel mean, not luminance.** Because Godot's tonemap
+> desaturates toward `dot(vec3(1.0), colour) * 0.33333` and every grade was
+> authored against that. A luminance-weighted mean is more correct and would
+> silently re-grade six looks the day it arrived.
+
+The table is 16 cubed — the low end of what film LUTs use, and about 12 KB against
+98 KB at 32. It is attached **on load** by `TrackBuilder.grade_scene`, not baked,
+because an `ImageTexture3D` is built at runtime and does not survive
+`PackedScene.pack` — the same serialisation limit that keeps `surface_road` out of
+the builder. A circuit carries the *name* of its look as metadata and the table is
+fetched through it. Grading is also, notably, **one of the few large visual levers
+the Compatibility renderer still has**: `Adjustments` are supported there, while
+volumetric fog, SSIL, SDFGI and depth of field are not.
+
+> An ungraded frame is a **plausible** frame — merely flatter than it should be —
+> so nothing catches this failing by looking at it. `tests/run_tests.gd` asserts
+> the LUT reaches the scene the player actually gets.
 
 ### Tyre marks: what shape, where, and for how long
 
