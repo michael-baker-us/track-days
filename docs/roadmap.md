@@ -277,7 +277,23 @@ Six streams, 100 KB, about 1% of the web `.pck`.
    rebuilt whenever one is added or deleted, and a signal connected per row is a
    signal missed on the row added next.
 
-**Not done: kerbs.** And the default is
+6. **Kerbs rattle.** A train of sharp clicks rather than a tone, because a kerb is
+   a *rhythm* — ribs going under a tyre — and the runtime shifts its rate with
+   speed, which is the whole information a kerb carries.
+
+   It needed something nothing else in the game had: **how far across the road the
+   car is**. The collision world answers everything else — on the tarmac at all is
+   a masked raycast, how steep it is comes off the contact normal — but not that.
+   The circuit carries its centreline as metadata, `race.gd` hands it over, and
+   `KerbFeel` walks a rolling index outward from the last answer rather than
+   scanning a couple of thousand points every physics frame.
+
+   **Deliberately only a sound.** A real kerb unsettles the car, and the collision
+   ribbon is smooth across its whole width — there is no bump to hit, so shaking
+   the car by hand would be inventing a physical event with no physics behind it.
+   Ribs on the ribbon is the honest version and a different piece of work.
+
+**M12 is now done bar the listening.** And the default is
 **still off**, which is the honest position — every claim above is a measurement,
 and the thing that condemned the last version was a person listening to it. The
 constant is `GameState.audio_enabled`; flipping it is one line, and it should be

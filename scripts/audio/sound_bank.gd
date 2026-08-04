@@ -298,6 +298,33 @@ static func ui_move() -> AudioStreamWAV:
 static func ui_pick() -> AudioStreamWAV:
 	return _tone(UI_PICK_HZ, UI_FRAMES * 2, 28.0, 0.12, 0.36)
 
+## Running over a kerb: a hard, fast rattle rather than a tone.
+##
+## A kerb is a *rhythm* — a row of ribs going under the tyre — so this is a train
+## of sharp clicks rather than anything pitched, built the same way the engine is:
+## impulses placed in time, wrapped so the buffer meets its own start. The rate is
+## fixed, and the runtime shifts it with `pitch_scale` so faster means busier,
+## which is the whole information a kerb carries.
+const KERB_FRAMES := 4410      # 0.20 s
+const KERB_RIBS := 14          # 70 ribs a second at pitch 1.0
+
+static func kerb() -> AudioStreamWAV:
+	var duration := float(KERB_FRAMES) / float(MIX_RATE)
+	var noise := _noise_table(KERB_FRAMES, 20260804)
+	var samples := PackedFloat32Array()
+	samples.resize(KERB_FRAMES)
+	for rib in KERB_RIBS:
+		var struck := duration * float(rib) / float(KERB_RIBS)
+		for i in KERB_FRAMES:
+			var dt := fposmod(float(i) / float(MIX_RATE) - struck, duration)
+			var env: float = exp(-dt * 320.0)
+			if env < 0.002:
+				continue
+			# A low knock with a broadband edge on it: the tyre and the rib.
+			var v := sin(TAU * 120.0 * dt) + 0.7 * noise[i]
+			samples[i] += v * env
+	return _to_wav(_normalised(samples, 0.7))
+
 ## A fixed field of white noise, exactly the buffer's length.
 ##
 ## Indexed modulo that length it is periodic, so it loops seamlessly — the

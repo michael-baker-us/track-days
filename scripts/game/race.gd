@@ -42,6 +42,14 @@ func _ready() -> void:
 		beams.set_hour(float(track.get_meta("headlights", 0.0)))
 	add_child(_car)
 
+	# The road coordinate, which is the one thing about the car's relationship to
+	# the circuit that the collision world cannot answer: how far *across* the
+	# road it is. The circuit carries its centreline as metadata, so a painted
+	# one and a baked one hand it over the same way.
+	var kerb := _car.get_node_or_null("Kerb") as KerbFeel
+	if kerb != null:
+		kerb.set_road(track.get_meta("centreline", PackedVector3Array()))
+
 	var spawn: Marker3D = track.get_node("SpawnPoint")
 	_place_car(spawn.position, spawn.rotation.y)
 	_hold_for_the_lights(track)

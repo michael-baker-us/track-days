@@ -129,6 +129,15 @@ func _bake(spec: CarSpec) -> bool:
 	car.add_child(_audio())
 	car.add_child(_shadow())
 	car.add_child(_headlights(body_size.z))
+	# The kerb rattle. Positional and close, because it is a thing happening at
+	# the contact patches rather than a thing filling the scene.
+	var kerb := AudioStreamPlayer3D.new()
+	kerb.name = "Kerb"
+	kerb.set_script(load("res://scripts/car/kerb_feel.gd"))
+	kerb.stream = load(KERB_STREAM)
+	kerb.unit_size = 22.0
+	kerb.volume_db = -80.0
+	car.add_child(kerb)
 	# What the tyres leave behind. A plain node like the others; it configures
 	# itself from the surface being raced on when it enters the tree.
 	var marks := MultiMeshInstance3D.new()
@@ -191,6 +200,7 @@ const OVERRUN_STREAM := "res://resources/audio/engine_overrun.tres"
 ## the one for the condition being raced. This is only what the scene ships with.
 const TYRE_STREAM := "res://resources/audio/tyre_tarmac.tres"
 const IMPACT_STREAM := "res://resources/audio/impact.tres"
+const KERB_STREAM := "res://resources/audio/kerb.tres"
 
 ## The engine note and the tyre scrub, as children of the car so they travel with
 ## it and are positioned in 3D by being where the car is.

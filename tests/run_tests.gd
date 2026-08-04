@@ -2132,6 +2132,7 @@ func test_audio_resources_match_their_source() -> void:
 		["go", SoundBank.go_tone()],
 		["ui_move", SoundBank.ui_move()],
 		["ui_pick", SoundBank.ui_pick()],
+		["kerb", SoundBank.kerb()],
 	]
 	for surface in SoundBank.TYRE_VOICES.keys():
 		built.append(["tyre_%s" % surface, SoundBank.tyre(surface)])
@@ -2239,6 +2240,62 @@ func test_the_engine_has_two_voices() -> void:
 	check_true("the loaded engine rings on (%.2f) more than the overrun (%.2f)"
 		% [tail["engine_load"], tail["engine_overrun"]],
 		float(tail["engine_load"]) > float(tail["engine_overrun"]) * 1.15)
+
+## Kerbs, and the road coordinate that finds them.
+##
+## Everything else about the car's relationship to the road is answered by the
+## collision world — whether it is on tarmac at all is a masked raycast, how steep
+## the surface is comes off the contact normal. Neither can say **how far across**
+## the road the car is, and that is the only thing a kerb is: the last metre or so
+## before the edge.
+func test_kerbs_are_felt_at_the_road_edge() -> void:
+	var car: Node = get_first_node_in_group("player_car")
+	var kerb := car.get_node_or_null("Kerb") as KerbFeel if car != null else null
+	check_true("the car carries a kerb rattle", kerb != null)
+	if kerb == null:
+		return
+	check_true("with a stream to play", kerb.stream != null)
+	# Positional: a kerb happens at the contact patches, not across the scene.
+	check_true("and it is positional", kerb is AudioStreamPlayer3D)
+
+	# A straight road down +Z, so "across" is just |x| and the answers can be
+	# read by hand.
+	var line := PackedVector3Array()
+	for i in 200:
+		line.append(Vector3(0.0, 0.0, float(i)))
+	kerb.set_road(line)
+
+	check_near("dead centre is no distance across",
+		kerb.nearest(Vector3(0.0, 0.0, 40.0)).x, 0.0, 0.001)
+	check_near("and it knows where along", kerb.nearest(Vector3(0.0, 0.0, 40.0)).y,
+		40.0, 0.001)
+	check_near("two metres out is two metres across",
+		kerb.nearest(Vector3(2.0, 0.0, 40.0)).x, 2.0, 0.001)
+
+	# The band: inside the road is not a kerb, the edge is, past the edge is not.
+	check_true("the racing line is not a kerb", not kerb.on_kerb(Vector3(1.0, 0.0, 60.0)))
+	check_true("the road edge is",
+		kerb.on_kerb(Vector3((KerbFeel.KERB_FROM + KerbFeel.KERB_TO) * 0.5, 0.0, 60.0)))
+	check_true("and so is the other edge",
+		kerb.on_kerb(Vector3(-(KerbFeel.KERB_FROM + KerbFeel.KERB_TO) * 0.5, 0.0, 60.0)))
+	check_true("out in the field is not",
+		not kerb.on_kerb(Vector3(KerbFeel.KERB_TO + 3.0, 0.0, 60.0)))
+
+	# **The rolling index survives being jumped.** The search walks outward from
+	# the last answer, which is a few dozen checks instead of a few thousand — but
+	# a car that has been reset or respawned is nowhere near where it was, and
+	# that has to fall back to the full scan rather than answer confidently from
+	# the wrong end of the lap.
+	check_near("walking along the road tracks it",
+		kerb.nearest(Vector3(3.0, 0.0, 41.0)).y, 41.0, 0.001)
+	check_near("and a jump to the far end still finds it",
+		kerb.nearest(Vector3(3.0, 0.0, 190.0)).y, 190.0, 0.001)
+
+	# With no road at all — a circuit whose metadata is missing — it says so
+	# rather than guessing.
+	kerb.set_road(PackedVector3Array())
+	check_near("no road, no answer", kerb.nearest(Vector3.ZERO).x, -1.0, 0.001)
+	check_true("and no rattle", not kerb.on_kerb(Vector3.ZERO))
 
 ## The menus answer, and answer more quietly than the race does.
 ##
@@ -6767,6 +6824,7 @@ func _physics_process(_delta: float) -> bool:
 		test_hitting_something_is_audible()
 		test_the_countdown_is_audible()
 		test_the_menus_answer()
+		test_kerbs_are_felt_at_the_road_edge()
 		test_generated_loops_meet_their_own_start()
 		test_sound_is_off_until_asked_for()
 		test_the_car_is_silent_when_sound_is_off()

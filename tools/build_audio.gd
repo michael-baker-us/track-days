@@ -20,6 +20,7 @@ func _initialize() -> void:
 		["go.tres", SoundBank.go_tone()],
 		["ui_move.tres", SoundBank.ui_move()],
 		["ui_pick.tres", SoundBank.ui_pick()],
+		["kerb.tres", SoundBank.kerb()],
 	]
 	# One scrub per surface: squeal is a tarmac phenomenon, and playing it on snow
 	# was the loudest wrong note in the old mix.
