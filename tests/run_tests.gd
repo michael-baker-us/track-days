@@ -2130,6 +2130,8 @@ func test_audio_resources_match_their_source() -> void:
 		["engine_overrun", SoundBank.engine_overrun()],
 		["count", SoundBank.count_tone()],
 		["go", SoundBank.go_tone()],
+		["ui_move", SoundBank.ui_move()],
+		["ui_pick", SoundBank.ui_pick()],
 	]
 	for surface in SoundBank.TYRE_VOICES.keys():
 		built.append(["tyre_%s" % surface, SoundBank.tyre(surface)])
@@ -2148,7 +2150,9 @@ func test_audio_resources_match_their_source() -> void:
 		# The countdown tones are one-shots and must **not** loop — a tone that
 		# ends in silence has nothing to meet at its own start, and one that
 		# looped would repeat under the race.
-		var one_shot: bool = String(pair[0]) in ["count", "go"]
+		var one_shot: bool = String(pair[0]) in [
+			"count", "go", "ui_move", "ui_pick"
+		]
 		check("%s loops as it should" % pair[0], committed.loop_mode,
 			AudioStreamWAV.LOOP_DISABLED if one_shot
 			else AudioStreamWAV.LOOP_FORWARD)
@@ -2235,6 +2239,43 @@ func test_the_engine_has_two_voices() -> void:
 	check_true("the loaded engine rings on (%.2f) more than the overrun (%.2f)"
 		% [tail["engine_load"], tail["engine_overrun"]],
 		float(tail["engine_load"]) > float(tail["engine_overrun"]) * 1.15)
+
+## The menus answer, and answer more quietly than the race does.
+##
+## A menu tick is an acknowledgement, not an instruction — a UI that answers as
+## loudly as a start signal is the kind of thing that gets the sound switched off.
+func test_the_menus_answer() -> void:
+	var move: AudioStreamWAV = load("res://resources/audio/ui_move.tres")
+	var pick: AudioStreamWAV = load("res://resources/audio/ui_pick.tres")
+	check_true("both menu tones exist", move != null and pick != null)
+	if move == null or pick == null:
+		return
+
+	# Shorter and quieter than the countdown, which is the whole point of them
+	# being separate sounds rather than a reuse.
+	var count: AudioStreamWAV = load("res://resources/audio/count.tres")
+	check_true("a menu tick is shorter than a countdown beep (%d vs %d frames)"
+		% [move.data.size() / 2, count.data.size() / 2],
+		move.data.size() < count.data.size())
+	var loudest := 0
+	var count_loudest := 0
+	for i in move.data.size() / 2:
+		loudest = maxi(loudest, absi(move.data.decode_s16(i * 2)))
+	for i in count.data.size() / 2:
+		count_loudest = maxi(count_loudest, absi(count.data.decode_s16(i * 2)))
+	check_true("and quieter (%d vs %d)" % [loudest, count_loudest],
+		loudest < count_loudest)
+	# Choosing answers above moving, so the two are told apart without looking.
+	check_true("choosing is pitched above moving",
+		SoundBank.UI_PICK_HZ > SoundBank.UI_MOVE_HZ)
+
+	# And the title screen carries the players, non-positional like the
+	# countdown's — nothing in a menu comes from a place in the world.
+	var title: Node = load("res://scenes/title.tscn").instantiate()
+	check_true("the title screen can sound them",
+		title.get_node_or_null("MoveBeep") is AudioStreamPlayer
+		and title.get_node_or_null("PickBeep") is AudioStreamPlayer)
+	title.free()
 
 ## The countdown has a voice, because a silent wait is indistinguishable from a
 ## game that has not started.
@@ -6725,6 +6766,7 @@ func _physics_process(_delta: float) -> bool:
 		test_the_engine_has_two_voices()
 		test_hitting_something_is_audible()
 		test_the_countdown_is_audible()
+		test_the_menus_answer()
 		test_generated_loops_meet_their_own_start()
 		test_sound_is_off_until_asked_for()
 		test_the_car_is_silent_when_sound_is_off()

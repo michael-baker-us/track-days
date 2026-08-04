@@ -279,6 +279,25 @@ static func _tone(
 	wav.loop_mode = AudioStreamWAV.LOOP_DISABLED
 	return wav
 
+## The menus, as two very short blips.
+##
+## Quieter and lower than the countdown on purpose: a start signal is an
+## instruction and a menu tick is an acknowledgement, and a UI that answers as
+## loudly as the race does is the kind of thing that gets the sound switched off.
+## The same fifth apart, so moving and choosing are recognisably the same family.
+##
+## Softer edge than the countdown too — `edge` there is what gives a start tone
+## its bite, and bite is precisely what a menu does not want fifty times a minute.
+const UI_MOVE_HZ := 440.0
+const UI_PICK_HZ := 660.0
+const UI_FRAMES := 2205   # 0.10 s
+
+static func ui_move() -> AudioStreamWAV:
+	return _tone(UI_MOVE_HZ, UI_FRAMES, 45.0, 0.08, 0.28)
+
+static func ui_pick() -> AudioStreamWAV:
+	return _tone(UI_PICK_HZ, UI_FRAMES * 2, 28.0, 0.12, 0.36)
+
 ## A fixed field of white noise, exactly the buffer's length.
 ##
 ## Indexed modulo that length it is periodic, so it loops seamlessly — the

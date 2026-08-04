@@ -75,6 +75,14 @@ func _ready() -> void:
 	# here.
 	GameState.return_scene = TITLE_SCENE
 	_populate()
+	# Every focus change ticks and every activation answers. Connected on the
+	# viewport rather than per-button because the list is rebuilt whenever a
+	# circuit is added or deleted, and a signal wired per row is a signal that
+	# gets missed on the row added next.
+	var here := get_viewport()
+	if here != null:
+		here.gui_focus_changed.connect(func(_c): _blip(_move_beep))
+
 	_car_button.pressed.connect(_on_car_pressed)
 	_surface_button.pressed.connect(_on_surface_pressed)
 	_editor_button.pressed.connect(_on_editor_pressed)
@@ -350,6 +358,7 @@ func _on_edit_pressed(track_id: String) -> void:
 	get_tree().change_scene_to_file(EDITOR_SCENE)
 
 func _on_track_pressed(index: int) -> void:
+	_blip(_pick_beep)
 	GameState.selected_index = index
 	get_tree().change_scene_to_file(RACE_SCENE)
 
@@ -359,6 +368,21 @@ func _on_track_pressed(index: int) -> void:
 ## — so changing the car re-reads every row. That is the point of showing it here
 ## rather than in the race: which car you are in changes what your best lap on
 ## each circuit *is*, and the menu should say so before you set off.
+## Plays a menu tone, if there is anyone to hear it.
+##
+## Gated on the same switch as everything else, and skipped headless where the
+## audio driver is a stub that never mixes — the players still exist and are
+## still found, so the wiring is testable without any of it making a sound.
+@onready var _move_beep: AudioStreamPlayer = $MoveBeep
+@onready var _pick_beep: AudioStreamPlayer = $PickBeep
+
+func _blip(player: AudioStreamPlayer) -> void:
+	if player == null or player.stream == null:
+		return
+	if not GameState.audio_enabled() or DisplayServer.get_name() == "headless":
+		return
+	player.play()
+
 func _on_car_pressed() -> void:
 	var specs := GameState.cars()
 	var at := 0

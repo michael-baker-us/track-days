@@ -31,6 +31,15 @@ func _initialize() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root_ctrl.add_child(bg)
 
+	# The menu's voice. Non-positional, like the countdown's: nothing in a menu is
+	# coming from a place in the world.
+	for pair in [["MoveBeep", "res://resources/audio/ui_move.tres"],
+			["PickBeep", "res://resources/audio/ui_pick.tres"]]:
+		var beep := AudioStreamPlayer.new()
+		beep.name = pair[0]
+		beep.stream = load(pair[1])
+		root_ctrl.add_child(beep)
+
 	# A single wide pool of light behind the menu, so the flat fill reads as a
 	# lit room rather than a blank buffer. Cheap enough for the compatibility
 	# renderer the web build uses: one scaled 256px texture, no shader.

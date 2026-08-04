@@ -269,7 +269,15 @@ Six streams, 100 KB, about 1% of the web `.pck`.
    different event rather than as a fourth number. Non-positional, because a start
    signal does not come from a place in the world.
 
-**Not done: kerbs and UI sound.** And the default is
+5. **The menus answer.** Two very short blips, a fifth apart like the countdown so
+   they read as the same family — but quieter and shorter, because a menu tick is
+   an acknowledgement and a start signal is an instruction, and a UI that answers
+   as loudly as the race does is the kind of thing that gets the sound switched
+   off. Wired to `gui_focus_changed` rather than per button: the circuit list is
+   rebuilt whenever one is added or deleted, and a signal connected per row is a
+   signal missed on the row added next.
+
+**Not done: kerbs.** And the default is
 **still off**, which is the honest position — every claim above is a measurement,
 and the thing that condemned the last version was a person listening to it. The
 constant is `GameState.audio_enabled`; flipping it is one line, and it should be

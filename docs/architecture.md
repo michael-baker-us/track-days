@@ -1779,6 +1779,17 @@ when the car enters the tree rather than baked into the car scene, because one c
 scene serves every condition. A squeal on snow was the loudest wrong note in the
 old mix once surfaces existed.
 
+### The menus answer, more quietly
+
+Two very short blips, a fifth apart like the countdown so they read as the same
+family, but shorter and quieter and with far less harmonic edge. A menu tick is an
+acknowledgement; a start signal is an instruction. A UI that answers as loudly as
+the race does is the kind of thing that gets the sound switched off.
+
+Connected to the viewport's `gui_focus_changed` rather than to each button. The
+circuit list is rebuilt whenever a circuit is added or deleted, so a signal wired
+per row is a signal missed on the row added next.
+
 ### The countdown has a voice
 
 Two one-shot tones, a fifth apart: one on each number, a longer and higher one on
