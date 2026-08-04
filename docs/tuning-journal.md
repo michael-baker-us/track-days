@@ -1162,13 +1162,23 @@ an error in every medal — and two changes moved it a long way in one session:
 `launch_accel` corrected by a factor of two, and drive made surface-aware. Neither
 had anything checking the result was still a *lower* bound.
 
-The strong check is a scripted driver trying to beat it. **That was attempted and
-abandoned.** A pure-pursuit driver was written against the circuit's centreline
-and did not complete a lap on any circuit inside 150 seconds — and a driver that
-spins off at the first corner proves nothing about par either way. Writing one
-good enough for its lap time to *mean* something is its own piece of work, most
-likely wanting the racing line `ParTime` already computes rather than the
-centreline, and a steering sign that has been checked rather than guessed.
+The strong check is a scripted driver trying to beat it. **That has now been
+attempted twice and abandoned twice**, and what came out of it is one measurement
+and one honest gap.
+
+The measurement: `car_controller` carried a comment saying its steering sign was
+"a guess at `VehicleBody3D`'s convention". It is not a guess any more — held at
+full lock with `steer_right` pressed, the car yaws at **-2.54 rad/s**, clockwise
+seen from above, which is right. The sign in the controller is correct, and the
+first scripted driver had it inverted, which is why it steered into the barrier at
+the first corner of every circuit.
+
+The gap: corrected, and following `ParTime`'s own racing line rather than the
+centreline, it still did not complete a lap on any circuit inside 150 seconds. A
+driver that cannot get round proves nothing about par either way, so nothing is
+claimed from it. What it wants next is instrumentation — where the car actually
+ends up, and whether it is stalling, spinning or simply never triggering a gate —
+rather than another guess at the control law.
 
 What is cheap and still definite is the arithmetic bound: **a lap cannot be driven
 faster than its own length at the car's top speed.** No cornering, no braking, no

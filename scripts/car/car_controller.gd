@@ -126,7 +126,15 @@ func _physics_process(delta: float) -> void:
 	var speed_factor: float = clamp(
 		1.0 - speed_kmh / tuning.steer_falloff_reference_kmh, 0.25, 1.0
 	)
-	# Sign is a guess at VehicleBody3D's steering convention; flip if turning is inverted.
+	# **Measured, not guessed.** This comment used to say the sign was a guess at
+	# `VehicleBody3D`'s convention. It is not: held at full lock with the
+	# `steer_right` action pressed, the car yaws at -2.54 rad/s — negative, which
+	# is clockwise seen from above, which is right. So `steer_right` turns right
+	# and this sign is correct.
+	#
+	# Worth having written down because anything driving the car programmatically
+	# has to know it. A scripted driver written against the opposite assumption
+	# steered into the barrier at the first corner of every circuit.
 	var steer_target: float = -steer_input * tuning.max_steer_angle * speed_factor
 	steering = move_toward(steering, steer_target, tuning.steer_speed * delta)
 
