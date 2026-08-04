@@ -24,36 +24,47 @@ GODOT=/Users/michael.baker/Downloads/Godot.app/Contents/MacOS/Godot
 
 ## Where things stand
 
-**Steps 1, 2 and 3 are done and committed. Step 4 is two thirds done and is the
-working diff. The suite is green — 2016 checks.**
+**Steps 1 to 4 are done. The suite is green — 2032 checks. The speed lines are
+the working diff; everything before them is committed.**
 
 Step 1 (the grading system) shipped as `39e465b`, step 2 (all six looks authored)
-as `bd3d09f`, step 3 (wind) as `5c15be2`.
+as `bd3d09f`, step 3 (wind) as `5c15be2`, step 4's camera shake as `999d288`.
 
 | File | What it is |
 | --- | --- |
-| `scripts/camera/chase_camera.gd` | The shake. `_aim`, `shake_degrees()`, `shake_shape()`, and the `SHAKE_X` / `SHAKE_Y` tables. Read the header before changing it — the two things it gets wrong first are both written down there. |
-| `resources/tuning/car_tuning.gd` | `camera_shake_degrees`, `camera_shake_hz`, `camera_shake_surface_gain`, beside the framing. All three presets stay at the defaults. |
-| `scripts/track/road_surface.gd` | `shake_of()` — how rough a surface is, 0 to 1, derived from `relief` rather than being a new number. |
-| `scripts/track/track_builder.gd` | Comment only. `_scenery_markers` claimed "about twenty a second" and that was never true of anything; it now carries the counted figures. |
-| `tests/run_tests.gd` | One new test, 18 checks. |
+| `scripts/ui/speed_lines.gd` | New. The streaks. Read the header before changing it — why it is not a blur, and why the colour comes from the surface, are both in there. |
+| `tools/build_ui.gd` | `SpeedLines` as the **first** child of the HUD's `Root`, so it draws behind the readouts, with `MOUSE_FILTER_IGNORE`. |
+| `scenes/ui/hud.tscn`, `scenes/race.tscn` | Rebaked, in that order. |
+| `resources/tuning/car_tuning.gd` | `speed_lines_opacity`, beside the shake and the FOV kick. |
+| `tests/run_tests.gd` | One new test, 16 checks. |
 
-### No rebake for any of this
+Committed already, from earlier in the same step: `chase_camera.gd` (the shake —
+`_aim`, `shake_degrees()`, `shake_shape()`, the `SHAKE_X` / `SHAKE_Y` tables),
+`road_surface.gd` (`shake_of()`), and a corrected density comment in
+`track_builder.gd`.
 
-Nothing in step 4 touches a baked scene. The shake is script and tuning, and the
-`track_builder.gd` change is a comment. (For contrast: a **wind** change does need
-`tools/build_track.gd` re-run, because `WIND_*` is baked into the circuits as
-`ShaderMaterial` parameters. A **grade** change does not.)
+### The rebake rule for this one
+
+`build_ui.gd` **before** `build_race.gd`, which instances `hud.tscn`. Only the
+node matters to the bake — the script is referenced by path, so changing
+`speed_lines.gd` needs no rebake at all. (For contrast: a **wind** change needs
+`tools/build_track.gd`, because `WIND_*` is baked into the circuits as
+`ShaderMaterial` parameters. A **grade** change needs nothing.)
 
 ### Verified this pass
 
 - **The shake was measured before it was tuned**, with a throwaway `_diag_shake.gd`
   that projected world points at a range of depths through the camera. That is
   what caught the design being wrong: see the tuning journal, M18.
-- **Every mutation the test claims to catch was made and caught** — linear instead
+- **Every mutation the tests claim to catch was made and caught** — linear instead
   of quadratic, the surface term flattened, the old harmonics restored, the aim
-  fed back through its own shake, and a roll term added at the point the shake is
-  applied. Six checks, six failures, all restored.
+  fed back through its own shake, a roll term added where the shake is applied,
+  and `INNER` zeroed so streaks ran through the middle of the frame. That last one
+  **passed at first**: the check compared `nearest` against `lines.INNER`, which
+  is the constant under test, so it agreed with itself. It now compares against a
+  number written out in the test.
+- **The lines were rendered at every speed, at 0.9 on purpose, and on snow** —
+  which is the run that found white streaks being invisible on a white circuit.
 - **The waveform is bounded** and the amplitude it is multiplied by is therefore
   in degrees: peak 1.0 per axis, 1.345 across both together.
 
@@ -76,41 +87,36 @@ Nothing in step 4 touches a baked scene. The shake is script and tuning, and the
   canopy already near the top of the range. It is a **web-build look difference**
   and belongs to whoever next touches lighting, not to wind.
 
-### And one from step 4
+### And two from step 4
 
-- **The shake has no accessibility toggle**, and camera shake is the effect that
-  most commonly gets one. `GameState` already keeps `analogue_input` and
-  `audio_enabled` in exactly the shape a third setting would take. Left out on
-  purpose: the amplitude is a few pixels of a level frame rather than a lurch, and
-  it is worth adding once there is a *set* of motion options to offer rather than
-  one. Written up in `docs/architecture.md`.
+- **There is now a motion-settings shaped hole.** The shake and the streaks are
+  both the sort of effect that usually gets an accessibility toggle, and
+  `GameState` already keeps `analogue_input` and `audio_enabled` in exactly the
+  shape a third would take. Left out of the change that added them on purpose —
+  and now there is genuinely a *set* to offer rather than one thing, which was the
+  stated condition for adding it. One switch could reasonably turn both down.
+- **Roadside density needed nothing and is now counted rather than claimed** —
+  6.0 to 8.7 markers a second at 165 km/h, 7.9 to 13 pieces of roadside furniture,
+  12 to 17 with the trees. The builder's comment claimed twenty and had never been
+  true. If the circuit ever needs to feel faster, argue with those numbers.
 
 ---
 
 ## Next action
 
-**Step 4's last piece: the screen-space speed effect at the frame edges — and it
-wants a decision before it wants code.**
+**Step 5: particles.** `CPUParticles3D`, not `GPUParticles3D` — the latter throws
+WebGL errors under Compatibility with a *View Depth* draw order, and particle
+trails and SDF collision are unsupported there anyway, so the constrained path is
+also the simple one.
 
-The roadmap says "a screen-space speed effect at the frame edges". Two readings,
-and they are not close:
+The data is already there and is the point: `RoadSurface.mark_always` says whether
+a tyre displaces material by rolling or only when sliding, and `mark` says what
+colour that material is. A dust plume on dirt, a rooster tail on snow, and nothing
+on dry tarmac until the tyre slides — that is the existing table read by something
+new, the same move `shake_of()` just made with `relief`.
 
-- **A radial blur.** The obvious one, and it fails both halves of the standard
-  this milestone was reordered under: it is a full-screen pass on a
-  single-threaded WebGL 2 build, and it smears exactly the crisp flat silhouettes
-  that are the identity. Blur is what every asset-store racer does.
-- **Speed lines.** Streaks drawn at the frame edges on a `CanvasLayer`, alpha
-  only, no screen texture, rising with the same `kick_t` the FOV and the shake
-  already use. Cheaper, web-safe by construction, and the kind of thing that makes
-  a screenshot recognisable rather than competent.
-
-Recommendation is the second. It is a judgement about the look rather than about
-the code, which is why it is here rather than already done.
-
-**The other two thirds of step 4 need nothing.** Shake is in. Roadside density was
-already built and is now counted rather than claimed — 6.0 to 8.7 markers a
-second at 165 km/h, 7.9 to 13 pieces of roadside furniture, 12 to 17 with the
-trees. If the circuit ever needs to feel faster, argue with those numbers.
+`tyre_marks.gd` already answers "is this wheel sliding, and where is it" for the
+marks it lays down, so the trigger exists too.
 
 ---
 
@@ -176,8 +182,8 @@ into the web export if left in the project root.
    verified.~~ **Done.**
 3. ~~Wind — trees and roadside marker flags.~~ **Done.** Banner towers and
    roadside grass deliberately not; see below.
-4. **Speed feedback** — ~~camera shake in `CarTuning`~~ and ~~roadside density~~
-   both done; the frame-edge effect is what is left, and the fork is above.
+4. ~~Speed feedback — camera shake, roadside density, and the frame edges.~~
+   **Done.** All three scale against one `camera_fov_reference_kmh`.
 5. **Particles** — `CPUParticles3D`, not GPU: GPU particles throw WebGL errors
    under Compatibility with a View Depth draw order. Read `RoadSurface.mark` and
    `mark_always`, which already answer "does this tyre displace material".

@@ -298,6 +298,104 @@ func test_the_camera_shakes_with_speed_and_surface() -> void:
 	car.linear_velocity = velocity
 	GameState.selected_surface = was
 
+## The third thing that says *fast*: streaks at the edge of the frame.
+##
+## **They have to stay out of the middle of it.** The road ahead and the car are
+## in there, and a streak across either is a scratch on the picture rather than a
+## sense of speed — so every line is born outside `INNER` of the way to the edge
+## and only ever travels outward. That is asserted on the geometry rather than
+## looked at, because a line drawn across the car for two frames of a fast lap is
+## exactly the kind of thing nobody catches by playing it.
+##
+## **And they must never swallow a touch.** It is a full-frame `Control` sitting
+## over the driving pads, which is the shape of a bug that has already been fixed
+## once on the countdown label: on a phone it would take the whole screen and the
+## car would not respond to anything.
+func test_the_frame_edges_streak_with_speed() -> void:
+	var lines: Control = _find_first("SpeedLines", "Control")
+	check_true("the HUD carries the speed lines", lines != null)
+	if lines == null:
+		return
+	check("and they cannot swallow a touch aimed at the pads",
+		lines.mouse_filter, Control.MOUSE_FILTER_IGNORE)
+	# Drawn before the readouts, so a streak passes behind the lap panel rather
+	# than through it.
+	check("and are drawn behind the rest of the HUD",
+		lines.get_index(), 0)
+
+	var car := get_first_node_in_group("player_car") as VehicleBody3D
+	var velocity := car.linear_velocity
+	lines._process(1.0 / 60.0)
+	var reference: float = lines._tuning.camera_fov_reference_kmh if lines._tuning \
+		!= null else 0.0
+	check_true("they know what fast is for this car (%.0f km/h)" % reference,
+		reference > 0.0)
+	if reference <= 0.0:
+		return
+
+	var full: float = lines.intensity(reference)
+	check_true("a parked car draws none of them",
+		is_zero_approx(lines.intensity(0.0)))
+	check_true("at speed they are drawn (%.2f)" % full, full > 0.05)
+	check_true("and never past opaque", full <= 1.0)
+	var half: float = lines.intensity(reference * 0.5)
+	check_near("half the speed is a quarter of them", half / full, 0.25, 0.01)
+	check_near("and past the reference they stop growing",
+		lines.intensity(reference * 3.0), full, 0.0001)
+
+	# Standing still draws nothing at all - not a faint set, none.
+	car.linear_velocity = Vector3.ZERO
+	lines._process(1.0 / 60.0)
+	check("a standstill has no streaks in it", lines.segments().size(), 0)
+
+	# And at speed they are all outside the middle of the frame, in whichever
+	# direction the frame is longest.
+	car.linear_velocity = -car.global_transform.basis.z * (reference / 3.6)
+	var seen := 0
+	var nearest := INF
+	var finite := true
+	var centre: Vector2 = lines.size * 0.5
+	check_true("the layer has been laid out to a real size (%s)" % lines.size,
+		centre.x > 0.0 and centre.y > 0.0)
+	# Walked across a whole run of the loop, so every line is caught at its
+	# innermost as well as at its longest.
+	for i in 40:
+		lines._process(1.0 / 60.0)
+		for line in lines.segments():
+			seen += 1
+			var at: Vector2 = (line[0] as Vector2) - centre
+			# Measured against the frame, not in pixels: the lines are placed on an
+			# ellipse matched to the viewport, so "how far out" is the same number
+			# in every direction.
+			nearest = minf(nearest, Vector2(at.x / centre.x, at.y / centre.y).length())
+			finite = finite and (line[1] as Vector2).is_finite()
+	# Aggregated rather than checked per line: two thousand identical assertions
+	# would tell the reader of a failure nothing the first one did not.
+	check_true("streaks were drawn at speed (%d)" % seen, seen > 100)
+	check_true("all of them somewhere real", finite)
+	# Against a number written here rather than against `INNER`, which is the
+	# constant under test — comparing it with itself passes however it is set, and
+	# did, until `INNER` was zeroed to check that this line meant something.
+	check_true("and none of them crossed the middle of the frame (%.2f, floor 0.35)"
+		% nearest, nearest >= 0.35)
+
+	# Light streaks on a dark road, dark ones on a bright one. **Found by
+	# rendering it on snow**, where a white streak over a white road under a white
+	# outfield is not there at all — at any opacity, and invisible from every
+	# tarmac screenshot ever taken of it.
+	var surface := GameState.selected_surface
+	GameState.selected_surface = "tarmac"
+	var on_tarmac: Color = lines.streak_colour()
+	GameState.selected_surface = "snow"
+	var on_snow: Color = lines.streak_colour()
+	GameState.selected_surface = surface
+	check_true("streaks are light on a dark road (%.2f)"
+		% on_tarmac.get_luminance(), on_tarmac.get_luminance() > 0.5)
+	check_true("and dark on a bright one (%.2f)"
+		% on_snow.get_luminance(), on_snow.get_luminance() < 0.2)
+
+	car.linear_velocity = velocity
+
 ## Records written by an older build have to survive the move to a composite key.
 ##
 ## Version 1 kept one flat `best_<track>` per circuit in a `[records]` section.
@@ -7247,6 +7345,7 @@ func _physics_process(_delta: float) -> bool:
 		test_tuning_invariants()
 		test_car_wired_to_tuning()
 		test_the_camera_shakes_with_speed_and_surface()
+		test_the_frame_edges_streak_with_speed()
 		test_old_records_migrate_to_the_composite_key()
 		test_records_are_kept_per_car_and_surface()
 		test_the_throttle_setting_survives_a_restart()

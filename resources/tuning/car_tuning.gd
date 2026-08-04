@@ -101,3 +101,9 @@ extends Resource
 ## reason this exists: on tarmac speed is smooth and only the frame edges move,
 ## on dirt the car is being thrown about and the camera should say so.
 @export var camera_shake_surface_gain: float = 2.6
+## How opaque the streaks at the edge of the frame get at the reference speed.
+## Here rather than in the HUD for the same reason the shake is: it is one of the
+## three things this car at this speed does to the picture, and a preset should
+## be able to make one car feel faster than another in all three at once. Zero
+## turns them off.
+@export_range(0.0, 1.0, 0.01) var speed_lines_opacity: float = 0.34

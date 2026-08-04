@@ -1,22 +1,30 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_136eg"]
-[ext_resource type="Script" path="res://scripts/ui/touch_controls.gd" id="2_oj5la"]
-[ext_resource type="Script" path="res://scripts/ui/pause_menu.gd" id="3_gss2c"]
-[ext_resource type="AudioStream" path="res://resources/audio/count.tres" id="4_h022r"]
-[ext_resource type="AudioStream" path="res://resources/audio/go.tres" id="5_4jqwt"]
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_oj5la"]
+[ext_resource type="Script" path="res://scripts/ui/speed_lines.gd" id="2_gss2c"]
+[ext_resource type="Script" path="res://scripts/ui/touch_controls.gd" id="3_h022r"]
+[ext_resource type="Script" path="res://scripts/ui/pause_menu.gd" id="4_4jqwt"]
+[ext_resource type="AudioStream" path="res://resources/audio/count.tres" id="5_kicr4"]
+[ext_resource type="AudioStream" path="res://resources/audio/go.tres" id="6_mj13f"]
 
-[node name="HUD" type="CanvasLayer" unique_id=374179671]
-script = ExtResource("1_136eg")
+[node name="HUD" type="CanvasLayer" unique_id=2118369865]
+script = ExtResource("1_oj5la")
 
-[node name="Root" type="Control" parent="." unique_id=1835087268]
+[node name="Root" type="Control" parent="." unique_id=923717902]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 
-[node name="LapPanel" type="PanelContainer" parent="Root" unique_id=1963357016]
+[node name="SpeedLines" type="Control" parent="Root" unique_id=1816877181]
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("2_gss2c")
+
+[node name="LapPanel" type="PanelContainer" parent="Root" unique_id=1989598874]
 custom_minimum_size = Vector2(214, 0)
 layout_mode = 0
 anchor_left = 1.0
@@ -27,52 +35,52 @@ offset_right = -230.0
 offset_bottom = 16.0
 theme_type_variation = &"HudPanel"
 
-[node name="LapMargin" type="MarginContainer" parent="Root/LapPanel" unique_id=1642283291]
+[node name="LapMargin" type="MarginContainer" parent="Root/LapPanel" unique_id=583263512]
 layout_mode = 2
 theme_override_constants/margin_left = 14
 theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 14
 theme_override_constants/margin_bottom = 8
 
-[node name="Rows" type="VBoxContainer" parent="Root/LapPanel/LapMargin" unique_id=1915758479]
+[node name="Rows" type="VBoxContainer" parent="Root/LapPanel/LapMargin" unique_id=1311981945]
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="Lap" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=934734156]
+[node name="Lap" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=1725106905]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "OUT LAP"
 horizontal_alignment = 2
 clip_text = true
 
-[node name="Current" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=536826242]
+[node name="Current" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=997466454]
 layout_mode = 2
 theme_override_font_sizes/font_size = 30
 text = "--:--.---"
 horizontal_alignment = 2
 clip_text = true
 
-[node name="Delta" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=1912057143]
+[node name="Delta" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=594992046]
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
 horizontal_alignment = 2
 clip_text = true
 
-[node name="Last" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=963163555]
+[node name="Last" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=82721521]
 layout_mode = 2
 theme_override_font_sizes/font_size = 15
 text = "last   --:--.---"
 horizontal_alignment = 2
 clip_text = true
 
-[node name="Best" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=381662381]
+[node name="Best" type="Label" parent="Root/LapPanel/LapMargin/Rows" unique_id=1010469089]
 layout_mode = 2
 theme_override_font_sizes/font_size = 15
 text = "best   --:--.---"
 horizontal_alignment = 2
 clip_text = true
 
-[node name="SpeedPanel" type="PanelContainer" parent="Root" unique_id=856074050]
+[node name="SpeedPanel" type="PanelContainer" parent="Root" unique_id=1568692474]
 layout_mode = 0
 anchor_left = 1.0
 anchor_top = 1.0
@@ -84,19 +92,19 @@ offset_right = -190.0
 offset_bottom = -84.0
 theme_type_variation = &"HudPanel"
 
-[node name="SpeedMargin" type="MarginContainer" parent="Root/SpeedPanel" unique_id=1801498211]
+[node name="SpeedMargin" type="MarginContainer" parent="Root/SpeedPanel" unique_id=491074367]
 layout_mode = 2
 theme_override_constants/margin_left = 14
 theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 14
 theme_override_constants/margin_bottom = 8
 
-[node name="Speed" type="Label" parent="Root/SpeedPanel/SpeedMargin" unique_id=1119514937]
+[node name="Speed" type="Label" parent="Root/SpeedPanel/SpeedMargin" unique_id=637045346]
 layout_mode = 2
 theme_override_font_sizes/font_size = 34
 text = "  0 km/h"
 
-[node name="Banner" type="Label" parent="Root" unique_id=856693712]
+[node name="Banner" type="Label" parent="Root" unique_id=1540287096]
 custom_minimum_size = Vector2(520, 0)
 layout_mode = 0
 anchor_left = 0.5
@@ -108,7 +116,7 @@ offset_bottom = 90.0
 theme_override_font_sizes/font_size = 40
 horizontal_alignment = 1
 
-[node name="Countdown" type="Label" parent="Root" unique_id=629577843]
+[node name="Countdown" type="Label" parent="Root" unique_id=1618348282]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -116,14 +124,14 @@ theme_override_font_sizes/font_size = 140
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="TouchControls" type="Control" parent="Root" unique_id=843301160]
+[node name="TouchControls" type="Control" parent="Root" unique_id=1759706361]
 anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
-script = ExtResource("2_oj5la")
+script = ExtResource("3_h022r")
 
-[node name="SteerLeft" type="PanelContainer" parent="Root/TouchControls" unique_id=1519453801]
+[node name="SteerLeft" type="PanelContainer" parent="Root/TouchControls" unique_id=61841649]
 custom_minimum_size = Vector2(120, 120)
 layout_mode = 0
 anchor_top = 1.0
@@ -135,14 +143,14 @@ offset_bottom = -28.0
 mouse_filter = 2
 theme_type_variation = &"HudPanel"
 
-[node name="Label" type="Label" parent="Root/TouchControls/SteerLeft" unique_id=1395108483]
+[node name="Label" type="Label" parent="Root/TouchControls/SteerLeft" unique_id=1724020088]
 layout_mode = 2
 theme_override_font_sizes/font_size = 30
 text = "<"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="SteerRight" type="PanelContainer" parent="Root/TouchControls" unique_id=2072714235]
+[node name="SteerRight" type="PanelContainer" parent="Root/TouchControls" unique_id=822686810]
 custom_minimum_size = Vector2(120, 120)
 layout_mode = 0
 anchor_top = 1.0
@@ -154,14 +162,14 @@ offset_bottom = -28.0
 mouse_filter = 2
 theme_type_variation = &"HudPanel"
 
-[node name="Label" type="Label" parent="Root/TouchControls/SteerRight" unique_id=324475706]
+[node name="Label" type="Label" parent="Root/TouchControls/SteerRight" unique_id=735764090]
 layout_mode = 2
 theme_override_font_sizes/font_size = 30
 text = ">"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Gas" type="PanelContainer" parent="Root/TouchControls" unique_id=166934738]
+[node name="Gas" type="PanelContainer" parent="Root/TouchControls" unique_id=1499316141]
 custom_minimum_size = Vector2(148, 104)
 layout_mode = 0
 anchor_left = 1.0
@@ -175,14 +183,14 @@ offset_bottom = -28.0
 mouse_filter = 2
 theme_type_variation = &"HudPanel"
 
-[node name="Label" type="Label" parent="Root/TouchControls/Gas" unique_id=288644756]
+[node name="Label" type="Label" parent="Root/TouchControls/Gas" unique_id=395015386]
 layout_mode = 2
 theme_override_font_sizes/font_size = 30
 text = "GAS"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Brake" type="PanelContainer" parent="Root/TouchControls" unique_id=2108462084]
+[node name="Brake" type="PanelContainer" parent="Root/TouchControls" unique_id=195337635]
 custom_minimum_size = Vector2(148, 104)
 layout_mode = 0
 anchor_left = 1.0
@@ -196,14 +204,14 @@ offset_bottom = -144.0
 mouse_filter = 2
 theme_type_variation = &"HudPanel"
 
-[node name="Label" type="Label" parent="Root/TouchControls/Brake" unique_id=1407504733]
+[node name="Label" type="Label" parent="Root/TouchControls/Brake" unique_id=917152131]
 layout_mode = 2
 theme_override_font_sizes/font_size = 30
 text = "BRAKE"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="PauseButton" type="Button" parent="Root" unique_id=2131411398]
+[node name="PauseButton" type="Button" parent="Root" unique_id=298967234]
 visible = false
 custom_minimum_size = Vector2(104, 44)
 layout_mode = 0
@@ -213,21 +221,21 @@ offset_right = 16.0
 offset_bottom = 16.0
 text = "PAUSE"
 
-[node name="PauseMenu" type="Control" parent="Root" unique_id=1387879065]
+[node name="PauseMenu" type="Control" parent="Root" unique_id=671196735]
 process_mode = 3
 visible = false
 anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
-script = ExtResource("3_gss2c")
+script = ExtResource("4_4jqwt")
 
-[node name="Dim" type="ColorRect" parent="Root/PauseMenu" unique_id=981899651]
+[node name="Dim" type="ColorRect" parent="Root/PauseMenu" unique_id=578013716]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 color = Color(0.043, 0.055, 0.075, 0.86)
 
-[node name="Panel" type="PanelContainer" parent="Root/PauseMenu" unique_id=1294085781]
+[node name="Panel" type="PanelContainer" parent="Root/PauseMenu" unique_id=555334986]
 custom_minimum_size = Vector2(320, 0)
 layout_mode = 0
 anchor_left = 0.5
@@ -238,39 +246,39 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_type_variation = &"CardPanel"
 
-[node name="Rows" type="VBoxContainer" parent="Root/PauseMenu/Panel" unique_id=424029367]
+[node name="Rows" type="VBoxContainer" parent="Root/PauseMenu/Panel" unique_id=1930357497]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Heading" type="Label" parent="Root/PauseMenu/Panel/Rows" unique_id=1519791255]
+[node name="Heading" type="Label" parent="Root/PauseMenu/Panel/Rows" unique_id=2054897100]
 layout_mode = 2
 theme_override_font_sizes/font_size = 30
 text = "PAUSED"
 horizontal_alignment = 1
 
-[node name="ResumeButton" type="Button" parent="Root/PauseMenu/Panel/Rows" unique_id=2132915193]
+[node name="ResumeButton" type="Button" parent="Root/PauseMenu/Panel/Rows" unique_id=933387752]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 theme_type_variation = &"PrimaryButton"
 text = "Resume"
 
-[node name="ThrottleButton" type="Button" parent="Root/PauseMenu/Panel/Rows" unique_id=1971764137]
+[node name="ThrottleButton" type="Button" parent="Root/PauseMenu/Panel/Rows" unique_id=238398777]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Throttle: Analogue"
 
-[node name="SoundButton" type="Button" parent="Root/PauseMenu/Panel/Rows" unique_id=1056413311]
+[node name="SoundButton" type="Button" parent="Root/PauseMenu/Panel/Rows" unique_id=1266366706]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Sound: Off"
 
-[node name="QuitButton" type="Button" parent="Root/PauseMenu/Panel/Rows" unique_id=1925924130]
+[node name="QuitButton" type="Button" parent="Root/PauseMenu/Panel/Rows" unique_id=779058959]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Back to menu"
 
-[node name="CountBeep" type="AudioStreamPlayer" parent="." unique_id=1288053045]
-stream = ExtResource("4_h022r")
+[node name="CountBeep" type="AudioStreamPlayer" parent="." unique_id=1510521255]
+stream = ExtResource("5_kicr4")
 
-[node name="GoBeep" type="AudioStreamPlayer" parent="." unique_id=143575728]
-stream = ExtResource("5_4jqwt")
+[node name="GoBeep" type="AudioStreamPlayer" parent="." unique_id=1023392545]
+stream = ExtResource("6_mj13f")

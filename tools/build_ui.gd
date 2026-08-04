@@ -18,6 +18,19 @@ func _initialize() -> void:
 	root_ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(root_ctrl)
 
+	# Speed lines, behind everything else on the layer.
+	#
+	# First child on purpose: it covers the whole frame, and a readout drawn under
+	# a streak is a readout with a scratch through it. `MOUSE_FILTER_IGNORE` for
+	# the same reason the countdown has it — nothing full-screen may swallow a
+	# touch aimed at the pads.
+	var lines := Control.new()
+	lines.name = "SpeedLines"
+	lines.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lines.set_script(load("res://scripts/ui/speed_lines.gd"))
+	root_ctrl.add_child(lines)
+
 	# Lap timing, top right.
 	var lap_panel := PanelContainer.new()
 	lap_panel.name = "LapPanel"

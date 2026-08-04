@@ -1240,6 +1240,29 @@ in the smoothing. The rates are now 1.00, 1.27, 1.61 and 1.79 against 8 Hz, so
 the fastest component is 14.3 Hz and survives a 30 fps frame. The suite asserts
 it off the table rather than trusting the comment.
 
+### Speed lines, tuned by rendering them wrong
+
+Four numbers, all fractions of the frame rather than pixels, so they hold at any
+resolution and in both orientations.
+
+| | First pass | Shipped | Why |
+|---|---|---|---|
+| `INNER` | 0.46 | **0.62** | At 0.46 streaks arrived under the car, on the one part of the frame being read |
+| `LONG` | 0.26 | **0.44** | Short streaks read as dashes, or as dust on the lens |
+| `WIDTH` | 2.5 | **3.5** | At 2.5 and a third of opacity they were scratches |
+| `COUNT` | 56 | **44** | Fewer, longer lines; the gaps are what carries the motion |
+
+Opacity is `0.34` at the reference speed and **quadratic in speed**, the same
+curve as the shake: 0.045 at 60 km/h, 0.151 at 110, 0.340 at 165. Rendered at
+each, the low end is genuinely invisible and the top end is present without
+being a filter over the game, which is the intent — the FOV kick is the honest
+framing change and these are decoration on top of it.
+
+Rendered at 0.9 on purpose as well, which is what showed the shape clearly
+enough to judge the spacing. And rendered **on snow**, which found the real bug:
+white streaks over a white road under a white outfield are not there at all. See
+`docs/architecture.md`; the colour now comes from the surface's own `base`.
+
 ### Still open, from M17
 - ~~Grass still grips like tarmac~~ — fixed. Off the ribbon the car keeps 0.55 of
   whatever the surface gives it, and the barriers became solid in the same change,

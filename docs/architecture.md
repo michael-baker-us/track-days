@@ -1264,6 +1264,50 @@ tuning was set against.
 > lurch, and a setting is worth adding once there is a set of motion options to
 > add rather than one.
 
+### Speed lines, and why they are not a blur
+
+The third thing the game does to say *fast*, after the FOV kick and the shake,
+and the three read the same `camera_fov_reference_kmh` so a quicker preset is
+quicker in all of them. `scripts/ui/speed_lines.gd` is a `Control` at the bottom
+of the HUD layer that draws a few dozen streaks radiating from the middle of the
+frame, each running its own loop from the middle outward and fading in and out
+across it.
+
+**A radial blur was the obvious version and it was rejected before any of it was
+written.** It is a full-screen pass sampling the screen texture on a build that
+is single-threaded WebGL 2 — and, the part that actually decides it, *it smears
+the flat silhouettes that are the identity*. This game is untextured colour with
+hard edges; blurring it buys a frame that could have come from any engine, which
+is the same argument that moved the PBR pass out of this milestone. Drawn
+streaks are a graphic device rather than a photographic one, and they cost a few
+dozen `draw_line` calls, no shader, no screen texture and no second viewport.
+
+**They move outward rather than sitting there**, because a static set of streaks
+is a vignette and a vignette says nothing about speed. What the eye reads is
+arrival rate — the same claim `_scenery_markers` makes about roadside props, one
+layer closer to the viewer.
+
+The radius is an **ellipse matched to the viewport**, not a circle: on a 16:9
+canvas a circle of streaks reaches the left and right edges long before the top
+and bottom, so the effect would be a pair of side curtains. The ellipse holds in
+portrait too, which is the orientation a phone actually plays in.
+
+> **The colour has to come from the surface, and only a render found that.** The
+> first version drew white. On a snow circuit — a white road under a white
+> outfield under a pale sky — the effect was *not there*, at any opacity, and no
+> tarmac screenshot could ever have shown it. `streak_colour()` takes the road's
+> own `base` colour out of `RoadSurface` and picks the theme's text colour under
+> about half luminance and the theme's page colour over it, so the pair is the
+> contrast the rest of the interface already uses. The hour is deliberately not
+> read: a dark hour dims everything including snow, and the ordering by surface
+> holds in all of them.
+
+Two things it must not do, both asserted rather than looked at. It must never
+draw across the middle of the frame — the car and the road ahead are in there,
+and a streak over either is a scratch on the picture — and being a full-frame
+`Control` over the driving pads, it must never swallow a touch. The second is
+the shape of a bug already fixed once on the countdown label.
+
 ### Tyre marks: what shape, where, and for how long
 
 Three separate rules, each of which has been wrong at some point.

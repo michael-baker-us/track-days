@@ -799,9 +799,8 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > cheap work and the identity-forming work turned out to be the same work.**
 > Realism is not the axis this game gets better along.
 
-**Status: steps 1–3 done — the grading system, all six looks authored, and the
-scenery moving. Step 4 is two thirds done: the camera shakes, the roadside was
-already dense, and the frame-edge effect is the one piece left.**
+**Status: steps 1–4 done — the grading system, all six looks authored, the
+scenery moving, and the car feeling fast.**
 
 1. **A colour grade per look, as a real LUT.** `CircuitLook` already pairs an hour
    with a place; it gains a third thing, and that thing is the signature.
@@ -917,13 +916,23 @@ already dense, and the frame-edge effect is the one piece left.**
 > twenty a second" and had never been true; it now carries the measured figures,
 > which is what a later argument about pace should start from.
 >
-> **Left: the screen-space effect at the frame edges**, and it wants a decision
-> before it wants code. The obvious version is a radial blur, which is a
-> full-screen pass on a single-threaded WebGL 2 build *and* smears the crisp flat
-> silhouettes that are the whole identity — it fails both halves of the standard
-> this milestone was reordered under. The stylised version — speed lines drawn at
-> the edges, alpha only, no screen texture — is cheaper and is the kind of thing
-> that makes a screenshot recognisable. That is the fork.
+> **The frame edges streak, and they are not a blur.** A radial blur is the
+> obvious reading and it fails both halves of the standard this milestone was
+> reordered under: a full-screen pass sampling the screen texture on a
+> single-threaded WebGL 2 build, and it smears the crisp flat silhouettes that
+> are the whole identity. It buys a frame that could have come from any engine —
+> the same argument that moved the PBR pass to M19. What shipped is drawn
+> streaks: a few dozen `draw_line` calls at the edge of the frame, flying
+> outward, no shader and no screen texture.
+>
+> The one thing no amount of reasoning would have found is that **the colour has
+> to come from the surface**. White streaks on a snow circuit — a white road
+> under a white outfield under a pale sky — are not there at all, at any opacity.
+> Rendering it on snow is what found it.
+>
+> **Step 4 is done.** All three of what the game does to say *fast* now scale
+> against the same `camera_fov_reference_kmh`, so a quicker car is quicker in the
+> framing, in the shake and at the edges of the frame at once.
 
 5. **Particles, from data the game already has.** Tyre spray, dust and grass
    clippings off the wheels; colour and behaviour taken from `RoadSurface`.
