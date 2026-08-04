@@ -1380,6 +1380,57 @@ Carving real depth still needs the drivable surface to *be* a dense generated
 ribbon that can be displaced in a vertex shader. The ribbon's coordinate system
 exists; the road being made of it does not.
 
+### And what the tyres throw into the air
+
+`TyreSpray` and `TyreMarks` read the **same** `mark_always` and answer opposite
+halves of one question: whether a tyre displaces material by rolling over it or
+only by sliding on it. That is the whole difference between a plume that follows
+the car everywhere on dirt and a puff that only appears when tarmac is abused.
+Neither file has a table of its own, which is what stops the mark and the plume
+ever disagreeing about what the road is made of.
+
+Rolling and sliding are a **maximum, not a sum**: a dirt car sliding at speed is
+already lifting everything the tyre can, and adding them put it at twice the
+density of anything that had been looked at. Sliding is deliberately *not* gated
+on road speed, because a stationary car spinning its wheels is the one place a
+standing plume is exactly right.
+
+`CPUParticles3D`, and here the constraint and the simple answer coincide:
+`GPUParticles3D` under Compatibility throws WebGL errors with a *View Depth*
+draw order, and trails and SDF collision are unsupported there at all — so every
+reason to reach for the GPU version is unavailable on the build that matters.
+`draw_order` stays at `INDEX`, and the suite asserts it, because the two node
+types swap easily and the failure would only ever appear in a browser.
+
+> **The emitters must not hang off the wheels, and the first version did.**
+> Parenting each to its `VehicleWheel3D` and dropping it by the wheel radius
+> looks exactly right and is wrong: Godot turns that node as the wheel rolls —
+> it is what makes the mesh parented to it spin — so at 70 km/h the emitter was
+> orbiting the axle fifty times a second, throwing dust in every direction
+> including into the road, and the point below the axle was at the contact patch
+> once per revolution. They hang off the spray node and are moved to
+> `get_contact_point()` each physics frame instead, which is the same number the
+> marks are laid at.
+
+> **The plume is not always `grit`, and a render is what found that.** A loose
+> surface throws up the loose material lying on it, which is exactly what `grit`
+> is. Tarmac has none: what comes off a sliding tyre there is burnt rubber, and
+> burnt rubber is pale. Reading `grit` for it drew a near-black plume on a
+> near-black road — physically the aggregate *in* the asphalt, a real colour for
+> the surface and the wrong one for smoke. It is the same shape of mistake the
+> speed lines made with white, found the same way.
+
+Two smaller things worth knowing. `amount_ratio` — the obvious way to scale
+emission with how hard the tyre is working — is `GPUParticles3D` only, and the
+CPU version's `amount` cannot be written per frame because setting it
+reallocates the particle array and restarts the system. `color` multiplies each
+particle's own colour and costs nothing, so the plume thins as a slide ends
+rather than stopping dead. And the material is `BILLBOARD_ENABLED` with
+`billboard_keep_scale`, not `BILLBOARD_PARTICLES`: that mode is for sprite
+sheets and wants animation frames this has none of, and without `keep_scale` a
+billboard rebuilds its own basis and every mote comes out at the mesh's full
+metre.
+
 ### Off the road, and the wall that had to come with it
 
 Grass gripped exactly like tarmac for the whole of the project's life. That was

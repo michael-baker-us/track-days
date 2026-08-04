@@ -799,8 +799,9 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > cheap work and the identity-forming work turned out to be the same work.**
 > Realism is not the axis this game gets better along.
 
-**Status: steps 1–4 done — the grading system, all six looks authored, the
-scenery moving, and the car feeling fast.**
+**Status: steps 1–5 done — the grading system, all six looks authored, the
+scenery moving, the car feeling fast, and the tyres throwing up what they are
+running on.**
 
 1. **A colour grade per look, as a real LUT.** `CircuitLook` already pairs an hour
    with a place; it gains a third thing, and that thing is the signature.
@@ -937,16 +938,25 @@ scenery moving, and the car feeling fast.**
 5. **Particles, from data the game already has.** Tyre spray, dust and grass
    clippings off the wheels; colour and behaviour taken from `RoadSurface`.
 
-> `RoadSurface` already answers this question for a different consumer:
-> `mark_always` says whether a tyre displaces material by rolling, `mark` says
-> what colour that material is. A dust plume on dirt, a snow rooster tail, and
-> nothing on dry tarmac until the tyre slides — that is the existing table, read
-> by something new.
+> **Done.** `TyreSpray` and `TyreMarks` read the *same* `mark_always` and answer
+> opposite halves of one question — whether a tyre displaces material by rolling
+> or only by sliding — so the plume and the rut can never disagree about what the
+> road is made of. A dust plume on dirt, a rooster tail on snow, and nothing on
+> dry tarmac until the tyre slides.
 >
-> **`CPUParticles3D` on web.** `GPUParticles3D` under Compatibility throws WebGL
-> errors with a *View Depth* draw order, and particle trails and SDF collision are
-> unsupported there anyway. This is a case where the constrained path is also the
-> simple one.
+> **`CPUParticles3D`, and the constrained path really was the simple one.**
+> `GPUParticles3D` under Compatibility throws WebGL errors with a *View Depth*
+> draw order, and trails and SDF collision are unsupported there anyway, so every
+> reason to reach for it is unavailable on the build that matters.
+>
+> **Not everything came out of the table, and that is the finding.** The plume's
+> colour is `grit` — the loose material on the surface — on dirt and snow, and
+> tarmac has none: what a sliding tyre makes there is burnt rubber, which is
+> pale. Reading `grit` for it drew a near-black plume on a near-black road. Two
+> further bugs were invisible in a still frame and are written up in
+> `docs/architecture.md`: emitters parented to the wheels orbit the axle fifty
+> times a second at speed, and `BILLBOARD_PARTICLES` renders nothing without the
+> sprite-sheet frames it expects.
 
 6. **Weather that does something.** `storm` is currently an hour with a grey
    grade. It becomes rain: a screen-space droplet layer, spray thrown from the

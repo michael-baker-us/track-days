@@ -1263,6 +1263,38 @@ enough to judge the spacing. And rendered **on snow**, which found the real bug:
 white streaks over a white road under a white outfield are not there at all. See
 `docs/architecture.md`; the colour now comes from the surface's own `base`.
 
+### Tyre spray, and two bugs a still frame could not have shown
+
+The emission rate is not tuned by eye at all — it comes out of `RoadSurface`.
+Rolling saturates at 90 km/h, well below the car's top speed, because a wheel
+rolling that fast is already displacing everything it can lift; sliding ramps
+from the same `SLIP_FLOOR` the marks use. The two are a maximum, and the suite
+asserts the rate never passes 1.0, which is what catches anyone turning it back
+into a sum.
+
+The particle numbers were driven, not guessed — full throttle off the grid, then
+handbrake and lock, on each of the three surfaces:
+
+| | First pass | Shipped | Why |
+|---|---|---|---|
+| `AMOUNT` | 24 | **40** | Two dozen motes read as debris being thrown, not as a plume |
+| `SIZE_MIN`/`MAX` | 0.18–0.42 | **0.10–0.26** | Large quads read as cargo falling off the car |
+| `LIFETIME` | 0.8 s | **0.6 s** | The trail hung around long enough to be a wall behind the car |
+| `THROW` | 29 deg | **42 deg** | At the shallower angle the plume never rose into frame |
+| alpha | 0.34 | **0.28** | Overlapping quads compound; the cloud was reading as solid |
+
+**Two bugs, and neither was visible in a screenshot of a parked car.** The
+emitters were parented to the wheels, which Godot rotates as they roll, so at
+70 km/h they were orbiting their axles fifty times a second — dust went in every
+direction including into the road. And the material used `BILLBOARD_PARTICLES`,
+which wants sprite-sheet animation frames it had none of, so nothing rendered at
+all. The full write-up is in `docs/architecture.md`.
+
+**And the colour is not one field for all three.** Dirt and snow throw up `grit`,
+the loose material lying on the surface. Tarmac has none, so a sliding tyre there
+makes burnt rubber — pale — and reading `grit` for it drew a near-black plume on
+a near-black road, because `grit` there is the aggregate *in* the asphalt.
+
 ### Still open, from M17
 - ~~Grass still grips like tarmac~~ — fixed. Off the ribbon the car keeps 0.55 of
   whatever the surface gives it, and the barriers became solid in the same change,

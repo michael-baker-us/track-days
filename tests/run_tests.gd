@@ -396,6 +396,139 @@ func test_the_frame_edges_streak_with_speed() -> void:
 
 	car.linear_velocity = velocity
 
+## What the tyres throw into the air, and the one table that decides it.
+##
+## `TyreSpray` and `TyreMarks` read the **same** `mark_always` and answer
+## opposite halves of one question: whether a tyre displaces material by rolling
+## over it or only by sliding on it. So the assertion that matters is not "dirt
+## makes dust" but that the two files cannot disagree — rolling throws nothing on
+## tarmac and something on everything else, exactly where the marks are laid by
+## rolling on everything else and by sliding on tarmac.
+##
+## Built per surface rather than by poking the staged car: the emitters are
+## configured when the node enters the tree, because what is under the tyres is
+## chosen on the title screen, so a car built under one surface can say nothing
+## about another.
+func test_the_tyres_throw_up_what_they_are_running_on() -> void:
+	var was := GameState.selected_surface
+	var rolling := {}
+	var sliding := {}
+	var burnout := {}
+	var parked := {}
+	var tint := {}
+	for surface in RoadSurface.ORDER:
+		GameState.selected_surface = surface
+		var car := load("res://scenes/car/race.tscn").instantiate() as VehicleBody3D
+		root.add_child(car)
+		car.global_position = Vector3(0.0, 400.0, 0.0)
+		var spray: TyreSpray = car.get_node_or_null("TyreSpray")
+		check_true("the car carries its spray on %s" % surface, spray != null)
+		if spray == null:
+			car.free()
+			continue
+
+		rolling[surface] = spray.spray_rate(0.0, 120.0)
+		sliding[surface] = spray.spray_rate(0.9, 120.0)
+		# A stationary car spinning its wheels, and a car rolling gently on a
+		# surface that has nothing loose on it.
+		burnout[surface] = spray.spray_rate(0.9, 0.0)
+		parked[surface] = spray.spray_rate(0.0, 0.0)
+
+		var wheels := 0
+		for child in car.get_children():
+			if child is VehicleWheel3D:
+				wheels += 1
+		var emitters := 0
+		var placed := true
+		var world := true
+		var off_the_wheels := true
+		var shadowed := false
+		var depth_sorted := false
+		for child in spray.get_children():
+			if not child is CPUParticles3D:
+				continue
+			var puff := child as CPUParticles3D
+			emitters += 1
+			# **Not parented to the wheel**, which is the whole trap here: Godot
+			# turns that node as the wheel rolls, so an emitter hanging off it
+			# orbits the axle fifty times a second at speed and throws dust into
+			# the road. They hang off the spray node and are moved to the contact
+			# point each physics frame instead.
+			off_the_wheels = off_the_wheels and puff.get_parent() == spray
+			# Below the axle it belongs to, by that wheel's own radius — a plume
+			# leaving a car half a metre off the ground reads as steam.
+			var wheel: VehicleWheel3D = spray._wheels[emitters - 1]
+			placed = placed and is_equal_approx(
+				puff.position.y, wheel.position.y - wheel.wheel_radius)
+			# A plume towed along behind the car is a scarf.
+			world = world and not puff.local_coords
+			shadowed = shadowed or (puff.cast_shadow
+				!= GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+			# The draw order the roadmap warns about: it is the GPU version that
+			# breaks on it under Compatibility, and this is the CPU one, but the
+			# two swap easily and the failure would only ever show in a browser.
+			depth_sorted = depth_sorted or (puff.draw_order
+				== CPUParticles3D.DRAW_ORDER_VIEW_DEPTH)
+			tint[surface] = (puff.material_override as StandardMaterial3D).albedo_color
+		if surface == RoadSurface.DEFAULT:
+			check("one emitter per wheel", emitters, wheels)
+			check_true("four of them", wheels == 4)
+			check_true("none of them hangs off a rolling wheel", off_the_wheels)
+			check_true("each starts below the axle it belongs to", placed)
+			check_true("emitting into the world, not into the car", world)
+			check_true("and casting no shadows", not shadowed)
+			check_true("nothing is sorted by view depth", not depth_sorted)
+		car.free()
+	GameState.selected_surface = was
+
+	# Rolling. The half `mark_always` decides, and the half that separates a rally
+	# stage from a race track.
+	check_true("rolling on tarmac throws nothing (%.2f)" % rolling["tarmac"],
+		is_zero_approx(rolling["tarmac"]))
+	check_true("rolling on dirt throws plenty (%.2f)" % rolling["dirt"],
+		rolling["dirt"] > 0.9)
+	check_true("and so does rolling on snow (%.2f)" % rolling["snow"],
+		rolling["snow"] > 0.9)
+	check_true("a dirt car at a standstill throws nothing",
+		is_zero_approx(parked["dirt"]))
+
+	# Sliding. Every surface, at any speed — a standing burnout is the one place a
+	# plume with no road speed behind it is exactly right.
+	for surface in RoadSurface.ORDER:
+		check_true("sliding on %s throws something (%.2f)"
+			% [surface, sliding[surface]], sliding[surface] > 0.5)
+		check_true("a standing burnout on %s does too (%.2f)"
+			% [surface, burnout[surface]], burnout[surface] > 0.5)
+		# The two ways in are a maximum, not a sum. A dirt car sliding at speed is
+		# already throwing everything the tyre can lift, and adding them put it at
+		# twice the density of anything that had been looked at.
+		check_true("and %s never throws more than it has (%.2f)"
+			% [surface, sliding[surface]], sliding[surface] <= 1.0)
+
+	# And the colour. A loose surface throws up the loose material lying on it,
+	# which is what `grit` is — but tarmac has none, so what a sliding tyre makes
+	# there is burnt rubber rather than displaced road. Reading `grit` for it drew
+	# a near-black plume on a near-black road, which is the aggregate *in* the
+	# asphalt: a real colour for the surface and the wrong one for smoke.
+	for surface in RoadSurface.ORDER:
+		var got: Color = tint[surface]
+		var grit: Color = RoadSurface.named(surface)["grit"]
+		if bool(RoadSurface.named(surface)["mark_always"]):
+			check_true("%s throws up its own grit (%s)" % [surface, got],
+				is_equal_approx(got.r, grit.r) and is_equal_approx(got.g, grit.g)
+				and is_equal_approx(got.b, grit.b))
+		else:
+			check_true("%s makes smoke rather than dust (%s)" % [surface, got],
+				is_equal_approx(got.r, TyreSpray.SMOKE.r)
+				and is_equal_approx(got.g, TyreSpray.SMOKE.g))
+			check_true("and it is pale enough to see on a black road (%.2f)"
+				% got.get_luminance(), got.get_luminance() > 0.6)
+			check_true("which the aggregate in the road is not (%.2f)"
+				% grit.get_luminance(), grit.get_luminance() < 0.5)
+		check_true("at less than full opacity", got.a < 1.0)
+	check_true("and the three do not all look the same",
+		tint["dirt"] != tint["snow"] and tint["dirt"] != tint["tarmac"])
+
 ## Records written by an older build have to survive the move to a composite key.
 ##
 ## Version 1 kept one flat `best_<track>` per circuit in a `[records]` section.
@@ -7346,6 +7479,7 @@ func _physics_process(_delta: float) -> bool:
 		test_car_wired_to_tuning()
 		test_the_camera_shakes_with_speed_and_surface()
 		test_the_frame_edges_streak_with_speed()
+		test_the_tyres_throw_up_what_they_are_running_on()
 		test_old_records_migrate_to_the_composite_key()
 		test_records_are_kept_per_car_and_surface()
 		test_the_throttle_setting_survives_a_restart()

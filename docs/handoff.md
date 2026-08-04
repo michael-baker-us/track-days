@@ -24,49 +24,45 @@ GODOT=/Users/michael.baker/Downloads/Godot.app/Contents/MacOS/Godot
 
 ## Where things stand
 
-**Steps 1 to 4 are done. The suite is green — 2032 checks. The speed lines are
-the working diff; everything before them is committed.**
+**Steps 1 to 5 are done. The suite is green — 2064 checks. The tyre spray is the
+working diff; everything before it is committed.**
 
 Step 1 (the grading system) shipped as `39e465b`, step 2 (all six looks authored)
-as `bd3d09f`, step 3 (wind) as `5c15be2`, step 4's camera shake as `999d288`.
+as `bd3d09f`, step 3 (wind) as `5c15be2`, step 4's camera shake as `999d288` and
+its speed lines as `40542ce`.
 
 | File | What it is |
 | --- | --- |
-| `scripts/ui/speed_lines.gd` | New. The streaks. Read the header before changing it — why it is not a blur, and why the colour comes from the surface, are both in there. |
-| `tools/build_ui.gd` | `SpeedLines` as the **first** child of the HUD's `Root`, so it draws behind the readouts, with `MOUSE_FILTER_IGNORE`. |
-| `scenes/ui/hud.tscn`, `scenes/race.tscn` | Rebaked, in that order. |
-| `resources/tuning/car_tuning.gd` | `speed_lines_opacity`, beside the shake and the FOV kick. |
-| `tests/run_tests.gd` | One new test, 16 checks. |
-
-Committed already, from earlier in the same step: `chase_camera.gd` (the shake —
-`_aim`, `shake_degrees()`, `shake_shape()`, the `SHAKE_X` / `SHAKE_Y` tables),
-`road_surface.gd` (`shake_of()`), and a corrected density comment in
-`track_builder.gd`.
+| `scripts/car/tyre_spray.gd` | New. The plume. Read the header before changing it — three things it got wrong first are written down there, and two of them are invisible in a still frame. |
+| `tools/build_car.gd` | An empty `TyreSpray` node beside `TyreMarks`, filled in when it enters the tree. |
+| `scenes/car/*.tscn` | Rebaked. Both cars, 23 nodes each. |
+| `tests/run_tests.gd` | One new test, 32 checks. |
 
 ### The rebake rule for this one
 
-`build_ui.gd` **before** `build_race.gd`, which instances `hud.tscn`. Only the
-node matters to the bake — the script is referenced by path, so changing
-`speed_lines.gd` needs no rebake at all. (For contrast: a **wind** change needs
+`tools/build_car.gd` after **any** change to what nodes a car carries — but not
+for the spray's own behaviour, since the script is referenced by path and the
+emitters are built at runtime. `build_audio.gd` comes first if the streams have
+changed, which they have not. (For contrast: a **wind** change needs
 `tools/build_track.gd`, because `WIND_*` is baked into the circuits as
 `ShaderMaterial` parameters. A **grade** change needs nothing.)
 
 ### Verified this pass
 
-- **The shake was measured before it was tuned**, with a throwaway `_diag_shake.gd`
-  that projected world points at a range of depths through the camera. That is
-  what caught the design being wrong: see the tuning journal, M18.
-- **Every mutation the tests claim to catch was made and caught** — linear instead
-  of quadratic, the surface term flattened, the old harmonics restored, the aim
-  fed back through its own shake, a roll term added where the shake is applied,
-  and `INNER` zeroed so streaks ran through the middle of the frame. That last one
-  **passed at first**: the check compared `nearest` against `lines.INNER`, which
-  is the constant under test, so it agreed with itself. It now compares against a
-  number written out in the test.
-- **The lines were rendered at every speed, at 0.9 on purpose, and on snow** —
-  which is the run that found white streaks being invisible on a white circuit.
-- **The waveform is bounded** and the amplitude it is multiplied by is therefore
-  in degrees: peak 1.0 per axis, 1.345 across both together.
+- **The spray was driven, not posed.** A throwaway `_diag_spray.gd` ran the car
+  full throttle off the grid and then handbraked it into a slide, on each of the
+  three surfaces, with the camera re-posed beside the car for every shot. Both of
+  the bugs it found — emitters orbiting their axles, and a billboard mode that
+  rendered nothing — are invisible in a screenshot of a parked car.
+- **Every mutation the tests claim to catch was made and caught** — `mark_always`
+  forced false, the two rates summed instead of maximised, the emitters parented
+  back onto the wheels, `local_coords` turned on, the contact-patch offset
+  removed, and tarmac reading `grit` again.
+- **Earlier in this milestone**, the same discipline caught the camera shake being
+  a translation, and one test that **passed when it should not have**: the streak
+  check compared `nearest` against `lines.INNER`, the constant under test, so it
+  agreed with itself. It now compares against a number written out in the test.
+  Worth repeating on any check whose threshold is a constant the code owns.
 
 ### Two things seen but not chased, still open from step 3
 
@@ -87,7 +83,7 @@ node matters to the bake — the script is referenced by path, so changing
   canopy already near the top of the range. It is a **web-build look difference**
   and belongs to whoever next touches lighting, not to wind.
 
-### And two from step 4
+### And three from steps 4 and 5
 
 - **There is now a motion-settings shaped hole.** The shake and the streaks are
   both the sort of effect that usually gets an accessibility toggle, and
@@ -99,24 +95,39 @@ node matters to the bake — the script is referenced by path, so changing
   6.0 to 8.7 markers a second at 165 km/h, 7.9 to 13 pieces of roadside furniture,
   12 to 17 with the trees. The builder's comment claimed twenty and had never been
   true. If the circuit ever needs to feel faster, argue with those numbers.
+- **The spray does not ask whether it is on the road.** `TyreMarks` raycasts for
+  that, so a set of ruts never wanders across a field; the plume skips the check
+  because it costs a ray per wheel per frame and nothing about a dust cloud is
+  wrong on grass. It does mean a tarmac car sliding on the verge makes tyre smoke
+  rather than a divot of turf. Cheap to fix if it ever reads badly —
+  `tyre_marks.on_road()` is already public.
 
 ---
 
 ## Next action
 
-**Step 5: particles.** `CPUParticles3D`, not `GPUParticles3D` — the latter throws
-WebGL errors under Compatibility with a *View Depth* draw order, and particle
-trails and SDF collision are unsupported there anyway, so the constrained path is
-also the simple one.
+**Step 6: weather that does something.** `storm` is currently an hour with a grey
+grade; it becomes rain. Three parts, and the third is the one with the real
+payoff:
 
-The data is already there and is the point: `RoadSurface.mark_always` says whether
-a tyre displaces material by rolling or only when sliding, and `mark` says what
-colour that material is. A dust plume on dirt, a rooster tail on snow, and nothing
-on dry tarmac until the tyre slides — that is the existing table read by something
-new, the same move `shake_of()` just made with `relief`.
+- **A screen droplet layer.** Nearest thing already built is `speed_lines.gd` — a
+  `Control` on the HUD layer drawing into the frame with no screen texture. The
+  droplets want the same shape.
+- **Spray from the wheels.** `TyreSpray` is now the thing to point at it: a wet
+  road is a surface with something loose on it, which is exactly the `mark_always`
+  branch that already exists.
+- **A wet road, which is a roughness change and not a new shader.** `RoadSurface`
+  already carries `roughness` per surface, and `sparkle` already proved that
+  punching roughness holes and letting the real sun answer beats drawing the
+  highlight. A low-roughness road reflecting a bright sky is a dramatic image
+  rather than a faithful one, which is the one place realism pays here.
 
-`tyre_marks.gd` already answers "is this wheel sliding, and where is it" for the
-marks it lays down, so the trigger exists too.
+**The open question is whether rain is a surface or an hour.** `storm` is a
+`SkyPreset`, chosen per circuit at build time; `tarmac`/`dirt`/`snow` are a
+`RoadSurface`, chosen per race and keyed into the lap record. Wet tarmac is
+plainly a *condition* — it changes grip, so it must not share a record with dry —
+which argues it belongs beside the other three rather than in the sky. Worth
+settling before writing any of it.
 
 ---
 
@@ -184,9 +195,8 @@ into the web export if left in the project root.
    roadside grass deliberately not; see below.
 4. ~~Speed feedback — camera shake, roadside density, and the frame edges.~~
    **Done.** All three scale against one `camera_fov_reference_kmh`.
-5. **Particles** — `CPUParticles3D`, not GPU: GPU particles throw WebGL errors
-   under Compatibility with a View Depth draw order. Read `RoadSurface.mark` and
-   `mark_always`, which already answer "does this tyre displace material".
+5. ~~Particles — tyre spray off the wheels, from `RoadSurface`.~~ **Done.**
+   `mark_always` decides rolling versus sliding, exactly as it does for the marks.
 6. **Rain** — screen droplets, wheel spray, and a roughness drop on the road.
 7. **Crowd** — billboard spectators in the stands that are currently empty.
 8. **Marker boards** — braking and apex markers placed from `Compiled.corners`.

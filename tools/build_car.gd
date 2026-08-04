@@ -144,6 +144,13 @@ func _bake(spec: CarSpec) -> bool:
 	marks.name = "TyreMarks"
 	marks.set_script(load("res://scripts/car/tyre_marks.gd"))
 	car.add_child(marks)
+	# And what they throw into the air. Empty for the same reason the marks node
+	# is: what the tyres are running on is a race-time choice, so the emitters are
+	# built when it enters the tree rather than baked here.
+	var spray := Node3D.new()
+	spray.name = "TyreSpray"
+	spray.set_script(load("res://scripts/car/tyre_spray.gd"))
+	car.add_child(spray)
 
 	TrackBuilder.set_owner_recursive(car, car)
 
