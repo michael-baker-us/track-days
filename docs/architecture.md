@@ -2590,9 +2590,18 @@ with slightly brighter tonemapping.
 > **Godot rewrites `project.godot` on its own schedule** — an `--import`, an
 > editor open, even a web export — and when it does it drops whole sections and
 > every `;` comment in the file. The `rendering_method.web` override has been lost
-> that way twice, and nothing warns: the export still succeeds and the page simply
-> renders wrong. So the reasoning lives here rather than in comments there, and
-> `tests/run_tests.gd` asserts both renderer settings are present.
+> that way **three times** now, and nothing warns: the export still succeeds and
+> the page simply renders wrong. So the reasoning lives here rather than in
+> comments there, and `tests/run_tests.gd` asserts both renderer settings are
+> present.
+>
+> **The third time is the one that proves the guard.** The whole `[rendering]`
+> section went in an ordinary commit, alongside a reordering of `[gui]` and a
+> rewrite of `[input]` that lost nothing — so a reviewer reading the diff sees a
+> plausible file-format churn and the deletion hidden inside it. The suite failed
+> on the next run with "the web renderer override is still in the file", which is
+> exactly what it is for. Restoring the four lines is the whole fix; comparing the
+> key list against the previous commit is how to check nothing else went with it.
 
 **No system fonts.** Godot's built-in font covers Latin and little else, and
 `allow_system_fallback` quietly fills the gaps from the OS — on desktop. The web

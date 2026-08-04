@@ -82,6 +82,20 @@ configure themselves at load. It is the node and the metadata that are baked.
   back onto the wheels, `local_coords` turned on, the contact-patch offset
   removed, tarmac reading `grit` again, the rain lean pinned to its at-rest
   value, and `wetted()` editing the shared table instead of a copy.
+- **`project.godot` lost its `[rendering]` section again — the third time — and
+  the suite caught it.** It went in the crowd commit, next to a harmless
+  reordering of `[gui]` and `[input]`, which is what makes it easy to miss in a
+  diff. Restored; the key list now matches the previous commit exactly and
+  survives an `--editor --quit`. **Check `git diff project.godot` after every
+  editor open or import**, as `CLAUDE.md` says — and if the suite ever reports
+  "the web renderer override is still in the file", this is what happened.
+- **A second thing rides along with that check.** Restoring `[rendering]` and
+  re-importing flipped `car_kit/Textures/colormap.png.import` from lossless to
+  `compress/mode=2`, VRAM-compressed as `s3tc_bptc` — Godot's "detect 3D"
+  auto-upgrade, fired by rendering the texture in a 3D scene. s3tc is desktop
+  only, so an import with no ETC2/ASTC variant is a texture the **web** build has
+  no compressed form of. Reverted, and it did not come back on the next import.
+  Worth a glance in `git status` alongside `project.godot`.
 - **The floating spectators are fixed, and the fix came from counting rather than
   looking.** Reported from play: people in mid-air beside the paddock. Measuring
   every spectator against the nearest stand found 15 to 21 adrift per circuit, up
