@@ -1155,6 +1155,27 @@ Tarmac is untouched, since its multiplier is 1.0.
 > than the game wants. It is one multiply in `car_controller` if so, and par
 > follows it automatically.
 
+### Par is bounded by arithmetic, not by a driver
+
+Par is a perfect lap and every medal is judged against it, so an error in par is
+an error in every medal — and two changes moved it a long way in one session:
+`launch_accel` corrected by a factor of two, and drive made surface-aware. Neither
+had anything checking the result was still a *lower* bound.
+
+The strong check is a scripted driver trying to beat it. **That was attempted and
+abandoned.** A pure-pursuit driver was written against the circuit's centreline
+and did not complete a lap on any circuit inside 150 seconds — and a driver that
+spins off at the first corner proves nothing about par either way. Writing one
+good enough for its lap time to *mean* something is its own piece of work, most
+likely wanting the racing line `ParTime` already computes rather than the
+centreline, and a steering sign that has been checked rather than guessed.
+
+What is cheap and still definite is the arithmetic bound: **a lap cannot be driven
+faster than its own length at the car's top speed.** No cornering, no braking, no
+acceleration — distance over speed. Par below that is impossible; par far above it
+means the model has stopped describing a car. Both ends are now checked for every
+circuit, car and surface: 96 combinations, all inside the band.
+
 ### Still open, from M17
 - ~~Grass still grips like tarmac~~ — fixed. Off the ribbon the car keeps 0.55 of
   whatever the surface gives it, and the barriers became solid in the same change,

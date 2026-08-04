@@ -2241,6 +2241,59 @@ func test_the_engine_has_two_voices() -> void:
 		% [tail["engine_load"], tail["engine_overrun"]],
 		float(tail["engine_load"]) > float(tail["engine_overrun"]) * 1.15)
 
+## **Par has to be physically possible, and not absurd.**
+##
+## Par is a *perfect* lap and every medal is judged against it, so an error in it
+## is an error in every medal. Two changes this session moved it a long way:
+## `launch_accel` was found wrong by a factor of two, and drive became
+## surface-aware. Both made par slower, and neither had anything checking that the
+## result was still a lower bound.
+##
+## The strong check is a scripted driver that tries to beat it. That was attempted
+## and abandoned — a driver good enough for its lap time to *mean* anything is its
+## own piece of work, and one that spins off at the first corner proves nothing.
+##
+## What is cheap and still definite is the arithmetic bound: **a lap cannot be
+## driven faster than its own length at the car's top speed.** No cornering, no
+## braking, no acceleration — just distance over speed. Par below that is
+## impossible, and par absurdly above it means the model has stopped describing a
+## car.
+func test_par_is_a_possible_lap() -> void:
+	for entry in GameState.TRACKS:
+		var info: Dictionary = entry
+		var circuit: Node3D = load(info["scene"]).instantiate()
+		var line: PackedVector3Array = circuit.get_meta(
+			"centreline", PackedVector3Array()
+		)
+		var length := 0.0
+		for i in line.size():
+			length += line[i].distance_to(line[(i + 1) % line.size()])
+		circuit.free()
+		check_true("%s has a lap to measure (%.0f m)" % [info["id"], length],
+			length > 100.0)
+		if length <= 100.0:
+			continue
+
+		for car_id in ["race", "race_future"]:
+			var spec: CarSpec = load("res://resources/cars/%s.tres" % car_id)
+			for surface in RoadSurface.ORDER:
+				var par: float = GameState.par_for(info, car_id, surface)
+				check_true("%s/%s/%s has a par" % [info["id"], car_id, surface],
+					par > 0.0)
+				if par <= 0.0:
+					continue
+				# Flat out the whole way, which nothing can beat.
+				var floor_s: float = length / (spec.top_speed_kmh / 3.6)
+				check_true("%s/%s/%s par %.1f s is above the flat-out floor %.1f s"
+					% [info["id"], car_id, surface, par, floor_s],
+					par > floor_s)
+				# And still recognisably a lap of this circuit rather than a
+				# crawl: three times the flat-out time is already a very slow
+				# average.
+				check_true("%s/%s/%s par %.1f s is not a crawl (floor %.1f s)"
+					% [info["id"], car_id, surface, par, floor_s],
+					par < floor_s * 3.0)
+
 ## Kerbs, and the road coordinate that finds them.
 ##
 ## Everything else about the car's relationship to the road is answered by the
@@ -6824,6 +6877,7 @@ func _physics_process(_delta: float) -> bool:
 		test_hitting_something_is_audible()
 		test_the_countdown_is_audible()
 		test_the_menus_answer()
+		test_par_is_a_possible_lap()
 		test_kerbs_are_felt_at_the_road_edge()
 		test_generated_loops_meet_their_own_start()
 		test_sound_is_off_until_asked_for()
