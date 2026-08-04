@@ -799,9 +799,9 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > cheap work and the identity-forming work turned out to be the same work.**
 > Realism is not the axis this game gets better along.
 
-**Status: steps 1–6 done — the grading system, all six looks authored, the
+**Status: steps 1–7 done — the grading system, all six looks authored, the
 scenery moving, the car feeling fast, the tyres throwing up what they are running
-on, and the storm actually raining.**
+on, the storm actually raining, and the circuit populated.**
 
 1. **A colour grade per look, as a real LUT.** `CircuitLook` already pairs an hour
    with a place; it gains a third thing, and that thing is the signature.
@@ -1003,10 +1003,12 @@ on, and the storm actually raining.**
 > Sampling the model's own vertices per row lands every row on its tier and
 > survives a change to the kit. See the tuning journal.
 >
-> **Not done: marshal posts.** The crowd was the substantial half and it is in;
-> flag-waving marshals at the corners are a separate placement pass against
-> `Compiled.corners`, which is the same data step 8 wants. They belong together
-> and they are the remainder of this step, left explicitly rather than quietly.
+> **And the marshal posts are in.** One high-vis figure and a flag at the outside
+> of every corner — 6 to 18 of them per circuit, the rest refused by the same
+> clearance test the barrier uses. They are the first trackside thing placed from
+> the *corners* rather than from arc length, which needed a corner list that did
+> not exist: `_corner_spans` is for banking and skips the flat ones, which is
+> nearly all of them. `_corner_entries` is what step 8's boards will read.
 
 8. **Boards that make the circuit readable.** Braking markers, apex markers and
    corner numbering, placed from the centreline the way everything trackside

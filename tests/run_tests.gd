@@ -1434,6 +1434,56 @@ func test_the_stands_have_people_on_the_seats() -> void:
 				== TrackBuilder.WIND_SHADER)
 		circuit.free()
 
+## A marshal at the outside of every corner, with a flag beside them.
+##
+## The one thing that has to be true and is not obvious from a screenshot is that
+## they are **off the road** — a marshal standing on the racing line is a marshal
+## the car drives through, and the placement runs from the centreline outward, so
+## a sign error puts every one of them on the tarmac. Measured against the
+## circuit's own centreline metadata rather than by raycast, which is the same
+## number `kerb_feel` uses to decide what a kerb is.
+func test_every_corner_is_marshalled() -> void:
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var people := circuit.find_children("Marshals", "MultiMeshInstance3D", true, false)
+		var flags := circuit.find_children("MarshalFlags", "MultiMeshInstance3D", true, false)
+		check_true("%s is marshalled" % id, not people.is_empty() and not flags.is_empty())
+		if people.is_empty() or flags.is_empty():
+			circuit.free()
+			continue
+		var mm := (people[0] as MultiMeshInstance3D).multimesh
+		check_true("%s posts a few of them (%d)" % [id, mm.instance_count],
+			mm.instance_count >= 4)
+		# One flag per marshal: a post is a person *and* a flag, and the two are
+		# placed from the same point, so a mismatch means one of them was refused
+		# by the clearance test and the other was not.
+		check("%s gives each of them a flag" % id,
+			(flags[0] as MultiMeshInstance3D).multimesh.instance_count,
+			mm.instance_count)
+		check("%s marshals cast no shadow" % id,
+			(people[0] as MultiMeshInstance3D).cast_shadow,
+			GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+
+		var line: PackedVector3Array = circuit.get_meta("centreline", PackedVector3Array())
+		var nearest := INF
+		var high_vis := true
+		for i in mm.instance_count:
+			var at := i * 16
+			var here := Vector2(mm.buffer[at + 3], mm.buffer[at + 11])
+			var apart := INF
+			for p in line:
+				apart = minf(apart, Vector2(p.x, p.z).distance_to(here))
+			nearest = minf(nearest, apart)
+			high_vis = high_vis and is_equal_approx(
+				mm.buffer[at + 12], TrackBuilder.MARSHAL_COLOUR.r)
+		# The road is about 11 m across, so half of it is 5.6 — and `KerbFeel`
+		# calls anything past 7.4 m off the road entirely.
+		check_true("%s stands them clear of the road (nearest %.1f m)"
+			% [id, nearest], nearest > KerbFeel.KERB_TO)
+		check_true("%s dresses them all in high-vis" % id, high_vis)
+		circuit.free()
+
 ## The scenery that ought to move is in the wind, on every shipped circuit.
 ##
 ## **Nothing catches this by looking at a screenshot**, which is the whole reason
@@ -7707,6 +7757,7 @@ func _physics_process(_delta: float) -> bool:
 		test_the_ground_takes_its_theme_and_its_hour()
 		test_roadside_markers_are_dense_enough_to_read_as_speed()
 		test_the_stands_have_people_on_the_seats()
+		test_every_corner_is_marshalled()
 		test_the_scenery_is_in_the_wind()
 		test_the_wind_carries_the_prop_colour_across()
 		test_flags_and_trees_move_differently()

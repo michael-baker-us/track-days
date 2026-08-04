@@ -24,8 +24,7 @@ GODOT=/Users/michael.baker/Downloads/Godot.app/Contents/MacOS/Godot
 
 ## Where things stand
 
-**Steps 1 to 6 are done, and step 7 is done apart from its marshal posts. The
-suite is green — 2118 checks. The tyre spray, the rain and the crowd are the
+**Steps 1 to 7 are done. The suite is green — 2146 checks. The tyre spray, the rain and the crowd are the
 working diff; everything before them is committed.**
 
 Step 1 (the grading system) shipped as `39e465b`, step 2 (all six looks authored)
@@ -169,32 +168,32 @@ configure themselves at load. It is the node and the metadata that are baked.
 
 ## Next action
 
-**Marshal posts, and then step 8's marker boards — together, because they are the
-same placement pass.**
+**Step 8, and it closes M18: boards that make the circuit readable.** Braking
+markers, apex markers and corner numbering, placed from the corners the way
+everything trackside already is.
 
-Step 7 shipped its crowd and not its marshals, deliberately: a flag-waving
-marshal stands at a *corner*, and corners are `Compiled.corners`, which is
-exactly the data step 8's braking and apex boards are placed from. Doing them in
-one pass means writing the corner-placement helper once.
+The placement pass the marshals needed is now in hand and is the thing to build
+on:
 
-What is already in hand for both:
+- **`_corner_entries`** records every corner's centreline index and which way it
+  turns — added for the marshals, because `_corner_spans` only holds *banked*
+  corners and nearly none are. Walking back from a corner's entry index is how a
+  marshal post finds its spot, and it is how a 100 m board finds its spot.
+- **Distance back is the interesting part**, not the model. Real boards sit at
+  150, 100 and 50 m before the corner because a driver reads distance-to-apex off
+  the gap between them. That is a walk backwards along `centreline` accumulating
+  length — the same loop `_point_at_arc` already does forwards.
+- **This is the one step in M18 with a gameplay claim.** Everything else has been
+  a look. A board that a driver can actually brake against is worth measuring
+  against the par-time model's braking distances, which are already in
+  `docs/tuning-journal.md`.
 
-- **`Compiled.corners`** gives every corner's cell, piece and turn direction, and
-  `_point_at_arc` turns an arc length into a point and a tangent. Every trackside
-  thing in the builder is placed from those two.
-- **A figure mesh exists.** `TrackBuilder.spectator_mesh()` is a person; a marshal
-  is one of those in a bright colour beside a post, which is a `MultiMesh` of the
-  same shape the crowd already uses.
-- **The flag is already in the wind.** `WIND_FLAG` and the marker flags prove the
-  path — `flagRed` and `flagGreen` are in the kit and already used as roadside
-  markers by theme.
+Corner numbering wants text, and there is no text in the 3D world yet — the whole
+HUD is `Control` nodes on a `CanvasLayer`. A number on a board is either a
+generated texture or a `Label3D`. Worth deciding before starting, the same way
+the crowd's "no textures" question was.
 
-Marker boards are the one thing here with a **gameplay** claim rather than a
-visual one: real circuits carry them because a driver reads distance-to-apex off
-them. That makes the placement rule the interesting part — 150, 100 and 50 metres
-before the corner's entry arc — rather than the model.
-
-**That closes M18.** Delete this file when it does.
+**When it lands, M18 is closed — delete this file.**
 
 ---
 
@@ -267,8 +266,8 @@ into the web export if left in the project root.
 6. ~~Rain — screen streaks, wheel spray, and a roughness drop on the road.~~
    **Done.** One number on the hour reaching all three. Grip deliberately
    untouched; see below.
-7. ~~Crowd — spectators in the stands that were empty.~~ **Done**, and not as
-   billboards; marshal posts are the remainder, and belong with step 8.
+7. ~~Crowd — spectators in the stands, and marshals at the corners.~~ **Done**,
+   and not as billboards.
 8. **Marker boards** — braking and apex markers placed from `Compiled.corners`.
 
 ### Left out of step 3, on purpose

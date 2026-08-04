@@ -1273,6 +1273,34 @@ its speed: people do not sway like a tree or flap like a flag, they shift, and
 what a full stand looks like at racing distance is a texture that is never quite
 still. Anything more legible reads as a crowd doing a wave.
 
+### Marshal posts, and the first thing placed from the corners
+
+The stands say a race is being watched; a marshal says it is being *run*. One
+high-vis figure and a flag at the outside of every corner, which is where a real
+one stands: they need to see the whole corner and be seen from it, and the inside
+is where a car that has lost the back end arrives. Outside a left-hander is the
+driver's right, so the side is simply the opposite of the turn.
+
+The figure is `spectator_mesh()` in high-vis. A marshal is a person, the project
+already has a person, and a second one would be inventing a difference the eye
+cannot find at fifty metres. The flag is the theme's own roadside marker at three
+times its usual size, so a post reads as *bigger than the little ones going
+past*.
+
+**This is the first trackside thing placed from the corners rather than from arc
+length**, and it needed a list that did not exist: `_corner_spans` is for banking
+and skips any corner that asked for none, which is nearly all of them now that
+corners are flat by default. `_corner_entries` records every corner regardless.
+That list is what the braking and apex boards want next.
+
+> **They must be off the road, and the suite measures it.** The placement runs
+> from the centreline outward, so a sign error puts every marshal on the racing
+> line — where the car drives through them. The check is the distance from each
+> marshal to the circuit's own centreline metadata, against `KerbFeel.KERB_TO`,
+> which is already the project's definition of "past the edge of the road".
+> Pulling the gap inside the barrier instead makes `_clear_of_road` refuse every
+> post, and the same test catches that from the other direction.
+
 ### Camera shake, which is a rotation and was a translation first
 
 The camera already carried one thing that says *speed* — the FOV kick, scaled

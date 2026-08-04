@@ -235,6 +235,24 @@ const CROWD_TURN := 0.35
 ## Shirts. Bright and few, because a crowd at distance is colour noise and the
 ## kit around it is white, grey and green — a palette drawn from the same range
 ## as the circuit would disappear into it.
+## A marshal post: how far out from the centreline it stands, how far before the
+## corner it is, and what a marshal wears.
+##
+## **Outside the corner**, which is where a real one stands: they need to see the
+## whole of it and be seen from it, and the inside is where a car that has lost
+## the back end arrives. Outside a left-hander is the driver's right, so the side
+## is simply the opposite of the turn.
+##
+## Far enough back that the post is passed on the way *in*, which is when a flag
+## is information rather than history, and just outside `RAIL_GAP` so a marshal
+## stands **behind the barrier** rather than in a field.
+const MARSHAL_GAP := 0.86
+const MARSHAL_BEFORE := 9
+const MARSHAL_SCALE := 0.12
+## High-vis, and the one colour in the game chosen to be impossible to miss
+## rather than to fit in.
+const MARSHAL_COLOUR := Color(0.98, 0.55, 0.10)
+
 const CROWD_COLOURS := [
 	Color(0.86, 0.28, 0.26), Color(0.95, 0.68, 0.22), Color(0.29, 0.45, 0.78),
 	Color(0.35, 0.66, 0.38), Color(0.90, 0.90, 0.92), Color(0.55, 0.35, 0.70),
@@ -780,6 +798,11 @@ var _placed: Array = []
 ## Centreline index ranges that sit inside a corner arc, with the bank that
 ## corner asks for. Turned into a continuous profile by `_build_bank_profile`.
 var _corner_spans: Array = []
+## Every corner, banked or not: where it starts on the centreline and which way
+## it goes. `_corner_spans` cannot serve — it exists for banking and skips a
+## corner that asked for none, which is nearly all of them, since corners are
+## flat by default.
+var _corner_entries: Array = []
 ## The road's lateral direction at each centreline point; see `_side_vectors`.
 var _sides: Array[Vector3] = []
 ## How far, in world units, the centreline at each point sits above the surface
@@ -814,6 +837,7 @@ func build(
 	_tunnel_spans.clear()
 	_placed = []
 	_corner_spans = []
+	_corner_entries = []
 	_sides = []
 	_ramp_lift = PackedFloat32Array()
 
@@ -884,6 +908,7 @@ func build(
 			# and neither can quietly bank a circuit nobody asked to bank.
 			_note_corner(piece, turn, from_idx,
 				float(seg[3]) if seg.size() > 3 else 0.0)
+			_corner_entries.append({"at": from_idx, "turn": turn})
 			pos = r[0]
 			height = r[5]
 			heading = new_heading
@@ -2411,6 +2436,7 @@ func _build_scenery(root_node: Node3D, track_name: String) -> void:
 	_lamp_lights(scenery, track_name)
 	_scenery_paddock(scenery, road)
 	_scenery_markers(scenery, road, track_name)
+	_scenery_marshals(scenery, road, track_name)
 	_build_tunnels(scenery)
 	_build_horizon(scenery, track_name)
 	_build_road_overlay(scenery)
@@ -3231,34 +3257,9 @@ func _scenery_crowd(parent: Node3D, road: Dictionary, arcs: Array) -> void:
 	# instances to work out how tall the prop ended up.
 	_windy(mesh, xforms, WIND_CROWD)
 
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	# The whole reason this is not `_multimesh`: twelve floats of transform then
-	# four of colour, which is the layout the buffer takes once colours are on.
-	mm.use_colors = true
-	mm.mesh = mesh
-	mm.instance_count = xforms.size()
-	var buf := PackedFloat32Array()
-	buf.resize(xforms.size() * 16)
-	for i in xforms.size():
-		var t := xforms[i]
-		var b := t.basis
-		var at := i * 16
-		buf[at + 0] = b.x.x; buf[at + 1] = b.y.x; buf[at + 2] = b.z.x; buf[at + 3] = t.origin.x
-		buf[at + 4] = b.x.y; buf[at + 5] = b.y.y; buf[at + 6] = b.z.y; buf[at + 7] = t.origin.y
-		buf[at + 8] = b.x.z; buf[at + 9] = b.y.z; buf[at + 10] = b.z.z; buf[at + 11] = t.origin.z
-		buf[at + 12] = colours[i].r; buf[at + 13] = colours[i].g
-		buf[at + 14] = colours[i].b; buf[at + 15] = colours[i].a
-	mm.buffer = buf
-	mm.custom_aabb = _instances_aabb(mesh.get_aabb(), xforms)
-
-	var mmi := MultiMeshInstance3D.new()
-	mmi.name = "Crowd"
-	mmi.multimesh = mm
-	# No shadows, for the same reason the markers cast none: several hundred small
-	# casters would swamp the atlas the car's own shadow needs.
-	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	parent.add_child(mmi)
+	# No shadows either, for the same reason the markers cast none: several hundred
+	# small casters would swamp the atlas the car's own shadow needs.
+	_coloured_multimesh(parent, "Crowd", mesh, xforms, colours)
 
 ## The top of the model at one depth into it: the height of the tier a row sits
 ## on, in the model's own units.
@@ -3274,6 +3275,91 @@ static func _seat_top(faces: PackedVector3Array, at: float, slice: float) -> flo
 		if absf(v.z - at) <= slice * 0.5:
 			top = maxf(top, v.y)
 	return top
+
+## A marshal at the outside of every corner, with a flag.
+##
+## The stands say a race is being watched; these say it is being *run*. They are
+## also the first trackside thing placed from the **corners** rather than from
+## arc length, which is the same data the braking and apex boards want — so the
+## helper that finds a corner's entry point is written once here.
+##
+## The figure is the spectator mesh in high-vis: a marshal is a person, the
+## project already has a person, and inventing a second one would be inventing a
+## difference the eye cannot see at fifty metres. The flag beside it is the
+## theme's own marker flag at three times its roadside size, so a post reads as
+## "the thing over there is bigger than the little ones going past".
+func _scenery_marshals(scenery: Node3D, road: Dictionary, track_name: String) -> void:
+	if _corner_entries.is_empty() or centreline.size() < 4:
+		return
+	var theme := CircuitLook.theme_of(track_name, _look)
+	var flag := _prop(String(theme["marker"]))
+	var people: Array[Transform3D] = []
+	var flags: Array[Transform3D] = []
+	for corner in _corner_entries:
+		# Outside the corner: a left-hander is watched from the driver's right.
+		var side := 1.0 if String(corner["turn"]) == "left" else -1.0
+		var at: int = (int(corner["at"]) - MARSHAL_BEFORE + centreline.size()) \
+			% centreline.size()
+		var here := centreline[at]
+		var next := centreline[(at + 1) % centreline.size()]
+		var tan := Vector2(next.x - here.x, next.z - here.z)
+		if tan.length_squared() < 0.0001:
+			continue
+		tan = tan.normalized()
+		var outward := Vector3(-tan.y, 0.0, tan.x) * side
+		var post := here + outward * (MARSHAL_GAP * SCALE)
+		if not _clear_of_road(road, post, MARKER_CLEARANCE * SCALE):
+			continue
+		var yaw := _yaw_facing(tan, side)
+		people.append(_prop_xform(post, yaw, MARSHAL_SCALE * SCALE, Vector3.ZERO))
+		# Beside them, not on top of them.
+		flags.append(_prop_xform(
+			post + Vector3(tan.x, 0.0, tan.y) * (0.22 * SCALE),
+			yaw, MARKER_SCALE * 3.0, flag["offset"]))
+	if people.is_empty():
+		return
+
+	var figures := spectator_mesh()
+	_windy(figures, people, WIND_CROWD)
+	var high_vis := PackedColorArray()
+	for i in people.size():
+		high_vis.append(MARSHAL_COLOUR)
+	_coloured_multimesh(scenery, "Marshals", figures, people, high_vis)
+	_multimesh(scenery, "MarshalFlags", flag, flags, false, WIND_FLAG)
+
+## One `MultiMesh` whose instances all wear the same colour.
+##
+## Split out of `_scenery_crowd` when the marshals arrived: both need the
+## sixteen-float buffer that `use_colors` demands, and `_multimesh` writes twelve.
+func _coloured_multimesh(
+	parent: Node3D, node_name: String, mesh: ArrayMesh,
+	xforms: Array[Transform3D], colours: PackedColorArray
+) -> void:
+	if xforms.is_empty():
+		return
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = mesh
+	mm.instance_count = xforms.size()
+	var buf := PackedFloat32Array()
+	buf.resize(xforms.size() * 16)
+	for i in xforms.size():
+		var t := xforms[i]
+		var b := t.basis
+		var at := i * 16
+		buf[at + 0] = b.x.x; buf[at + 1] = b.y.x; buf[at + 2] = b.z.x; buf[at + 3] = t.origin.x
+		buf[at + 4] = b.x.y; buf[at + 5] = b.y.y; buf[at + 6] = b.z.y; buf[at + 7] = t.origin.y
+		buf[at + 8] = b.x.z; buf[at + 9] = b.y.z; buf[at + 10] = b.z.z; buf[at + 11] = t.origin.z
+		var c: Color = colours[i]
+		buf[at + 12] = c.r; buf[at + 13] = c.g; buf[at + 14] = c.b; buf[at + 15] = c.a
+	mm.buffer = buf
+	mm.custom_aabb = _instances_aabb(mesh.get_aabb(), xforms)
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = node_name
+	mmi.multimesh = mm
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mmi)
 
 ## One spectator: a body and a head, authored one unit tall standing on y = 0, so
 ## the instance scale is the height in world units and nothing has to know how
