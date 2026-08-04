@@ -76,24 +76,52 @@ const THROW := Vector3(0.0, 0.9, 1.0)
 ## the asphalt, which is a real colour for the road and the wrong one for smoke.
 const SMOKE := Color(0.82, 0.82, 0.84)
 
-const AMOUNT := 40
-const SIZE_MIN := 0.10
-const SIZE_MAX := 0.26
+## What a wet road throws, which is water rather than either of the above:
+## paler than smoke and colourless, because the road under it is not what is
+## being lifted.
+const WATER := Color(0.88, 0.92, 0.96)
+
+## Sized against the **chase camera**, not against a side view. The first pass
+## was tuned from a camera six metres away and looked right there; from where the
+## game actually sits — 4.2 m behind the car, with the plume immediately in front
+## of it — the same motes were half-metre boxes floating over the road.
+const AMOUNT := 52
+const SIZE_MIN := 0.055
+const SIZE_MAX := 0.15
 ## How much bigger a mote gets over its life. Dust spreads as it slows.
 const GROWTH := 1.8
 
 var _car: VehicleBody3D
 var _wheels: Array[VehicleWheel3D] = []
 var _emitters: Array[CPUParticles3D] = []
-var _always := false
+## How much loose material this road has on it, 0 to 1: all of it on dirt and
+## snow, as much as it is raining on anything else, and none on a dry road. It
+## is what decides whether *rolling* throws anything, and holding it as an
+## amount rather than as a flag is what lets a drizzle throw less than a
+## downpour without a second rule.
+var _loose := 0.0
+var _rain := 0.0
+
+## Handed over by `race.gd` before the car enters the tree, the way the hour is
+## handed to the headlights. The rain belongs to the circuit and the surface
+## belongs to the race, and this node is the only thing that needs both.
+func set_rain(amount: float) -> void:
+	_rain = clampf(amount, 0.0, 1.0)
 
 func _ready() -> void:
 	_car = get_parent() as VehicleBody3D
 	if _car == null:
 		return
 	var surface := RoadSurface.named(GameState.selected_surface)
-	_always = bool(surface["mark_always"])
-	var material := spray_material(surface["grit"] if _always else SMOKE)
+	var loose := bool(surface["mark_always"])
+	_loose = 1.0 if loose else _rain
+	# Three different things get thrown, and which one it is is not a matter of
+	# taste: a loose surface throws itself, a wet one throws water, and a dry
+	# hard one throws burnt rubber. Surface first — dirt in the rain is still
+	# dirt.
+	var thrown: Color = surface["grit"] if loose else (
+		WATER if _rain > 0.0 else SMOKE)
+	var material := spray_material(thrown)
 	for child in _car.get_children():
 		if not child is VehicleWheel3D:
 			continue
@@ -160,10 +188,11 @@ static func spray_material(tint: Color) -> StandardMaterial3D:
 ##
 ## Two ways to reach it, and the surface decides whether the first exists.
 ##
-## **Rolling** displaces material on anything loose and nothing at all on tarmac,
-## which is `mark_always` — the same field that decides whether a tyre marks the
-## road by rolling. It rises with speed to a saturation point well below the
-## car's.
+## **Rolling** displaces whatever is loose on the road and nothing at all on dry
+## tarmac, which is `mark_always` — the same field that decides whether a tyre
+## marks the road by rolling — plus the rain, which puts something loose on a
+## surface that had none. It rises with speed to a saturation point well below
+## the car's.
 ##
 ## **Sliding** displaces material on every surface, and is deliberately *not*
 ## gated on speed: a stationary car spinning its wheels is the one place a
@@ -174,9 +203,7 @@ static func spray_material(tint: Color) -> StandardMaterial3D:
 ## already throwing everything the tyre can lift, and adding the two put it at
 ## twice the density of anything that had been looked at.
 func spray_rate(slip: float, speed_kmh: float) -> float:
-	var rolling := 0.0
-	if _always:
-		rolling = clampf(speed_kmh / REFERENCE_KMH, 0.0, 1.0)
+	var rolling := clampf(speed_kmh / REFERENCE_KMH, 0.0, 1.0) * _loose
 	var sliding := clampf(
 		(slip - TyreMarks.SLIP_FLOOR) / (1.0 - TyreMarks.SLIP_FLOOR), 0.0, 1.0)
 	return maxf(rolling, sliding)

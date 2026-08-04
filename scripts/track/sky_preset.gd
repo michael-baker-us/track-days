@@ -70,6 +70,19 @@ extends RefCounted
 ##   whole circuit read as a torch beam following the car. Floodlighting is what
 ##   lights a circuit; headlights are what a car has.
 ## - `lamp_color` — warm sodium at the evening hours, cold under a storm.
+## - `rain` — how hard it is coming down, 0 to 1, and the only entry here that is
+##   weather rather than light. It reaches three things: the road goes dark and
+##   glossy, the tyres throw water, and the screen collects droplets. It lives on
+##   the hour because that is where `storm` already lives, and because the hour is
+##   fixed per circuit at *build* time — which is what keeps a wet lap out of a
+##   dry lap record without the record key having to learn a fourth axis.
+##
+##   **It deliberately does not touch grip.** Wet tarmac that gripped like dry
+##   tarmac is dishonest, and it is honest about being so: grip is what `par_time`
+##   is derived from and what a record is keyed on, so changing it here would move
+##   every baked par on a storm circuit and make its stored times incomparable
+##   with themselves. That is a change with a migration in it, not a line in a
+##   table. See `docs/roadmap.md` M18 step 6.
 
 const PRESETS := {
 	# The look M8 arrived at, kept as the default so nothing that does not ask
@@ -229,6 +242,8 @@ const PRESETS := {
 		"lamp_energy": 0.22,
 		"lamp_color": Color(0.86, 0.90, 1.0),
 		"road_glow": 0.04,
+		# The only wet hour there is.
+		"rain": 1.0,
 		"headlights": 0.25,
 		"ground_tint": 0.5,
 		"silhouette": Color(0.30, 0.33, 0.36),

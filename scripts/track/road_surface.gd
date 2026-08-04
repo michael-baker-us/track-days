@@ -140,6 +140,40 @@ static func named(surface: String) -> Dictionary:
 static func grip_of(surface: String) -> float:
 	return float(named(surface)["grip"])
 
+## Roughness a road is driven to under full rain, and how much of its colour
+## survives being wet.
+##
+## Water fills the surface and reflects rather than scattering, so a wet road is
+## both **much darker** and **much glossier** than a dry one — 0.86 down to 0.18
+## is the whole effect, and the darkening is what stops it reading as a road
+## someone has polished. The grain goes with it, because the aggregate that
+## makes a dry road look made of something is what the water is sitting on top
+## of.
+const WET_ROUGHNESS := 0.18
+const WET_ALBEDO := 0.55
+const WET_GRAIN := 0.45
+
+## The same surface with rain on it, 0 to 1, as a table the road material can be
+## built from directly.
+##
+## A copy rather than an edit: `SURFACES` is shared by everything that asks, and
+## a dry lap after a wet one would otherwise be raced on a road that stayed wet.
+##
+## **Only the look changes.** `grip` is passed through untouched, and that is a
+## deliberate limit rather than an oversight — see `SkyPreset`'s `rain`, where
+## the reasoning lives, and `docs/roadmap.md` M18 step 6.
+static func wetted(surface: String, rain: float) -> Dictionary:
+	var spec: Dictionary = named(surface).duplicate()
+	if rain <= 0.0:
+		return spec
+	var wet: float = clampf(rain, 0.0, 1.0)
+	spec["roughness"] = lerpf(float(spec["roughness"]), WET_ROUGHNESS, wet)
+	spec["grain"] = lerpf(float(spec["grain"]), float(spec["grain"]) * WET_GRAIN, wet)
+	for key in ["base", "grit"]:
+		spec[key] = (spec[key] as Color).lerp(
+			(spec[key] as Color) * WET_ALBEDO, wet)
+	return spec
+
 static func label_of(surface: String) -> String:
 	return String(named(surface)["label"])
 

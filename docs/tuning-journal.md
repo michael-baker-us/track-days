@@ -1295,6 +1295,38 @@ the loose material lying on the surface. Tarmac has none, so a sliding tyre ther
 makes burnt rubber — pale — and reading `grit` for it drew a near-black plume on
 a near-black road, because `grit` there is the aggregate *in* the asphalt.
 
+### Rain, and the measurement that overturned the worry
+
+The fear was readability: a wet road is darker, and `road_glow` exists because a
+racing line you cannot see is a broken circuit rather than a hard one. Measured
+on Suzuka — the storm circuit — over a band of frame that is all road, with the
+track's `rain` metadata written on and off between two shots of the same pose:
+
+| Pose | Dry | Wet |
+|---|---|---|
+| Low, near the road | mean 34.5/255, peak 248 | mean 35.2/255, peak 255 |
+| Chase camera | mean 57.6/255, peak 250 | mean 60.9/255, peak 249 |
+
+**The wet road is not darker.** Roughness 0.86 → 0.18 makes the floodlight masts
+reflect in it, and those reflections put back everything the 45% albedo cut takes
+away. The whole effect lives in the distribution rather than the level, which is
+what wet asphalt actually looks like and is the opposite of what was expected.
+`WET_ALBEDO` stayed at 0.55 on the strength of it, where the instinct was to
+raise it.
+
+**And the spray was retuned against the right camera.** The particle sizes from
+the step before were judged from a diagnostic camera six metres to the side. From
+where the game actually sits — 4.2 m behind the car, with the plume immediately
+in front of it — the same motes were half-metre boxes floating over the road:
+
+| | Side view | Chase camera |
+|---|---|---|
+| `SIZE_MIN`/`MAX` | 0.10–0.26 | **0.055–0.15** |
+| `AMOUNT` | 40 | **52** |
+
+The lesson is not about particles. **Tune from the pose the player has**, not the
+pose that shows the effect best.
+
 ### Still open, from M17
 - ~~Grass still grips like tarmac~~ — fixed. Off the ribbon the car keeps 0.55 of
   whatever the surface gives it, and the barriers became solid in the same change,

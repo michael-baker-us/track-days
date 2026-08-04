@@ -31,6 +31,16 @@ func _initialize() -> void:
 	lines.set_script(load("res://scripts/ui/speed_lines.gd"))
 	root_ctrl.add_child(lines)
 
+	# The rain, in front of the speed lines and behind everything that has to be
+	# read. Same rules as the streaks below it: full frame, and never in the way
+	# of a touch.
+	var veil := Control.new()
+	veil.name = "RainVeil"
+	veil.set_anchors_preset(Control.PRESET_FULL_RECT)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	veil.set_script(load("res://scripts/ui/rain_veil.gd"))
+	root_ctrl.add_child(veil)
+
 	# Lap timing, top right.
 	var lap_panel := PanelContainer.new()
 	lap_panel.name = "LapPanel"

@@ -1431,6 +1431,55 @@ sheets and wants animation frames this has none of, and without `keep_scale` a
 billboard rebuilds its own basis and every mote comes out at the mesh's full
 metre.
 
+### Weather is an hour, and it reaches three things
+
+`SkyPreset.rain` is one number, 0 to 1, and `storm` is the only hour that has
+any. It reaches the road, the tyres and the screen, and it travels to each of
+them the same way everything else about the hour does: written onto the track
+root as metadata at build time, because the things that apply it run at *load*
+and have the track but not the preset.
+
+- **The road** goes dark and glossy. `RoadSurface.wetted` drops roughness from
+  0.86 to 0.18 and takes 45% off the albedo, and that is the whole of it — no
+  new shader, exactly as the roadmap scoped it. What makes it dramatic is not
+  the roughness but what was already there: the floodlight masts on a storm
+  circuit are *reflected* in it, in long vertical streaks that move with the eye.
+  A copy of the spec, never an edit — `SURFACES` is shared, and a dry lap after a
+  wet one would otherwise be raced on a road that stayed wet.
+- **The tyres** throw water. `TyreSpray` holds `_loose` as an *amount* rather
+  than a flag: 1.0 on dirt and snow, the rain on anything else, zero on a dry
+  hard road. Rain is the thing that puts something loose on a surface that had
+  none, so rolling starts throwing — and what it throws is `WATER` rather than
+  `SMOKE`, unless the surface itself is loose, because dirt in the rain is still
+  dirt.
+- **The screen** collects streaks (`rain_veil.gd`), on the HUD layer in front of
+  the speed lines and behind everything that has to be read.
+
+> **The road is not measurably darker, and that is the finding.** The worry was
+> readability — `road_glow` exists precisely because a racing line you cannot see
+> is a broken circuit, not a hard one. Measured over a band of frame that is all
+> road, from the same pose with the rain written on and off: mean 34.5/255 dry
+> against 35.2 wet from a low pose, 57.6 against 60.9 from the chase camera. The
+> reflections put back what the albedo takes away. The effect is entirely in the
+> *distribution* rather than the level, which is what wet asphalt actually looks
+> like and is not what anyone would have guessed.
+
+> **Falling streaks, not droplets on glass.** The obvious screen effect is beads
+> clinging to the lens and sliding down it, and there is no glass: the chase
+> camera is a third-person view floating behind the car, so anything stuck to the
+> front of it is a smudge on a lens the game has never claimed to have. Rain
+> falling through the space between camera and car is the honest version, and it
+> is the one that moves. The streaks **lean with speed**, against the same
+> `camera_fov_reference_kmh` the FOV kick and the shake use, which is the
+> difference between weather near the car and weather the car is driving through.
+
+**Rain deliberately does not touch grip**, and that limit is worth stating
+plainly because it is the obvious next thing to want. `grip` is what `ParTime`
+derives a target lap from and what a lap record is keyed on. Changing it under
+rain would move every baked par on a storm circuit and make its stored times
+incomparable with themselves — a change with a migration in it, not a line in a
+table. The roadmap scoped this step as a look for that reason.
+
 ### Off the road, and the wall that had to come with it
 
 Grass gripped exactly like tarmac for the whole of the project's life. That was

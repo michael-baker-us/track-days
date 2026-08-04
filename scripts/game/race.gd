@@ -44,7 +44,21 @@ func _ready() -> void:
 	var beams := _car.get_node_or_null("Headlights") as CarLights
 	if beams != null:
 		beams.set_hour(float(track.get_meta("headlights", 0.0)))
+	# The weather, by the same route and for the same reason. The rain belongs to
+	# the circuit and the surface belongs to the race, and the spray is the one
+	# thing that needs both — so it is told here, before the car enters the tree
+	# and builds its emitters.
+	var rain := float(track.get_meta("rain", 0.0))
+	var spray := _car.get_node_or_null("TyreSpray") as TyreSpray
+	if spray != null:
+		spray.set_rain(rain)
 	add_child(_car)
+
+	# And the same number to the HUD layer, which draws the rain itself. Nothing
+	# on the HUD has any business searching the scene for a circuit's weather.
+	var veil := get_node_or_null("HUD/Root/RainVeil") as Control
+	if veil != null:
+		veil.set_rain(rain)
 
 	# The road coordinate, which is the one thing about the car's relationship to
 	# the circuit that the collision world cannot answer: how far *across* the

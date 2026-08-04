@@ -529,6 +529,119 @@ func test_the_tyres_throw_up_what_they_are_running_on() -> void:
 	check_true("and the three do not all look the same",
 		tint["dirt"] != tint["snow"] and tint["dirt"] != tint["tarmac"])
 
+	# Rain puts something loose on a road that had none, which is the whole of
+	# what makes a wet lap different here. Told to the car before it enters the
+	# tree, the way the hour is told to the headlights, because the rain belongs
+	# to the circuit and the surface belongs to the race.
+	var wet := {}
+	for surface in ["tarmac", "dirt"]:
+		GameState.selected_surface = surface
+		var car := load("res://scenes/car/race.tscn").instantiate() as VehicleBody3D
+		var spray: TyreSpray = car.get_node("TyreSpray")
+		spray.set_rain(1.0)
+		root.add_child(car)
+		car.global_position = Vector3(0.0, 400.0, 0.0)
+		wet[surface] = [
+			spray.spray_rate(0.0, 120.0),
+			(spray.get_child(0) as CPUParticles3D).material_override.albedo_color,
+		]
+		car.free()
+	GameState.selected_surface = was
+
+	check_true("rolling on a wet road throws something where a dry one threw"
+		+ " nothing (%.2f)" % wet["tarmac"][0], wet["tarmac"][0] > 0.9)
+	var water: Color = wet["tarmac"][1]
+	check_true("and what it throws is water, not smoke (%s)" % water,
+		is_equal_approx(water.r, TyreSpray.WATER.r)
+		and is_equal_approx(water.b, TyreSpray.WATER.b))
+	# Surface first: the road is still made of what it is made of.
+	var muddy: Color = wet["dirt"][1]
+	var dirt_grit: Color = RoadSurface.named("dirt")["grit"]
+	check_true("but dirt in the rain is still dirt (%s)" % muddy,
+		is_equal_approx(muddy.r, dirt_grit.r) and is_equal_approx(muddy.b, dirt_grit.b))
+
+## Rain, which is three separate things and one number.
+##
+## `SkyPreset.rain` reaches the road (dark and glossy), the tyres (water instead
+## of smoke) and the screen (streaks). All three take it from the *circuit* —
+## the hour is fixed per circuit at build time — which is what keeps a wet lap
+## out of a dry lap record without the record key learning a fourth axis.
+##
+## The assertion that matters most is the **negative** one: the circuit being
+## raced here is `bright`, and a sunny circuit that drew rain would be the most
+## visible bug in the game.
+func test_rain_reaches_the_road_the_tyres_and_the_screen() -> void:
+	var veil: Control = _find_first("RainVeil", "Control")
+	check_true("the HUD carries the rain", veil != null)
+	if veil == null:
+		return
+	check("and it cannot swallow a touch", veil.mouse_filter,
+		Control.MOUSE_FILTER_IGNORE)
+	# After the speed lines, before anything that has to be read.
+	check("drawn in front of the streaks and behind the readouts",
+		veil.get_index(), 1)
+	check_true("a dry circuit draws no rain at all",
+		not veil.visible and not veil.is_processing()
+		and veil.segments().is_empty())
+
+	# Which is not because it cannot: told it is raining, it rains.
+	veil.set_rain(1.0)
+	var streaks: Array = veil.segments()
+	check("a wet one draws a full set", streaks.size(), veil.COUNT)
+	var falling := true
+	var faint := true
+	for streak in streaks:
+		falling = falling and (streak[1] as Vector2).y > (streak[0] as Vector2).y
+		faint = faint and float(streak[2]) <= veil.OPACITY
+	check_true("every streak falls downward", falling)
+	check_true("and none of them is more than the veil's own opacity", faint)
+
+	# The lean is the speed. Rain falls straight down; a car driving into it does
+	# not see it that way, and the tilt is the only thing that says so.
+	var car := get_first_node_in_group("player_car") as VehicleBody3D
+	var velocity := car.linear_velocity
+	car.linear_velocity = Vector3.ZERO
+	veil._process(1.0 / 60.0)
+	var at_rest: float = veil._lean
+	var short: float = veil._length
+	car.linear_velocity = -car.global_transform.basis.z * 46.0
+	veil._process(1.0 / 60.0)
+	check_true("rain leans further at speed (%.2f against %.2f)"
+		% [veil._lean, at_rest], absf(veil._lean) > absf(at_rest) * 2.0)
+	check_true("and the streaks lengthen with it (%.3f against %.3f)"
+		% [veil._length, short], veil._length > short)
+	car.linear_velocity = velocity
+	veil.set_rain(0.0)
+	check_true("and it goes away again when told to", not veil.visible)
+
+	# The road. `storm` is the one wet hour, and the wetting is a look rather
+	# than a grip change — deliberately, since grip is what par is derived from
+	# and what a record is keyed on.
+	var dry := RoadSurface.wetted("tarmac", 0.0)
+	var wet := RoadSurface.wetted("tarmac", 1.0)
+	check_true("a wet road is glossier (%.2f against %.2f)"
+		% [wet["roughness"], dry["roughness"]],
+		float(wet["roughness"]) < float(dry["roughness"]) * 0.5)
+	check_true("and darker (%.2f against %.2f)"
+		% [(wet["base"] as Color).get_luminance(),
+			(dry["base"] as Color).get_luminance()],
+		(wet["base"] as Color).get_luminance()
+			< (dry["base"] as Color).get_luminance())
+	check_near("and grips exactly the same", float(wet["grip"]),
+		float(dry["grip"]), 0.0001)
+	# Never edited in place: `SURFACES` is shared by everything that asks, and a
+	# dry lap after a wet one would be raced on a road that stayed wet.
+	check_near("wetting one road does not wet the table",
+		float(RoadSurface.named("tarmac")["roughness"]),
+		float(dry["roughness"]), 0.0001)
+
+	# And exactly one hour is wet.
+	var wet_hours := []
+	for hour in SkyPreset.PRESETS:
+		if float(SkyPreset.PRESETS[hour].get("rain", 0.0)) > 0.0:
+			wet_hours.append(hour)
+	check("one hour rains, and it is the storm", wet_hours, ["storm"])
+
 ## Records written by an older build have to survive the move to a composite key.
 ##
 ## Version 1 kept one flat `best_<track>` per circuit in a `[records]` section.
@@ -7480,6 +7593,7 @@ func _physics_process(_delta: float) -> bool:
 		test_the_camera_shakes_with_speed_and_surface()
 		test_the_frame_edges_streak_with_speed()
 		test_the_tyres_throw_up_what_they_are_running_on()
+		test_rain_reaches_the_road_the_tyres_and_the_screen()
 		test_old_records_migrate_to_the_composite_key()
 		test_records_are_kept_per_car_and_surface()
 		test_the_throttle_setting_survives_a_restart()

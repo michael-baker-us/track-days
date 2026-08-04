@@ -2044,6 +2044,9 @@ func _build_lighting(root_node: Node3D, track_name: String = "") -> void:
 	# static, so it has the track but not the hour. Metadata serialises into the
 	# packed scene, so a baked circuit and a painted one carry it the same way.
 	root_node.set_meta("road_glow", preset.get("road_glow", 0.0))
+	# And the weather, by the same route and for the same reason: `surface_road`
+	# runs at load and is static, so it has the track but not the hour.
+	root_node.set_meta("rain", preset.get("rain", 0.0))
 	# The centreline, so anything at *runtime* can ask where the road goes.
 	#
 	# A shipped circuit is a packed scene and the layout that produced it lives in
@@ -2248,7 +2251,11 @@ static func grade_scene(track_root: Node3D) -> void:
 ## `grass`, so both survive — which is why this matches by name rather than by
 ## surface index, the pieces not agreeing on the order.
 static func surface_road(track_root: Node3D, surface: String = "") -> void:
-	var spec := RoadSurface.named(surface)
+	# Wet if the hour is. The rain is the circuit's, the surface is the race's,
+	# and the road is built from both at once rather than one overriding the
+	# other.
+	var spec := RoadSurface.wetted(
+		surface, float(track_root.get_meta("rain", 0.0)))
 	var tarmac := ShaderMaterial.new()
 	tarmac.shader = load("res://assets/shaders/tarmac.gdshader")
 	# Linear on the way in, like every other colour handed to a shader.

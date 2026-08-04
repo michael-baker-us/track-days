@@ -24,8 +24,8 @@ GODOT=/Users/michael.baker/Downloads/Godot.app/Contents/MacOS/Godot
 
 ## Where things stand
 
-**Steps 1 to 5 are done. The suite is green — 2064 checks. The tyre spray is the
-working diff; everything before it is committed.**
+**Steps 1 to 6 are done. The suite is green — 2082 checks. The tyre spray and
+the rain are the working diff; everything before them is committed.**
 
 Step 1 (the grading system) shipped as `39e465b`, step 2 (all six looks authored)
 as `bd3d09f`, step 3 (wind) as `5c15be2`, step 4's camera shake as `999d288` and
@@ -33,19 +33,29 @@ its speed lines as `40542ce`.
 
 | File | What it is |
 | --- | --- |
-| `scripts/car/tyre_spray.gd` | New. The plume. Read the header before changing it — three things it got wrong first are written down there, and two of them are invisible in a still frame. |
-| `tools/build_car.gd` | An empty `TyreSpray` node beside `TyreMarks`, filled in when it enters the tree. |
-| `scenes/car/*.tscn` | Rebaked. Both cars, 23 nodes each. |
-| `tests/run_tests.gd` | One new test, 32 checks. |
+| `scripts/car/tyre_spray.gd` | New, step 5. The plume. Read the header before changing it — three things it got wrong first are written down there, and two of them are invisible in a still frame. |
+| `scripts/ui/rain_veil.gd` | New, step 6. Rain on the screen. Falling streaks, not droplets on glass; the reasoning is in the header. |
+| `scripts/track/sky_preset.gd` | `rain` on the hour, and `storm` is the only one that has any. |
+| `scripts/track/road_surface.gd` | `wetted()` — the same surface with rain on it, as a **copy**. |
+| `scripts/track/track_builder.gd` | `rain` metadata on the track root, and `surface_road` reading it. |
+| `scripts/game/race.gd` | Hands the number to the spray and the veil, the way it already hands the hour to the headlights. |
+| `tools/build_car.gd`, `tools/build_ui.gd` | An empty `TyreSpray` beside `TyreMarks`; a `RainVeil` between the speed lines and the readouts. |
+| `scenes/car/*.tscn`, `scenes/ui/hud.tscn`, `scenes/race.tscn`, `scenes/track/*.tscn` | Rebaked. |
+| `tests/run_tests.gd` | Two new tests, 50 checks. |
 
-### The rebake rule for this one
+### The rebake rule for these two
 
-`tools/build_car.gd` after **any** change to what nodes a car carries — but not
-for the spray's own behaviour, since the script is referenced by path and the
-emitters are built at runtime. `build_audio.gd` comes first if the streams have
-changed, which they have not. (For contrast: a **wind** change needs
-`tools/build_track.gd`, because `WIND_*` is baked into the circuits as
-`ShaderMaterial` parameters. A **grade** change needs nothing.)
+Everything, in order, because both steps changed what a baked scene contains:
+
+```bash
+"$GODOT" --headless --path . --script tools/build_car.gd    # the spray node
+"$GODOT" --headless --path . --script tools/build_track.gd  # the rain metadata
+"$GODOT" --headless --path . --script tools/build_ui.gd     # the veil node
+"$GODOT" --headless --path . --script tools/build_race.gd   # instances hud.tscn
+```
+
+Neither script's *behaviour* needs a rebake — both are referenced by path and
+configure themselves at load. It is the node and the metadata that are baked.
 
 ### Verified this pass
 
@@ -54,10 +64,25 @@ changed, which they have not. (For contrast: a **wind** change needs
   three surfaces, with the camera re-posed beside the car for every shot. Both of
   the bugs it found — emitters orbiting their axles, and a billboard mode that
   rendered nothing — are invisible in a screenshot of a parked car.
+- **The rain was measured rather than judged.** One run wrote the track's `rain`
+  metadata off and on and re-applied `surface_road` between two shots of the same
+  pose, so the only difference in the picture was the water. It overturned the
+  worry: the wet road is *not* darker (34.5 against 35.2 of 255 low down, 57.6
+  against 60.9 from the chase camera) because the reflections put back what the
+  albedo takes away.
+- **And the spray was retuned against the right camera.** Its sizes had been
+  judged from a diagnostic pose six metres to the side; from the chase camera the
+  same motes were half-metre boxes. **Tune from the pose the player has.**
 - **Every mutation the tests claim to catch was made and caught** — `mark_always`
   forced false, the two rates summed instead of maximised, the emitters parented
   back onto the wheels, `local_coords` turned on, the contact-patch offset
-  removed, and tarmac reading `grit` again.
+  removed, tarmac reading `grit` again, the rain lean pinned to its at-rest
+  value, and `wetted()` editing the shared table instead of a copy.
+- **Grep the suite output for `SCRIPT ERROR`, not just the pass line.** A
+  malformed `%` in a new check aborted its whole test function and the run still
+  printed `PASS` — with a check count *equal* to the previous run, which is what
+  gave it away. `CLAUDE.md` says this about `--check-only`; it is true of the
+  suite too.
 - **Earlier in this milestone**, the same discipline caught the camera shake being
   a translation, and one test that **passed when it should not have**: the streak
   check compared `nearest` against `lines.INNER`, the constant under test, so it
@@ -83,7 +108,7 @@ changed, which they have not. (For contrast: a **wind** change needs
   canopy already near the top of the range. It is a **web-build look difference**
   and belongs to whoever next touches lighting, not to wind.
 
-### And three from steps 4 and 5
+### And four from steps 4 to 6
 
 - **There is now a motion-settings shaped hole.** The shake and the streaks are
   both the sort of effect that usually gets an accessibility toggle, and
@@ -101,33 +126,46 @@ changed, which they have not. (For contrast: a **wind** change needs
   wrong on grass. It does mean a tarmac car sliding on the verge makes tyre smoke
   rather than a divot of turf. Cheap to fix if it ever reads badly —
   `tyre_marks.on_road()` is already public.
+- **Rain does not touch grip, and that is the obvious next thing to want.** It is
+  written up in `sky_preset.gd`, `docs/architecture.md` and the roadmap rather
+  than left implied, because the reason is not "later": `grip` is what `ParTime`
+  derives a target lap from and what a record is keyed on, so a wet grip factor
+  moves every baked par on a storm circuit and makes its own stored times
+  incomparable with themselves. That is a change with a migration in it. Nothing
+  else in M18 has a consequence like it.
 
 ---
 
 ## Next action
 
-**Step 6: weather that does something.** `storm` is currently an hour with a grey
-grade; it becomes rain. Three parts, and the third is the one with the real
-payoff:
+**Step 7: the grandstands are empty, and that reads as abandoned.** Billboard
+spectators with a shimmer, and marshal posts with flags.
 
-- **A screen droplet layer.** Nearest thing already built is `speed_lines.gd` — a
-  `Control` on the HUD layer drawing into the frame with no screen texture. The
-  droplets want the same shape.
-- **Spray from the wheels.** `TyreSpray` is now the thing to point at it: a wet
-  road is a surface with something loose on it, which is exactly the `mark_always`
-  branch that already exists.
-- **A wet road, which is a roughness change and not a new shader.** `RoadSurface`
-  already carries `roughness` per surface, and `sparkle` already proved that
-  punching roughness holes and letting the real sun answer beats drawing the
-  highlight. A low-roughness road reflecting a bright sky is a dramatic image
-  rather than a faithful one, which is the one place realism pays here.
+An impostor crowd is a textured quad per spectator with two frames of animation,
+a technique older than the renderer it runs on. The grandstands are already
+placed and already lit, so this is placement against geometry that exists rather
+than new geometry — the same move `_scenery_markers` makes against the
+centreline.
 
-**The open question is whether rain is a surface or an hour.** `storm` is a
-`SkyPreset`, chosen per circuit at build time; `tarmac`/`dirt`/`snow` are a
-`RoadSurface`, chosen per race and keyed into the lap record. Wet tarmac is
-plainly a *condition* — it changes grip, so it must not share a record with dry —
-which argues it belongs beside the other three rather than in the sky. Worth
-settling before writing any of it.
+Two things it will run into, worth knowing before starting:
+
+- **There are no textures in this project**, and a crowd is the first thing that
+  genuinely wants one. Everything so far is untextured flat colour, and the one
+  textured prop in the kit is `flagCheckersSmall`. A crowd of flat-coloured quads
+  is a wall of confetti; a crowd of *generated* ones is a small `Image` written
+  at load, which is the same move the audio and the LUTs already make. Decide
+  which before writing placement code.
+- **`MultiMesh` under `--headless` loses every instance transform.** Already
+  recorded in `docs/architecture.md`, already bitten once by the barriers. A
+  crowd is a `MultiMesh` or it is a thousand nodes, so it will meet this.
+
+The shimmer is what stops a crowd being wallpaper, and the wind shader is the
+obvious source: `assets/shaders/wind.gdshader` already displaces by world
+position and already survives `MultiMesh`, which is exactly the per-instance
+phase a crowd wants.
+
+**Step 8, after it**, is marker boards from `Compiled.corners` — braking and apex
+markers, placed the way everything trackside already is. That one closes M18.
 
 ---
 
@@ -197,7 +235,9 @@ into the web export if left in the project root.
    **Done.** All three scale against one `camera_fov_reference_kmh`.
 5. ~~Particles — tyre spray off the wheels, from `RoadSurface`.~~ **Done.**
    `mark_always` decides rolling versus sliding, exactly as it does for the marks.
-6. **Rain** — screen droplets, wheel spray, and a roughness drop on the road.
+6. ~~Rain — screen streaks, wheel spray, and a roughness drop on the road.~~
+   **Done.** One number on the hour reaching all three. Grip deliberately
+   untouched; see below.
 7. **Crowd** — billboard spectators in the stands that are currently empty.
 8. **Marker boards** — braking and apex markers placed from `Compiled.corners`.
 

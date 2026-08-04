@@ -799,9 +799,9 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > cheap work and the identity-forming work turned out to be the same work.**
 > Realism is not the axis this game gets better along.
 
-**Status: steps 1–5 done — the grading system, all six looks authored, the
-scenery moving, the car feeling fast, and the tyres throwing up what they are
-running on.**
+**Status: steps 1–6 done — the grading system, all six looks authored, the
+scenery moving, the car feeling fast, the tyres throwing up what they are running
+on, and the storm actually raining.**
 
 1. **A colour grade per look, as a real LUT.** `CircuitLook` already pairs an hour
    with a place; it gains a third thing, and that thing is the signature.
@@ -962,11 +962,27 @@ running on.**
    grade. It becomes rain: a screen-space droplet layer, spray thrown from the
    wheels, and a wet road — which is a **roughness change**, not a new shader.
 
-> Wet tarmac is the one place realism pays here, because a low-roughness road
-> reflecting a bright sky is a dramatic image rather than a faithful one. It also
-> composes with what exists: `RoadSurface` already carries `roughness` per
-> surface, and `sparkle` already proved that punching roughness holes and letting
-> the real sun answer beats drawing the highlight.
+> **Done, as one number on the hour reaching three things.** `SkyPreset.rain` is
+> 0 to 1 and `storm` is the only hour with any: the road goes dark and glossy,
+> the tyres throw water instead of smoke, and the screen collects falling
+> streaks. It travels the way everything else about the hour does — metadata on
+> the track root, because the things that apply it run at load.
+>
+> Wet tarmac is the one place realism pays here, and it paid: roughness 0.86 to
+> 0.18 is the whole road change, and what makes it dramatic is that the
+> floodlight masts already standing on a storm circuit are now *reflected* in it.
+> `sparkle` had already proved that punching roughness holes and letting the real
+> sun answer beats drawing the highlight.
+>
+> **The road is not measurably darker**, which was the worry and is not what the
+> measurement says: the reflections put back what the albedo cut takes away, so
+> the effect is entirely in the distribution. Numbers in the tuning journal.
+>
+> **Rain does not touch grip, deliberately.** `grip` is what par is derived from
+> and what a record is keyed on, so changing it under rain would move every baked
+> par on a storm circuit and make its own stored times incomparable. That is a
+> change with a migration in it rather than a line in a table — and it is the
+> obvious next thing to want, so it is written down rather than left implied.
 
 7. **The grandstands are empty, and that reads as abandoned.** Billboard
    spectators with a shimmer, and marshal posts with flags.
