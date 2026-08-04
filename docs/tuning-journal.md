@@ -1186,6 +1186,60 @@ acceleration — distance over speed. Par below that is impossible; par far abov
 means the model has stopped describing a car. Both ends are now checked for every
 circuit, car and surface: 96 combinations, all inside the band.
 
+## M18 — camera shake, and why it is a rotation
+
+The first version offset the camera's **position**, which is the obvious way to
+shake a camera and does not work. Measured with `_diag_shake.gd`, projecting
+world points at a range of depths through the camera with each form of shake
+applied, at 1280x720 and a 70 degree vertical FOV (514 px per radian):
+
+| Depth | Translation, 0.05 m | Rotation, 0.45 deg |
+|---|---|---|
+| 4.2 m (the car) | 8.2 px | 5.4 px |
+| 12 m | 2.9 px | 5.4 px |
+| 30 m | 1.1 px | 5.4 px |
+| 120 m | 0.3 px | 5.4 px |
+| 400 m (horizon) | 0.1 px | 5.4 px |
+
+A translation of `d` moves an object at distance `z` by `d/z`, so it moves
+whatever is nearest and nothing else. The car sits 4.2 m back and the rest of the
+circuit is tens to hundreds of metres away, so the whole effect was **the car
+jiggling against a road that stayed perfectly still** — a loose wheel, not a fast
+camera. A rotation moves the entire frame by `focal x angle` at every depth, and
+that is what a shaking camera looks like.
+
+**Yaw and pitch only.** Roll tips the horizon, which is the one line in frame
+that is reliably level, and a rolled frame reads as the car spinning.
+
+The amplitude scale, from the same rig, as peak displacement of the whole frame
+at 720p:
+
+| Degrees per axis | Frame moves | Verdict |
+|---|---|---|
+| 0.20 | 2.4 px | Below the noise; indistinguishable from no shake |
+| **0.45** | **5.4 px** | Shipped, dry tarmac at top speed |
+| **1.17** | **14.1 px** | Shipped, dirt at top speed (0.45 x 2.6) |
+| 3.00 | 36.1 px | Driven wrong on purpose: a lurch, not a buzz |
+
+Peak magnitude of the waveform is 1.345 across both axes together, so those
+figures are the worst case rather than the average.
+
+**Quadratic in speed**, where the FOV kick that sits beside it is linear: at half
+the reference speed the shake is a quarter, which keeps it out of the range where
+a corner is exited. **Surface is a multiplier, not a term**, so a car crawling
+over dirt does not shake — loose ground amplifies the motion speed causes rather
+than being a source of its own. It comes from `RoadSurface.relief`, the number
+the road shader already bends its normals by, normalised against the roughest
+surface in the table: tarmac 0.0, snow 0.64, dirt 1.0.
+
+**The frequency has a ceiling set by the display, not by taste.** The camera is
+driven at 120 Hz and seen at 60, or at whatever a browser gives it. The first
+waveform summed harmonics at 2.37x and 3.11x an 11 Hz base — 26 and 34 Hz, both
+past a 60 Hz Nyquist limit — which aliases into a slow wobble that reads as a bug
+in the smoothing. The rates are now 1.00, 1.27, 1.61 and 1.79 against 8 Hz, so
+the fastest component is 14.3 Hz and survives a 30 fps frame. The suite asserts
+it off the table rather than trusting the comment.
+
 ### Still open, from M17
 - ~~Grass still grips like tarmac~~ — fixed. Off the ribbon the car keeps 0.55 of
   whatever the surface gives it, and the barriers became solid in the same change,

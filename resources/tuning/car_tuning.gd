@@ -82,5 +82,22 @@ extends Resource
 @export var camera_rotation_lag: float = 5.0
 @export var camera_base_fov: float = 70.0
 @export var camera_max_fov_kick: float = 12.0
-## Should track actual top speed so the FOV kick reaches full value there.
+## Should track actual top speed so the FOV kick reaches full value there. Shake
+## is scaled against the same number: it is "the speed at which this car's camera
+## is doing everything it does", and a second reference would only ever be wrong
+## in the gap between the two.
 @export var camera_fov_reference_kmh: float = 165.0
+## Peak camera rotation, in degrees per axis, at the reference speed on smooth
+## tarmac. A degree moves the whole frame about nine pixels of 720p, so this is
+## four - felt rather than seen, which is the whole intent. See
+## docs/tuning-journal.md, M18, for what the range either side of it looks like.
+@export var camera_shake_degrees: float = 0.45
+## Cycles per second at the reference speed, for the lowest of the four
+## components the shake is made of. Below ~5 it reads as a drunk camera rather
+## than a fast one; the ceiling is set by the *display* rather than by taste, and
+## is argued in `chase_camera.gd`.
+@export var camera_shake_hz: float = 8.0
+## What the roughest surface multiplies the amplitude by. Dirt is the whole
+## reason this exists: on tarmac speed is smooth and only the frame edges move,
+## on dirt the car is being thrown about and the camera should say so.
+@export var camera_shake_surface_gain: float = 2.6

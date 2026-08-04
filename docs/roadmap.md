@@ -800,7 +800,8 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > Realism is not the axis this game gets better along.
 
 **Status: steps 1–3 done — the grading system, all six looks authored, and the
-scenery moving.**
+scenery moving. Step 4 is two thirds done: the camera shakes, the roadside was
+already dense, and the frame-edge effect is the one piece left.**
 
 1. **A colour grade per look, as a real LUT.** `CircuitLook` already pairs an hour
    with a place; it gains a third thing, and that thing is the signature.
@@ -895,14 +896,34 @@ scenery moving.**
    a screen-space speed effect at the frame edges, and roadside density that
    streams.
 
-> **FOV kick already exists** — `chase_camera.gd` scales it against
-> `camera_fov_reference_kmh` per car preset — so this is the rest of the set, not
-> the start of it. Shake belongs with it in `CarTuning` for the same reason
-> framing does: it is part of how a car feels, not a property of the scene.
+> **Shake is done, and it is a rotation.** It lives in `CarTuning` beside the FOV
+> kick that was already there, for the same reason the framing does: it is part of
+> how a car feels, not a property of the scene. Quadratic in speed where the kick
+> is linear, multiplied by how loose the surface is, and yaw and pitch only — the
+> horizon is never rolled.
 >
-> "Density is speed" is already written into the suite's own comments. Marker
-> posts, verge lines and lighting columns passing at a rate are most of what sells
-> pace in an arcade racer, and they cost geometry that is already placed.
+> It was built as a *translation* first and that is the finding worth keeping: a
+> translation of `d` moves an object at distance `z` by `d/z`, so shaking the
+> camera's position shakes only what is nearest it. Measured, a 0.05 m shake slid
+> the car eight pixels and moved the horizon by a tenth of one. That is a loose
+> wheel, not a fast camera. The measurements, and the frame-rate ceiling the
+> waveform has to live inside, are in `docs/tuning-journal.md` under M18.
+>
+> **Roadside density needed nothing.** "Density is speed" was already built —
+> `_scenery_markers` places a flag every 10.5 to 15.4 m down both verges, by
+> theme, and the lighting columns and floodlight masts are on top of that. Counted
+> at 165 km/h: 6.0 to 8.7 markers a second, 7.9 to 13 pieces of roadside furniture
+> a second, 12 to 17 with the trees. The builder's own comment claimed "about
+> twenty a second" and had never been true; it now carries the measured figures,
+> which is what a later argument about pace should start from.
+>
+> **Left: the screen-space effect at the frame edges**, and it wants a decision
+> before it wants code. The obvious version is a radial blur, which is a
+> full-screen pass on a single-threaded WebGL 2 build *and* smears the crisp flat
+> silhouettes that are the whole identity — it fails both halves of the standard
+> this milestone was reordered under. The stylised version — speed lines drawn at
+> the edges, alpha only, no screen texture — is cheaper and is the kind of thing
+> that makes a screenshot recognisable. That is the fork.
 
 5. **Particles, from data the game already has.** Tyre spray, dust and grass
    clippings off the wheels; colour and behaviour taken from `RoadSurface`.

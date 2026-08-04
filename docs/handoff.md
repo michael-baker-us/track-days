@@ -24,40 +24,40 @@ GODOT=/Users/michael.baker/Downloads/Godot.app/Contents/MacOS/Godot
 
 ## Where things stand
 
-**Steps 1, 2 and 3 are done and the suite is green — 1998 checks.**
+**Steps 1, 2 and 3 are done and committed. Step 4 is two thirds done and is the
+working diff. The suite is green — 2016 checks.**
 
 Step 1 (the grading system) shipped as `39e465b`, step 2 (all six looks authored)
-as `bd3d09f`. **Step 3 is the working diff.**
+as `bd3d09f`, step 3 (wind) as `5c15be2`.
 
 | File | What it is |
 | --- | --- |
-| `assets/shaders/wind.gdshader` | New. The vertex displacement; read its header before changing it. |
-| `scripts/track/track_builder.gd` | `WIND_*` constants, `_windy()`, and a `wind` argument on `_multimesh`. |
-| `scenes/track/*.tscn` | Rebaked — **wind is baked, unlike the grade.** |
-| `tests/run_tests.gd` | Three new tests. |
-| `scripts/track/colour_grade.gd` | Step 2, already committed. `GRADES` holds **all six** looks, in `CircuitLook.ORDER` so it reads as a day; `from_bcs` kept as the fallback for a future look. |
+| `scripts/camera/chase_camera.gd` | The shake. `_aim`, `shake_degrees()`, `shake_shape()`, and the `SHAKE_X` / `SHAKE_Y` tables. Read the header before changing it — the two things it gets wrong first are both written down there. |
+| `resources/tuning/car_tuning.gd` | `camera_shake_degrees`, `camera_shake_hz`, `camera_shake_surface_gain`, beside the framing. All three presets stay at the defaults. |
+| `scripts/track/road_surface.gd` | `shake_of()` — how rough a surface is, 0 to 1, derived from `relief` rather than being a new number. |
+| `scripts/track/track_builder.gd` | Comment only. `_scenery_markers` claimed "about twenty a second" and that was never true of anything; it now carries the counted figures. |
+| `tests/run_tests.gd` | One new test, 18 checks. |
 
-### The rebake rule, which differs between the two steps
+### No rebake for any of this
 
-- **A grade change needs no rebake.** Grades are data, the LUT is built at load,
-  and the `.tscn` files carry only the look's *name*. Edit `GRADES`, run, look.
-- **A wind change does.** `WIND_TREE` / `WIND_FLAG` / `WIND_DIRECTION` are baked
-  into the circuits as `ShaderMaterial` parameters, so
-  `"$GODOT" --headless --path . --script tools/build_track.gd` after touching
-  them.
+Nothing in step 4 touches a baked scene. The shake is script and tuning, and the
+`track_builder.gd` change is a comment. (For contrast: a **wind** change does need
+`tools/build_track.gd` re-run, because `WIND_*` is baked into the circuits as
+`ShaderMaterial` parameters. A **grade** change does not.)
 
 ### Verified this pass
 
-- **All six looks looked at**, chase and wide framing, against both the ungraded
-  frame and the derived grade each look used to have.
-- **Grading survives the Compatibility renderer** — within 1–2 of 255 of Forward+.
-- **Wind survives it too**: no shader errors, and the trees measurably move.
-- **The wind material swap is lossless.** With the sway pinned at zero, a wind
-  frame and a pre-wind frame differ on ~0.06% of pixels by a mean of ~2/255 —
-  anti-aliasing on thin silhouettes, because `world_vertex_coords` does the model
-  transform in the shader and the last bits differ.
+- **The shake was measured before it was tuned**, with a throwaway `_diag_shake.gd`
+  that projected world points at a range of depths through the camera. That is
+  what caught the design being wrong: see the tuning journal, M18.
+- **Every mutation the test claims to catch was made and caught** — linear instead
+  of quadratic, the surface term flattened, the old harmonics restored, the aim
+  fed back through its own shake, and a roll term added at the point the shake is
+  applied. Six checks, six failures, all restored.
+- **The waveform is bounded** and the amplitude it is multiplied by is therefore
+  in degrees: peak 1.0 per axis, 1.345 across both together.
 
-### Two things seen but not chased
+### Two things seen but not chased, still open from step 3
 
 - **Nobody has run it in an actual browser.** The web export builds clean, but the
   Chrome here reports `WebGL2 - Check web browser configuration and hardware
@@ -76,15 +76,41 @@ as `bd3d09f`. **Step 3 is the working diff.**
   canopy already near the top of the range. It is a **web-build look difference**
   and belongs to whoever next touches lighting, not to wind.
 
+### And one from step 4
+
+- **The shake has no accessibility toggle**, and camera shake is the effect that
+  most commonly gets one. `GameState` already keeps `analogue_input` and
+  `audio_enabled` in exactly the shape a third setting would take. Left out on
+  purpose: the amplitude is a few pixels of a level frame rather than a lurch, and
+  it is worth adding once there is a *set* of motion options to offer rather than
+  one. Written up in `docs/architecture.md`.
+
 ---
 
 ## Next action
 
-**Step 4: speed you can feel.** Camera shake that rises with speed and with
-surface, and roadside density that streams. `chase_camera.gd` already has the FOV
-kick and reads its numbers from `CarTuning`, so shake belongs beside
-`camera_base_fov` and friends for the same reason the framing does: it is part of
-how a car feels, not a property of the scene.
+**Step 4's last piece: the screen-space speed effect at the frame edges — and it
+wants a decision before it wants code.**
+
+The roadmap says "a screen-space speed effect at the frame edges". Two readings,
+and they are not close:
+
+- **A radial blur.** The obvious one, and it fails both halves of the standard
+  this milestone was reordered under: it is a full-screen pass on a
+  single-threaded WebGL 2 build, and it smears exactly the crisp flat silhouettes
+  that are the identity. Blur is what every asset-store racer does.
+- **Speed lines.** Streaks drawn at the frame edges on a `CanvasLayer`, alpha
+  only, no screen texture, rising with the same `kick_t` the FOV and the shake
+  already use. Cheaper, web-safe by construction, and the kind of thing that makes
+  a screenshot recognisable rather than competent.
+
+Recommendation is the second. It is a judgement about the look rather than about
+the code, which is why it is here rather than already done.
+
+**The other two thirds of step 4 need nothing.** Shake is in. Roadside density was
+already built and is now counted rather than claimed — 6.0 to 8.7 markers a
+second at 165 km/h, 7.9 to 13 pieces of roadside furniture, 12 to 17 with the
+trees. If the circuit ever needs to feel faster, argue with those numbers.
 
 ---
 
@@ -128,6 +154,16 @@ right one are the same picture. Pushing the tree sway to 0.22 made it obvious th
 trunks stayed planted and neighbours were out of phase; coming back to 0.07 was
 then just a number.
 
+**Step 4 added one more, and it is the cheapest of the lot: some visual questions
+do not need a render at all.** `camera.unproject_position(point)` says exactly
+where a world point lands on screen, so "how far does this move the picture" is a
+subtraction rather than a diff of two PNGs — no frames to settle, no wind or
+suspension moving underneath the measurement, and an answer in pixels. Projecting
+one point at each of five depths is what showed that shaking the camera's position
+moves the car and nothing else, which no amount of looking at a still frame could
+have. Render the PNGs as well, but render them to *confirm* a number rather than
+to find one.
+
 Delete the scripts when the step closes — they are throwaway, and they get packed
 into the web export if left in the project root.
 
@@ -140,8 +176,8 @@ into the web export if left in the project root.
    verified.~~ **Done.**
 3. ~~Wind — trees and roadside marker flags.~~ **Done.** Banner towers and
    roadside grass deliberately not; see below.
-4. **Speed feedback** — camera shake in `CarTuning` beside the framing that is
-   already there (`chase_camera.gd` has FOV kick; this is the rest of the set).
+4. **Speed feedback** — ~~camera shake in `CarTuning`~~ and ~~roadside density~~
+   both done; the frame-edge effect is what is left, and the fork is above.
 5. **Particles** — `CPUParticles3D`, not GPU: GPU particles throw WebGL errors
    under Compatibility with a View Depth draw order. Read `RoadSurface.mark` and
    `mark_always`, which already answer "does this tyre displace material".

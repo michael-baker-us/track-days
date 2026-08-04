@@ -157,6 +157,147 @@ func test_car_wired_to_tuning() -> void:
 				wheel.suspension_stiffness, car.tuning.suspension_stiffness, 0.01)
 			break
 
+## Speed you can feel: the camera shakes harder the faster the car goes and the
+## looser the ground under it.
+##
+## Three separate things, and only the first is obvious from playing it.
+##
+## **The curve.** Shake is quadratic in speed where the FOV kick is linear, so
+## half of top speed is a quarter of the shake and not half of it. Linear would
+## leave a third of the shake running at the speed a slow corner is exited at,
+## which reads as a broken camera rather than a fast one.
+##
+## **The surface.** `RoadSurface.shake_of` derives from `relief`, the number the
+## road shader already bends its normals by, so a surface that looks broken up is
+## one that feels broken up. The ordering is the test: dirt is clods, snow is
+## drifts, tarmac is flat.
+##
+## **The feedback.** Shake is applied to the basis *after* the smoothing, and the
+## smoothed basis is kept separately for exactly that reason. Read the shaken
+## basis back into the next frame's slerp and the buzz goes through a low-pass
+## filter whose cutoff is the camera lag — it would lag its own amplitude and
+## never return to centre, which looks like a camera slowly swimming rather than
+## like a bug. So the same eight frames are run with the shake off and on, and
+## the unshaken aim has to come out identical.
+##
+## The **display** is what bounds the frequency, and that is asserted too: every
+## component of the waveform has to survive being sampled at 30 fps, or it aliases
+## into a slow wobble that reads as a bug in the smoothing.
+func test_the_camera_shakes_with_speed_and_surface() -> void:
+	var camera: Camera3D = _find_first("ChaseCamera", "Camera3D")
+	check_true("the race scene has a camera holding the car's tuning",
+		camera != null and camera._tuning != null)
+	if camera == null or camera._tuning == null:
+		return
+	var reference: float = camera._tuning.camera_fov_reference_kmh
+	var was := GameState.selected_surface
+
+	GameState.selected_surface = "tarmac"
+	var full: float = camera.shake_degrees(reference)
+	var stopped: float = camera.shake_degrees(0.0)
+	check_true("a stopped car does not shake the camera", is_zero_approx(stopped))
+	check_true("at speed it does (%.2f degrees)" % full, full > 0.1)
+	var half: float = camera.shake_degrees(reference * 0.5)
+	check_near("half the speed is a quarter of the shake", half / full, 0.25, 0.01)
+	# Every car's top speed is a little past its own reference, and a shake that
+	# kept growing there would be unbounded on the fastest preset.
+	var past: float = camera.shake_degrees(reference * 3.0)
+	check_near("and past the reference it stops growing", past, full, 0.0001)
+
+	GameState.selected_surface = "dirt"
+	var dirt: float = camera.shake_degrees(reference)
+	GameState.selected_surface = "snow"
+	var snow: float = camera.shake_degrees(reference)
+	check_true("dirt shakes harder than tarmac (%.2f vs %.2f degrees)" % [dirt, full],
+		dirt > full * 1.5)
+	check_true("and harder than snow, which is drifts rather than clods"
+		+ " (%.2f degrees)" % snow, dirt > snow)
+	check_true("snow still shakes more than tarmac", snow > full)
+
+	# The waveform. Bounded per axis by construction, so the amplitude above is in
+	# degrees and means what it says; nothing on the roll axis, which is the one
+	# rotation that tips the horizon; and not back where it started after a single
+	# cycle, which is what stops it reading as a bounce.
+	var peak := Vector3.ZERO
+	for i in 4000:
+		var at: Vector3 = camera.shake_shape(float(i) / 100.0)
+		peak = Vector3(maxf(peak.x, absf(at.x)), maxf(peak.y, absf(at.y)),
+			maxf(peak.z, absf(at.z)))
+	check_true("the shake stays inside its own amplitude (%.2f, %.2f)"
+		% [peak.x, peak.y], peak.x <= 1.0 and peak.y <= 1.0)
+	check_true("and uses most of it", peak.x > 0.7 and peak.y > 0.7)
+	check_true("the horizon is never rolled", is_zero_approx(peak.z))
+	check_true("one cycle on does not land back on the start",
+		camera.shake_shape(0.0).distance_to(camera.shake_shape(1.0)) > 0.1)
+
+	# Nothing in it may pass half the frame rate of the slowest machine it is
+	# meant for. The camera is driven at 120 Hz and *seen* at 60, or at whatever a
+	# browser gives it, and a component above half the display rate aliases into a
+	# slow wobble that reads as a bug in the smoothing rather than as a shake.
+	var fastest := 0.0
+	var weight := [0.0, 0.0]
+	for axis in 2:
+		for part in (camera.SHAKE_X if axis == 0 else camera.SHAKE_Y):
+			fastest = maxf(fastest, float(part[0]))
+			weight[axis] += float(part[1])
+	var top: float = fastest * camera._tuning.camera_shake_hz
+	check_true("the shake survives a 30 fps frame (fastest %.1f Hz)" % top,
+		top < 15.0)
+	check_near("yaw is scaled to its amplitude", weight[0], 1.0, 0.0001)
+	check_near("and so is pitch", weight[1], 1.0, 0.0001)
+
+	# And the feedback. Driven at speed on the surface that shakes hardest, since
+	# a difference that only showed at the tarmac amplitude would be lost in the
+	# tolerance.
+	GameState.selected_surface = "dirt"
+	var car := get_first_node_in_group("player_car") as VehicleBody3D
+	var velocity := car.linear_velocity
+	var aim: Basis = camera._aim
+	var origin: Vector3 = camera.global_transform.origin
+	var phase: float = camera._shake_phase
+	var degrees: float = camera._tuning.camera_shake_degrees
+	car.linear_velocity = -car.global_transform.basis.z * (reference / 3.6)
+
+	camera._tuning.camera_shake_degrees = 0.0
+	for i in 8:
+		camera._physics_process(1.0 / 120.0)
+	var unshaken: Basis = camera._aim
+
+	# Wound all the way back, position included: the aim is computed from where
+	# the camera is, so a second run that started from a different place would
+	# differ for a reason that has nothing to do with the shake.
+	camera._tuning.camera_shake_degrees = degrees
+	camera._aim = aim
+	camera.global_transform.origin = origin
+	camera._shake_phase = phase
+	for i in 8:
+		camera._physics_process(1.0 / 120.0)
+
+	check_true("the shake does not feed back into what it is applied to",
+		camera._aim.get_rotation_quaternion().angle_to(
+			unshaken.get_rotation_quaternion()) < 0.0001)
+	# The whole picture moves, which is the point of shaking the basis rather
+	# than the position: a translation only moves what is nearest the camera.
+	var thrown: float = rad_to_deg(camera.global_transform.basis
+		.get_rotation_quaternion().angle_to(camera._aim.get_rotation_quaternion()))
+	check_true("the camera is turned off its aim, and not by more than asked"
+		+ " (%.2f degrees)" % thrown,
+		thrown > 0.0 and thrown <= dirt * 1.42 + 0.0001)
+	# And it is turned in two axes, not three. Read off the applied basis rather
+	# than off the waveform: a roll term costs one character to introduce at the
+	# point the two are combined, and tipping the horizon is both the shake that
+	# disorients and the one that reads as the car spinning.
+	var applied: Vector3 = (camera._aim.inverse()
+		* camera.global_transform.basis).get_euler()
+	check_true("and the horizon is not tipped (%.3f degrees of roll)"
+		% rad_to_deg(applied.z), is_zero_approx(applied.z))
+
+	# Setting `linear_velocity` outside a physics step is only visible to the
+	# server at the end of the frame, so putting it back here means the car was
+	# never actually moving.
+	car.linear_velocity = velocity
+	GameState.selected_surface = was
+
 ## Records written by an older build have to survive the move to a composite key.
 ##
 ## Version 1 kept one flat `best_<track>` per circuit in a `[records]` section.
@@ -7105,6 +7246,7 @@ func _physics_process(_delta: float) -> bool:
 		test_time_formatting()
 		test_tuning_invariants()
 		test_car_wired_to_tuning()
+		test_the_camera_shakes_with_speed_and_surface()
 		test_old_records_migrate_to_the_composite_key()
 		test_records_are_kept_per_car_and_surface()
 		test_the_throttle_setting_survives_a_restart()

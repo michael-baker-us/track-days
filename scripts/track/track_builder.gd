@@ -2945,8 +2945,15 @@ func _multimesh_of(
 ## "Density is speed" (`docs/ideas.md`): what sells pace in this kind of racer is
 ## a lot of things streaming past at the edge of vision, not a bigger number on
 ## the speedometer. Trees are too far out and too sparse to do it — they read as
-## landscape. These stand just off the tarmac at a few metres apart, so at
-## 160 km/h they arrive about twenty a second.
+## landscape. These stand just off the tarmac, a theme's `marker_step` apart,
+## which is 10.5 to 15.4 m depending on the place.
+##
+## **Counted rather than claimed**, because this comment said "about twenty a
+## second" for a milestone and that was never true of anything: at 165 km/h the
+## markers arrive at 6.0/s on La Sarthe to 8.7/s on Monte Carlo, and the whole
+## roadside — markers, lighting columns and floodlight masts — at 7.9 to 13/s.
+## With the trees it is 12 to 17. That is the figure to argue with if the
+## circuit ever needs to feel faster.
 ##
 ## Cheap by construction: one `MultiMesh` per circuit, a model of a few triangles,
 ## no collision and no shadow. The same clearance test the barrier uses keeps them

@@ -1206,6 +1206,64 @@ colour grade — a `ShaderMaterial` on a duplicated mesh serialises fine, where 
 > movement, and that neighbouring trees were visibly out of phase, then brought
 > back to 0.07, which is about four degrees.
 
+### Camera shake, which is a rotation and was a translation first
+
+The camera already carried one thing that says *speed* — the FOV kick, scaled
+against `camera_fov_reference_kmh` per preset — and shake is the rest of that
+set. It lives in `CarTuning` beside the framing for the same reason the framing
+does: it is part of how a car feels, not a property of the scene.
+
+**Shaking the camera's position does not shake the camera.** This was built and
+measured that way before it was built the right way, and the reason it fails is
+geometric rather than a matter of taste: a translation of `d` moves an object at
+distance `z` across the screen by `d/z`, so it moves whatever is nearest and
+almost nothing else. The car is 4.2 m away and the circuit is tens to hundreds of
+metres away, so a 0.05 m shake slid the car eight pixels and left the road, the
+trees and the horizon within a tenth of a pixel of where they were. That is a car
+with a loose wheel — the opposite of the thing being asked for. A rotation moves
+the whole frame by `focal x angle` at every depth. The measurements are in
+`docs/tuning-journal.md` under M18.
+
+**Yaw and pitch, never roll.** The horizon is the one line in frame that is
+reliably level; rolling it is both the shake that disorients and the shake that
+reads as the car spinning. The suite asserts it twice — once that the waveform's
+third axis is unused, and once off the basis that actually gets applied, because
+a roll term costs one character to introduce where the two are combined.
+
+**The smoothed aim is held separately from the transform.** `_aim` is what the
+rotation lag smooths toward; the shake is applied on top of it, and the result is
+what goes into `global_transform`. Reading the shaken basis back into the next
+frame's `slerp` — which is what happens if there is only one of them — puts the
+buzz through a low-pass filter whose cutoff is the camera lag, so it lags its own
+amplitude and never returns to centre. It looks like a camera slowly swimming
+rather than like a bug, which is why the suite runs the same eight frames with
+the shake off and on and compares the aim.
+
+> **The waveform has a frame rate to live inside, and this is the trap.** The
+> camera is driven at 120 Hz in `_physics_process` and *seen* at 60, or at
+> whatever a browser gives it, so the display is what samples the shake. The first
+> version summed harmonics at 2.37x and 3.11x an 11 Hz base — 26 and 34 Hz, both
+> past a 60 Hz Nyquist limit — and anything above half the display rate aliases
+> into a slow wobble that reads as a bug in the smoothing. The rates now live in
+> `SHAKE_X` / `SHAKE_Y` as a table rather than as four sines written out,
+> precisely so the fastest one can be asserted against the base frequency.
+
+Surface comes from `RoadSurface.shake_of`, which is derived from `relief` rather
+than being a fourth number per surface. `relief` already *is* how much shape a
+surface has — the amplitude the road shader bends its normals by — so a surface
+that looks broken up is one that feels broken up, with no way for the two to
+drift apart. It is normalised against the table's own maximum, so adding a
+rougher surface rescales the others instead of pushing the camera past what the
+tuning was set against.
+
+> **Not yet offered as a setting.** Camera shake is a common accessibility
+> toggle and there is a natural home for one — `GameState` already keeps
+> `analogue_input` and `audio_enabled` this way, and the pause menu already
+> carries rows. It is deliberately not done in the same change as the effect
+> itself: the amplitude here is a few pixels of a level frame rather than a
+> lurch, and a setting is worth adding once there is a set of motion options to
+> add rather than one.
+
 ### Tyre marks: what shape, where, and for how long
 
 Three separate rules, each of which has been wrong at some point.

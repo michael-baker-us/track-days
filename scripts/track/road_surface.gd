@@ -143,6 +143,29 @@ static func grip_of(surface: String) -> float:
 static func label_of(surface: String) -> String:
 	return String(named(surface)["label"])
 
+## How much this surface throws the car about, 0 on tarmac and 1 on the
+## roughest thing in the table. Read by the chase camera's shake.
+##
+## **Derived from `relief` rather than being a fourth number per surface.**
+## `relief` already is how much shape the surface has — it is the amplitude the
+## road shader bends its normals by — so a surface that *looks* broken up is a
+## surface that *feels* broken up, with no way for the two to drift apart. The
+## alternative was a `shake` entry beside it, which is two numbers that must
+## always be edited together and one day would not be.
+##
+## Normalised against the table's own maximum rather than a constant, so adding
+## a rougher surface re-scales the others instead of pushing the camera past
+## whatever the tuning was set against. `relief_scale` is deliberately not read:
+## it is how far apart the bumps are, which belongs in the *rate* of a shake and
+## not its height, and one surface term is enough to tune.
+static func shake_of(surface: String) -> float:
+	var most := 0.0
+	for key in SURFACES:
+		most = maxf(most, float(SURFACES[key]["relief"]))
+	if most <= 0.0:
+		return 0.0
+	return clampf(float(named(surface)["relief"]) / most, 0.0, 1.0)
+
 static func after(surface: String) -> String:
 	var at := ORDER.find(surface)
 	return String(ORDER[(at + 1) % ORDER.size()]) if at >= 0 else DEFAULT
