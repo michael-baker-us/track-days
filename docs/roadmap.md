@@ -1080,6 +1080,28 @@ attribution required.
 > web, ORM-packed, VRAM-compressed. Godot will not downscale per platform on its
 > own, and a budget that lives only in a document erodes exactly the way the
 > `[rendering]` section of `project.godot` has twice.
+>
+> **Half done: the manifest and the budget are in, the fetch tool is not.**
+> `resources/asset_manifest.gd` names two ids verified against Poly Haven's live
+> API — `asphalt_03` for the road ribbon and `gravel_floor_02` for the runoff —
+> with their maps, their per-platform resolution and their measured download
+> cost. The suite fails on a resolution past the ceiling or a total past the
+> budget, offline, because the sizes are recorded when an id is added.
+>
+> **And the numbers change the shape of the milestone.** Measured rather than
+> estimated: the whole game is an **11 MB** `.pck` today, one texture set at 1 K
+> is **2.7 to 3.7 MB**, and the same set at 2 K is **12 to 14 MB** — more than
+> the entire game, for one surface. 2 K on the web is not a tuning choice, it is
+> out of the question, and even 1 K is a third of the current download *per
+> surface*. "The primary cost is bytes rather than frames" was written before
+> anyone had counted; this is what it means. (Source JPEG totals from the API, not
+> post-import `.pck` bytes, which are VRAM-compressed and will differ — the order
+> of magnitude is the finding.)
+>
+> **Left to write: `tools/fetch_assets.gd`.** It needs the network to be tested at
+> all, which is why the manifest and its guard were done first: they are the half
+> that verifies on any machine, and the half that decides what the fetch tool is
+> allowed to bring back.
 
 2. **Image-based lighting.** The HDRI becomes the radiance and reflection source;
    `SkyPreset` keeps its hours but rebalances ambient against real irradiance.

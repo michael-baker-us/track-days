@@ -1543,6 +1543,57 @@ func test_the_boards_are_a_real_distance_back() -> void:
 			% [id, nearest], nearest > KerbFeel.KERB_TO)
 		circuit.free()
 
+## The asset budget, which is the whole of M19's first step.
+##
+## **A budget that lives in a document erodes.** This project has the scar:
+## `project.godot` has lost its `[rendering]` block three times, silently, and the
+## only reason it was noticed is that the suite fails on it. Texture resolution is
+## the same shape of problem and worse — Godot will not downscale per platform on
+## its own, and the failure is a download that got slower rather than a thing that
+## looks wrong, so nobody sees it at all.
+##
+## The numbers are the argument. The whole game is an 11 MB `.pck` today; one
+## texture set at 2K is 12 to 14 MB of source. 2K on the web is not a tuning
+## choice, it is out of the question.
+##
+## Offline by construction: the sizes are recorded in the manifest when an id is
+## added, so CI never reaches for the network to check a budget.
+func test_the_asset_budget_is_enforced_rather_than_written_down() -> void:
+	check_true("the manifest names some assets (%d)" % AssetManifest.ids().size(),
+		not AssetManifest.ids().is_empty())
+	for id in AssetManifest.ids():
+		var entry: Dictionary = AssetManifest.ASSETS[id]
+		check_true("%s says what it is for" % id,
+			not String(entry.get("use", "")).is_empty())
+		for platform in AssetManifest.MAX_RESOLUTION:
+			var want: String = entry.get(platform, "")
+			var ceiling: String = AssetManifest.MAX_RESOLUTION[platform]
+			check_true("%s ships %s at a real resolution (%s)" % [id, platform, want],
+				AssetManifest.rank(want) >= 0)
+			check_true("%s stays inside the %s ceiling of %s (%s)"
+				% [id, platform, ceiling, want],
+				AssetManifest.rank(want) <= AssetManifest.rank(ceiling))
+			# The size has to be recorded for the resolution actually shipped, or
+			# the budget below is adding up numbers that are not there.
+			check_true("%s records what its %s download costs" % [id, platform],
+				entry.has("bytes_%s" % want))
+
+	# ORM-packed, not three loose maps: a third of the files and a third of the
+	# requests, and the layout Godot reads natively.
+	check_true("the maps are packed rather than loose",
+		AssetManifest.MAPS.has("arm")
+		and not AssetManifest.MAPS.has("Rough")
+		and not AssetManifest.MAPS.has("AO"))
+
+	var web := AssetManifest.cost_mb("web")
+	var desktop := AssetManifest.cost_mb("desktop")
+	check_true("the web build stays inside its budget (%.1f of %.1f MB)"
+		% [web, AssetManifest.WEB_BUDGET_MB], web <= AssetManifest.WEB_BUDGET_MB)
+	# Not a second budget, a sanity check: desktop is allowed to be bigger and is
+	# not allowed to be *smaller*, which would mean a platform column was swapped.
+	check_true("and desktop is the heavier of the two (%.1f vs %.1f MB)"
+		% [desktop, web], desktop > web)
+
 ## The scenery that ought to move is in the wind, on every shipped circuit.
 ##
 ## **Nothing catches this by looking at a screenshot**, which is the whole reason
@@ -7818,6 +7869,7 @@ func _physics_process(_delta: float) -> bool:
 		test_the_stands_have_people_on_the_seats()
 		test_every_corner_is_marshalled()
 		test_the_boards_are_a_real_distance_back()
+		test_the_asset_budget_is_enforced_rather_than_written_down()
 		test_the_scenery_is_in_the_wind()
 		test_the_wind_carries_the_prop_colour_across()
 		test_flags_and_trees_move_differently()
