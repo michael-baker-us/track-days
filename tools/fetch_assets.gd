@@ -25,10 +25,9 @@ extends SceneTree
 
 const API := "https://api.polyhaven.com"
 const INTO := "res://assets/polyhaven"
-## Poly Haven's textures are published as JPEG, PNG and EXR. JPEG is what a
-## colour map wants and is a third of the bytes; EXR is for displacement, which
-## this project does not use.
-const FORMAT := "jpg"
+## Which file format each kind of asset is fetched in lives in the manifest, not
+## here: a colour map wants JPEG and a sky wants `.hdr`, and the difference is a
+## property of the asset rather than of the fetcher.
 
 var _http: HTTPRequest
 var _failures: Array[String] = []
@@ -53,15 +52,17 @@ func _run() -> void:
 		var resolutions := {}
 		for platform in AssetManifest.MAX_RESOLUTION:
 			resolutions[String(entry[platform])] = true
+		var kind := AssetManifest.kind_of(String(id))
 		for resolution in resolutions:
-			for map in AssetManifest.MAPS:
+			for map in kind["maps"]:
 				wanted += 1
+				var format: String = kind["format"]
 				var url: String = files.get(map, {}).get(resolution, {}).get(
-					FORMAT, {}).get("url", "")
+					format, {}).get("url", "")
 				if url.is_empty():
 					_failures.append("%s: no %s at %s" % [id, map, resolution])
 					continue
-				var to := "%s/%s_%s_%s.%s" % [INTO, id, map, resolution, FORMAT]
+				var to := "%s/%s_%s_%s.%s" % [INTO, id, map, resolution, format]
 				var got := await _download(url, to)
 				if got <= 0:
 					_failures.append("%s: %s at %s would not download"

@@ -1122,6 +1122,25 @@ attribution required.
 > there being no materials and no varying roughness — and M18's wet road supplies
 > the second.
 >
+> **Started: the first HDRI is fetched and the budget has already spoken.**
+> `kloofendal_43d_clear_puresky` at 1 K and 2 K, for `noon` — one hour rather
+> than six, because what this step has to answer first is whether real irradiance
+> and the hand-tuned sky shader can agree at all, and six skies is five more
+> downloads than that question needs.
+>
+> An HDRI is one file and it has to be `.hdr` rather than JPEG: the whole reason
+> to use one is the range above white that 8 bits cannot hold, and an 8-bit sky
+> lights a scene like a *photograph* of a sky, which is the thing being replaced.
+> The manifest now carries a `kind` per asset for that, since the format is a
+> property of the asset rather than of the fetcher.
+>
+> **And the ceiling arrives sooner than expected.** Six HDRIs at 1 K is 7 MB
+> against a 12 MB web budget that two surfaces have already taken 6.7 MB of, so
+> the guard will refuse the fourth or fifth. That is the guard working: the
+> decision it forces is whether the web build gets HDRIs at all, or gets them at a
+> resolution chosen for *irradiance* rather than for looking at — a 256 px sky
+> lights a scene almost identically and costs a fortieth as much.
+>
 > **The sky shader stays as the visible background.** The banded gradient and the
 > oversized sun are the graphic statement and they were tuned; the HDRI is wanted
 > for its *light*, not its picture. Whether the two agree at every hour is the

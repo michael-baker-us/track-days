@@ -53,9 +53,24 @@ const RESOLUTIONS := ["1k", "2k", "4k", "8k"]
 ## rather than wide enough to accept whatever gets added.
 const WEB_BUDGET_MB := 12.0
 
-## The maps a surface ships. `arm` is ambient occlusion, roughness and metalness
-## packed one per channel; there is no separate AO or Rough entry on purpose.
+## What each kind of asset is made of, and in what format.
+##
+## A texture is three maps as JPEG — `arm` being ambient occlusion, roughness and
+## metalness packed one per channel, so there is no separate AO or Rough entry on
+## purpose. An **HDRI is one file** and it must be `.hdr` rather than JPEG,
+## because the whole reason to use one is the range above white that a JPEG
+## cannot hold: an 8-bit sky lights a scene like a photograph of a sky, which is
+## the thing being replaced.
+const KINDS := {
+	"texture": {"maps": ["Diffuse", "nor_gl", "arm"], "format": "jpg"},
+	"hdri": {"maps": ["hdri"], "format": "hdr"},
+}
+
+## Kept for the suite and for anything that only deals in surfaces.
 const MAPS := ["Diffuse", "nor_gl", "arm"]
+
+static func kind_of(id: String) -> Dictionary:
+	return KINDS[String(ASSETS[id].get("kind", "texture"))]
 
 ## Every asset, its id on Poly Haven, and what it is for here.
 ##
@@ -77,6 +92,22 @@ const ASSETS := {
 		"use": "runoff",
 		"desktop": "2k", "web": "1k",
 		"bytes_1k": 3890000, "bytes_2k": 14800000,
+	},
+	# M19 step 2: the first HDRI, for `noon`. One hour rather than six, because
+	# what step 2 has to answer first is whether real irradiance and the hand-tuned
+	# sky shader can agree at all — and six skies is five more downloads than that
+	# question needs.
+	#
+	# **The budget is what makes this one at a time.** Six HDRIs at 1 K is 7 MB
+	# against a 12 MB web ceiling that two surfaces have already taken 6.7 MB of.
+	# The guard will refuse the fourth or fifth, which is the guard working: the
+	# decision it forces is whether the web build gets HDRIs at all, or gets them
+	# at a resolution chosen for irradiance rather than for looking at.
+	"kloofendal_43d_clear_puresky": {
+		"kind": "hdri",
+		"use": "noon",
+		"desktop": "2k", "web": "1k",
+		"bytes_1k": 1184531, "bytes_2k": 4624289,
 	},
 }
 
