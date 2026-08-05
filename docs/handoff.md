@@ -24,7 +24,7 @@ GODOT=/Users/michael.baker/Downloads/Godot.app/Contents/MacOS/Godot
 
 ## Where things stand
 
-**Steps 1 to 7 are done. The suite is green — 2146 checks. The tyre spray, the rain and the crowd are the
+**M18 is complete — all eight steps. The suite is green — 2166 checks. The tyre spray, the rain and the crowd are the
 working diff; everything before them is committed.**
 
 Step 1 (the grading system) shipped as `39e465b`, step 2 (all six looks authored)
@@ -168,32 +168,26 @@ configure themselves at load. It is the node and the metadata that are baked.
 
 ## Next action
 
-**Step 8, and it closes M18: boards that make the circuit readable.** Braking
-markers, apex markers and corner numbering, placed from the corners the way
-everything trackside already is.
+**M18 is done. This file has served its purpose — delete it**, and take the two
+things below with you first, because they are the only parts not already recorded
+in `docs/architecture.md` or the tuning journal.
 
-The placement pass the marshals needed is now in hand and is the thing to build
-on:
+**The one thing left inside M18, on purpose.** Corner *numbering* wants text, and
+there is none in the 3D world — the whole HUD is `Control` nodes on a
+`CanvasLayer`. A number on a board is either a generated texture or a `Label3D`,
+and that is a decision about what this game is made of rather than a detail of
+this step. The boards work without it: what a driver reads is the rate they
+arrive, not the digit. Same shape as the crowd's "no textures" question, which is
+the one that saved that step from being an impostor crowd.
 
-- **`_corner_entries`** records every corner's centreline index and which way it
-  turns — added for the marshals, because `_corner_spans` only holds *banked*
-  corners and nearly none are. Walking back from a corner's entry index is how a
-  marshal post finds its spot, and it is how a 100 m board finds its spot.
-- **Distance back is the interesting part**, not the model. Real boards sit at
-  150, 100 and 50 m before the corner because a driver reads distance-to-apex off
-  the gap between them. That is a walk backwards along `centreline` accumulating
-  length — the same loop `_point_at_arc` already does forwards.
-- **This is the one step in M18 with a gameplay claim.** Everything else has been
-  a look. A board that a driver can actually brake against is worth measuring
-  against the par-time model's braking distances, which are already in
-  `docs/tuning-journal.md`.
+**Two hazards that outlive the milestone.**
 
-Corner numbering wants text, and there is no text in the 3D world yet — the whole
-HUD is `Control` nodes on a `CanvasLayer`. A number on a board is either a
-generated texture or a `Label3D`. Worth deciding before starting, the same way
-the crowd's "no textures" question was.
-
-**When it lands, M18 is closed — delete this file.**
+- `project.godot` lost its `[rendering]` section three times, once during this
+  milestone, inside an ordinary commit next to harmless `[input]` churn. The
+  suite catches it. Check `git diff project.godot` after any editor open.
+- Grep the suite output for `SCRIPT ERROR`, not only the pass line. A malformed
+  `%` aborted a whole test function and the run still printed `PASS`, with a
+  check count *equal* to the previous run — which was the only tell.
 
 ---
 
@@ -268,7 +262,9 @@ into the web export if left in the project root.
    untouched; see below.
 7. ~~Crowd — spectators in the stands, and marshals at the corners.~~ **Done**,
    and not as billboards.
-8. **Marker boards** — braking and apex markers placed from `Compiled.corners`.
+8. ~~Marker boards — braking markers placed from the corners.~~ **Done.** Corner
+   *numbering* is deliberately not: it wants text, and there is none in the 3D
+   world yet.
 
 ### Left out of step 3, on purpose
 

@@ -1484,6 +1484,65 @@ func test_every_corner_is_marshalled() -> void:
 		check_true("%s dresses them all in high-vis" % id, high_vis)
 		circuit.free()
 
+## Braking boards before every corner, and the distance rule under them.
+##
+## **This is the one piece of M18 furniture with a claim on how the game plays.**
+## A driver brakes off the gap between the boards, so 150, 100 and 50 m have to
+## be real distances along the road — not a fixed number of centreline points,
+## which are sampled about a metre apart and not exactly. A board 137 m out on one
+## circuit and 162 on another is not a braking board.
+##
+## So the walk is tested directly rather than only through what it places: ask for
+## 100 m back from a point and measure what came out.
+func test_the_boards_are_a_real_distance_back() -> void:
+	var builder := TrackBuilder.new()
+	builder.measure(load("res://tools/build_track.gd").ARDENNES)
+	var line := builder.centreline
+	check_true("a centreline to walk (%d)" % line.size(), line.size() > 100)
+	if line.size() <= 100:
+		return
+	for metres in TrackBuilder.BOARD_METRES:
+		var at := builder._back_from(400, float(metres))
+		var walked := 0.0
+		var i := at
+		while i != 400:
+			var next := (i + 1) % line.size()
+			walked += line[i].distance_to(line[next])
+			i = next
+		# Within one sample of the road, which is what a walk of whole points can
+		# promise and is a metre here.
+		check_near("%.0f m back is %.0f m back" % [metres, walked],
+			walked, float(metres), 2.0)
+
+	for entry in GameState.TRACKS:
+		var id: String = entry["id"]
+		var circuit: Node3D = load(entry["scene"]).instantiate()
+		var found := circuit.find_children("Boards", "MultiMeshInstance3D", true, false)
+		check_true("%s carries braking boards" % id, not found.is_empty())
+		if found.is_empty():
+			circuit.free()
+			continue
+		var mmi := found[0] as MultiMeshInstance3D
+		var mm := mmi.multimesh
+		check_true("%s carries a set per corner (%d)" % [id, mm.instance_count],
+			mm.instance_count >= 12)
+		check("%s boards cast no shadow" % id, mmi.cast_shadow,
+			GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+		# Off the road, for the same reason the marshals are: the placement runs
+		# outward from the centreline, so a sign error puts every board on the
+		# racing line.
+		var track_line: PackedVector3Array = circuit.get_meta(
+			"centreline", PackedVector3Array())
+		var nearest := INF
+		for i in mm.instance_count:
+			var at := i * 16
+			var here := Vector2(mm.buffer[at + 3], mm.buffer[at + 11])
+			for p in track_line:
+				nearest = minf(nearest, Vector2(p.x, p.z).distance_to(here))
+		check_true("%s stands them clear of the road (nearest %.1f m)"
+			% [id, nearest], nearest > KerbFeel.KERB_TO)
+		circuit.free()
+
 ## The scenery that ought to move is in the wind, on every shipped circuit.
 ##
 ## **Nothing catches this by looking at a screenshot**, which is the whole reason
@@ -7758,6 +7817,7 @@ func _physics_process(_delta: float) -> bool:
 		test_roadside_markers_are_dense_enough_to_read_as_speed()
 		test_the_stands_have_people_on_the_seats()
 		test_every_corner_is_marshalled()
+		test_the_boards_are_a_real_distance_back()
 		test_the_scenery_is_in_the_wind()
 		test_the_wind_carries_the_prop_colour_across()
 		test_flags_and_trees_move_differently()

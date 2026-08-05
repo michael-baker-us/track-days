@@ -253,6 +253,26 @@ const MARSHAL_SCALE := 0.12
 ## rather than to fit in.
 const MARSHAL_COLOUR := Color(0.98, 0.55, 0.10)
 
+## Braking boards: how far before a corner they stand, in metres of road.
+##
+## **The spacing is the information.** A real board carries a countdown chevron,
+## and there is no text anywhere in this world yet — but a driver does not read
+## the number so much as the *rate the boards arrive*, and three identical panels
+## fifty metres apart carry that without a glyph. It is also the honest version of
+## what this project can draw: a number would be the first sampled texture in the
+## frame, which is the argument that kept the crowd out of impostors.
+const BOARD_METRES := [150.0, 100.0, 50.0]
+## Out from the centreline, matching the marshal posts so a corner's furniture
+## lines up rather than staggering.
+const BOARD_GAP := 0.86
+## A panel on a post, in tile units: how tall the whole thing is, and how much of
+## that is panel.
+const BOARD_HEIGHT := 0.20
+const BOARD_WIDTH := 0.30
+const BOARD_PANEL := 0.55
+const BOARD_COLOUR := Color(0.93, 0.94, 0.96)
+const BOARD_POST := Color(0.22, 0.24, 0.28)
+
 const CROWD_COLOURS := [
 	Color(0.86, 0.28, 0.26), Color(0.95, 0.68, 0.22), Color(0.29, 0.45, 0.78),
 	Color(0.35, 0.66, 0.38), Color(0.90, 0.90, 0.92), Color(0.55, 0.35, 0.70),
@@ -2437,6 +2457,7 @@ func _build_scenery(root_node: Node3D, track_name: String) -> void:
 	_scenery_paddock(scenery, road)
 	_scenery_markers(scenery, road, track_name)
 	_scenery_marshals(scenery, road, track_name)
+	_scenery_boards(scenery, road)
 	_build_tunnels(scenery)
 	_build_horizon(scenery, track_name)
 	_build_road_overlay(scenery)
@@ -3326,6 +3347,100 @@ func _scenery_marshals(scenery: Node3D, road: Dictionary, track_name: String) ->
 		high_vis.append(MARSHAL_COLOUR)
 	_coloured_multimesh(scenery, "Marshals", figures, people, high_vis)
 	_multimesh(scenery, "MarshalFlags", flag, flags, false, WIND_FLAG)
+
+## Braking boards before every corner, at 150, 100 and 50 m.
+##
+## **The one thing in this milestone with a claim on how the game plays** rather
+## than on how it looks: a driver brakes off the gap between the boards, so their
+## spacing has to be a real distance along the road rather than a number of
+## centreline points. `_back_from` walks the centreline backwards accumulating
+## length, which is `_point_at_arc` run the other way and is the piece step 8
+## exists to write — corner numbering and apex markers want the same walk.
+##
+## Placed on the same side as the marshal post, which is the outside of the
+## corner: a board on the inside is a board the car is pointed away from through
+## the whole braking zone.
+func _scenery_boards(scenery: Node3D, road: Dictionary) -> void:
+	if _corner_entries.is_empty() or centreline.size() < 4:
+		return
+	var xforms: Array[Transform3D] = []
+	for corner in _corner_entries:
+		var side := 1.0 if String(corner["turn"]) == "left" else -1.0
+		for metres in BOARD_METRES:
+			var at := _back_from(int(corner["at"]), float(metres))
+			var here := centreline[at]
+			var next := centreline[(at + 1) % centreline.size()]
+			var tan := Vector2(next.x - here.x, next.z - here.z)
+			if tan.length_squared() < 0.0001:
+				continue
+			tan = tan.normalized()
+			var outward := Vector3(-tan.y, 0.0, tan.x) * side
+			var spot := here + outward * (BOARD_GAP * SCALE)
+			if not _clear_of_road(road, spot, MARKER_CLEARANCE * SCALE):
+				continue
+			xforms.append(_prop_xform(spot, _yaw_facing(tan, side),
+				BOARD_HEIGHT * SCALE, Vector3.ZERO))
+	if xforms.is_empty():
+		return
+	var white := PackedColorArray()
+	for i in xforms.size():
+		white.append(Color.WHITE)
+	_coloured_multimesh(scenery, "Boards", board_mesh(), xforms, white)
+
+## The centreline index a given distance back along the road from `at`.
+##
+## Backwards along the *road*, not backwards through the array by a fixed count:
+## the centreline is sampled about a metre apart but not exactly, and a braking
+## board that is 137 m out on one circuit and 162 on another is not a braking
+## board. Wraps, because a corner near the start line has its boards on the far
+## side of it.
+func _back_from(at: int, metres: float) -> int:
+	var total := centreline.size()
+	var walked := 0.0
+	var i := at
+	while walked < metres:
+		var prev := (i - 1 + total) % total
+		var step := centreline[prev].distance_to(centreline[i])
+		# **The nearer of the two points either side of the target**, not the first
+		# one past it. The centreline is not sampled evenly — a corner arc steps
+		# several metres at a time where a straight steps about one — so always
+		# overshooting put a 50 m board 55 m out, which is a tenth of the distance
+		# it is there to announce.
+		if walked + step > metres and (walked + step) - metres > metres - walked:
+			break
+		walked += step
+		i = prev
+		if i == at:
+			break
+	return i
+
+## One braking board: a panel on a post, authored one unit tall on y = 0.
+##
+## No number on it, and that is a decision rather than a gap — see
+## `BOARD_METRES`. Two colours, carried on the mesh rather than per instance,
+## because every board is the same board.
+static func board_mesh() -> ArrayMesh:
+	var post := 1.0 - BOARD_PANEL
+	# Two surfaces, because the post and the panel are two colours: a white board
+	# on a white post in front of a white kit is one shape, and the dark post is
+	# what separates the panel from everything behind it.
+	var mesh := _surface(Vector3(0.0, post * 0.5, 0.0),
+		Vector3(BOARD_WIDTH * 0.18, post, BOARD_WIDTH * 0.18), BOARD_POST, null)
+	return _surface(Vector3(0.0, post + BOARD_PANEL * 0.5, 0.0),
+		Vector3(BOARD_WIDTH, BOARD_PANEL, BOARD_WIDTH * 0.1), BOARD_COLOUR, mesh)
+
+## One box as its own surface, appended to `into` if there is one.
+static func _surface(
+	centre: Vector3, size: Vector3, tint: Color, into: ArrayMesh
+) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_figure_box(st, centre, size)
+	st.generate_normals()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = tint
+	st.set_material(mat)
+	return st.commit(into)
 
 ## One `MultiMesh` whose instances all wear the same colour.
 ##

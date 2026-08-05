@@ -799,9 +799,11 @@ more. That ordering was arrived at the wrong way round and is corrected below.
 > cheap work and the identity-forming work turned out to be the same work.**
 > Realism is not the axis this game gets better along.
 
-**Status: steps 1–7 done — the grading system, all six looks authored, the
+**Status: M18 complete — steps 1–8 done — the grading system, all six looks authored, the
 scenery moving, the car feeling fast, the tyres throwing up what they are running
-on, the storm actually raining, and the circuit populated.**
+on, the storm actually raining, the circuit populated, and the corners
+readable. Corner *numbering* is the one thing left out, and it is written up
+under step 8.**
 
 1. **A colour grade per look, as a real LUT.** `CircuitLook` already pairs an hour
    with a place; it gains a third thing, and that thing is the signature.
@@ -1014,10 +1016,22 @@ on, the storm actually raining, and the circuit populated.**
    corner numbering, placed from the centreline the way everything trackside
    already is.
 
-> Real circuits carry these because they *work* — a driver reads distance-to-apex
-> off them — so they are the rare piece of set dressing that improves play and
-> authenticity with one asset. Placement is a function of `Compiled.corners`,
-> which the builder already has.
+> **Done, as braking boards.** Three panels at 150, 100 and 50 m before every
+> corner, on the outside, placed from `_corner_entries` — the corner list the
+> marshals added. Real circuits carry these because they *work*, and this is the
+> one thing in M18 with a claim on play rather than on looks.
+>
+> **The distance rule is the deliverable, not the model.** A fixed number of
+> centreline points is not a distance: the line is sampled about a metre apart on
+> a straight and several metres at a time through a corner. `_back_from` walks
+> real length and takes the nearer point either side of the target — always
+> overshooting put a 50 m board 55 m out.
+>
+> **Not done: corner numbering.** It wants text, and there is none in the 3D world
+> — the whole HUD is `Control` nodes on a `CanvasLayer`. A number is either a
+> generated texture or a `Label3D`, and that decision deserves its own pass rather
+> than being made in passing here. The boards work without it, because what a
+> driver reads is the rate they arrive.
 
 **Deliberately not here: live time-of-day transition.** It was asked for and it
 does not fit yet. `SkyPreset` is discrete presets resolved at *build* time, with

@@ -1273,6 +1273,32 @@ its speed: people do not sway like a tree or flap like a flag, they shift, and
 what a full stand looks like at racing distance is a texture that is never quite
 still. Anything more legible reads as a crowd doing a wave.
 
+### Braking boards, and the distance rule under them
+
+Three panels at 150, 100 and 50 m before every corner, on the outside — a board
+on the inside is a board the car is pointed away from through the whole braking
+zone. **The one piece of M18 furniture with a claim on how the game plays**
+rather than on how it looks.
+
+**The spacing is the information, and there is no number on them.** A real board
+carries a countdown chevron; there is no text anywhere in this world yet, and a
+glyph would be the first sampled texture in the frame — the same argument that
+kept the crowd out of impostors. A driver does not read the number so much as the
+*rate the boards arrive*, and three identical panels fifty metres apart carry
+that without one.
+
+> **A fixed number of centreline points is not a distance.** The centreline is
+> sampled about a metre apart on a straight and several metres at a time through
+> a corner arc, so `_back_from` walks it accumulating real length. It also takes
+> **the nearer of the two points either side of the target** rather than the
+> first one past it: always overshooting put a 50 m board 55 m out, a tenth of
+> the distance it exists to announce, and the suite measures the walk directly
+> rather than only what it places.
+
+The board is a post and a panel as **two surfaces**, because a white board on a
+white post in front of a white kit is one shape — the dark post is what separates
+the panel from what is behind it.
+
 ### Marshal posts, and the first thing placed from the corners
 
 The stands say a race is being watched; a marshal says it is being *run*. One
