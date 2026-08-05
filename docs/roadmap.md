@@ -1081,7 +1081,16 @@ attribution required.
 > own, and a budget that lives only in a document erodes exactly the way the
 > `[rendering]` section of `project.godot` has twice.
 >
-> **Half done: the manifest and the budget are in, the fetch tool is not.**
+> **Done.** `resources/asset_manifest.gd`, the budget guard in the suite, and
+> `tools/fetch_assets.gd`, which pulled all twelve files (32.6 MB) on its first
+> real run.
+>
+> **And the downsizing step does not exist**, which only reading the API showed:
+> Poly Haven serves *every* resolution as its own encoded file, so asking for 1 K
+> is a 1.2 MB request rather than 40 MB downloaded and mostly thrown away. The
+> plan above assumed a 4 K source reduced locally, the way a `.blend` would be.
+> There is no derivative to generate and nothing to commit — the fetched file
+> *is* the shipped file, and it stays gitignored.
 > `resources/asset_manifest.gd` names two ids verified against Poly Haven's live
 > API — `asphalt_03` for the road ribbon and `gravel_floor_02` for the runoff —
 > with their maps, their per-platform resolution and their measured download
@@ -1098,10 +1107,10 @@ attribution required.
 > post-import `.pck` bytes, which are VRAM-compressed and will differ — the order
 > of magnitude is the finding.)
 >
-> **Left to write: `tools/fetch_assets.gd`.** It needs the network to be tested at
-> all, which is why the manifest and its guard were done first: they are the half
-> that verifies on any machine, and the half that decides what the fetch tool is
-> allowed to bring back.
+> The manifest and its guard were written first on purpose: they verify on any
+> machine, offline, and they are what decides what the fetch tool is allowed to
+> bring back. The fetcher exits non-zero on any miss, because a half-fetched set
+> imports cleanly and leaves a surface wrong in a way nobody can see.
 
 2. **Image-based lighting.** The HDRI becomes the radiance and reflection source;
    `SkyPreset` keeps its hours but rebalances ambient against real irradiance.

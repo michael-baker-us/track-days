@@ -12,3 +12,7 @@ build/
 
 # macOS
 .DS_Store
+
+# Poly Haven source, fetched by tools/fetch_assets.gd. Only what the game
+# ships is committed; see resources/asset_manifest.gd.
+assets/polyhaven/
