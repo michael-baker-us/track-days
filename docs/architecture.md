@@ -2024,6 +2024,15 @@ Two decisions inside it:
 > which is why the scene is generated at all — and swapping the material is
 > exactly the change that could drop it again. The suite checks every painted
 > surface still has the texture.
+>
+> **The atlas import must also be platform-neutral.** It was once committed as
+> an S3TC-only VRAM texture while the Web preset exported neither desktop nor
+> mobile VRAM formats. Desktop still looked correct because its warm import cache
+> held the S3TC payload; the Web pack carried the scene's texture reference but
+> no format WebGL could load, so the same shader sampled white. The atlas is only
+> 512x512 and consists of flat colour swatches, so it is imported losslessly as a
+> portable `.ctex` instead. The suite reads the committed `.import` file rather
+> than trusting a local cache.
 
 ### The car's own shadow
 

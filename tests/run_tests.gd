@@ -6737,6 +6737,26 @@ func test_web_render_settings_survive() -> void:
 	check_true("the stretch mode is still in the file",
 		text.contains('window/stretch/mode="canvas_items"'))
 
+## The car's palette is tiny, but it used to be imported as S3TC-only VRAM
+## data while the Web preset deliberately exports neither desktop nor mobile
+## VRAM formats. Desktop loaded its cached S3TC texture; Web exported the scene
+## reference without a usable texture payload, so the shader sampled white.
+##
+## Keep the atlas portable rather than enabling a platform compression family
+## for one 512x512 colour chart. This reads the committed import settings because
+## a warm local cache can make the broken configuration look correct.
+func test_the_car_palette_can_ship_to_web() -> void:
+	var path := "res://assets/kenney/car_kit/Textures/colormap.png.import"
+	check_true("the car palette import settings are readable", FileAccess.file_exists(path))
+	if not FileAccess.file_exists(path):
+		return
+	var text := FileAccess.get_file_as_string(path)
+	check_true("the car palette is portable rather than VRAM-only",
+		text.contains("compress/mode=0"))
+	check_true("the car palette exports a platform-neutral ctex",
+		text.contains('path="res://.godot/imported/colormap.png-')
+		and not text.contains("path.s3tc="))
+
 ## `keep_height` is right for every landscape shape but pins the canvas to 720
 ## units tall, so a 9:16 phone gets 720 * 9/16 = 405 units of width — narrower
 ## than the 300-unit track buttons plus the Edit column, which then run off both
@@ -7967,6 +7987,7 @@ func _physics_process(_delta: float) -> bool:
 		test_ui_text_stays_inside_the_built_in_font()
 		test_ui_scales_with_the_window()
 		test_web_render_settings_survive()
+		test_the_car_palette_can_ship_to_web()
 		test_the_project_wears_the_theme()
 		test_theme_resource_matches_its_source()
 		stage_title_menu()
