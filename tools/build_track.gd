@@ -16,8 +16,9 @@ extends SceneTree
 # Ardennes is Spa-Francorchamps, Monte Carlo is Monaco, La Sarthe is Le Mans.
 # The tile set only turns in right angles and only in three radii, so none of
 # them is a survey — what carries over is the shape of the lap and the order of
-# its corners: where the hairpin is, which straight is the long one, which bends
-# are quick enough to be worth banking, and where the road climbs.
+# its corners: where the hairpin is, which straight is the long one, and where
+# the road climbs. Shipped corners stay flat; banking remains available to
+# player-authored tracks in the editor.
 #
 # Each layout was solved as a rectilinear polygon first. A leg of the polygon
 # spans `straight_cells + N_in + N_out - 1` tile units, where N is the size of
@@ -63,10 +64,9 @@ extends SceneTree
 # structure at all, meant for the editor's sustained elevated sections.
 
 # Spa-Francorchamps: La Source, the climb through Eau Rouge onto a long straight
-# at height, then the fast half of the lap. The three big sweepers carry 4
-# degrees of bank and the medium bends 2.5; the hairpin and the chicane get
-# nothing, because banking is a per-corner choice and a hairpin banked hard is a
-# skate bowl. 1473 m, 14 corners, 3.5 m of climb.
+# at height, then the fast half of the lap. Every corner is deliberately flat;
+# the car does not yet handle bank transitions reliably. 1473 m, 14 corners,
+# 3.5 m of climb.
 const ARDENNES := [
 	["S", "roadStartPositions", 1],
 	["S", "roadStart", 1],
@@ -78,9 +78,9 @@ const ARDENNES := [
 	["C", "roadCornerSmall", "right", 0.0],
 	["S", "roadStraightLong", 3],
 	# Eau Rouge and Raidillon: the left-right flick, and then the climb.
-	["C", "roadCornerLarge", "left", 2.5],
+	["C", "roadCornerLarge", "left", 0.0],
 	["S", "roadStraight", 1],
-	["C", "roadCornerLarge", "right", 2.5],
+	["C", "roadCornerLarge", "right", 0.0],
 	["S", "roadStraightLong", 1],
 	["S", "roadRampLongCurved", 1, 1],
 	# The Kemmel straight, held at height over the crest and then run out flat.
@@ -98,16 +98,16 @@ const ARDENNES := [
 	["S", "roadStraight", 1],
 	["C", "roadCornerSmall", "right", 0.0],
 	["S", "roadStraightLong", 1],
-	# Pouhon, Fagnes, Stavelot: the fast, banked half.
-	["C", "roadCornerLarger", "left", 4.0],
+	# Pouhon, Fagnes, Stavelot: the fast half.
+	["C", "roadCornerLarger", "left", 0.0],
 	["S", "roadStraightLong", 4],
-	["C", "roadCornerLarge", "right", 2.5],
+	["C", "roadCornerLarge", "right", 0.0],
 	["S", "roadStraightLong", 1],
-	["C", "roadCornerLarger", "right", 4.0],
+	["C", "roadCornerLarger", "right", 0.0],
 	["S", "roadStraightLong", 4],
 	["S", "roadStraight", 1],
 	# Blanchimont, flat out, onto a rise back towards the line.
-	["C", "roadCornerLarger", "left", 4.0],
+	["C", "roadCornerLarger", "left", 0.0],
 	["S", "roadStraight", 1],
 	["S", "roadRampLongCurved", 1, 1],
 	["S", "roadStraightBridge", 1],
@@ -121,14 +121,10 @@ const ARDENNES := [
 	["S", "roadStraight", 1],
 ]
 
-# Monaco: the shortest circuit, the tightest, and the flattest in the only sense
-# that matters here -- **not one corner on it is banked**. That is the point of
-# it next to the other two. Banking is a choice per corner rather than something
-# every bend gets, and a street circuit is where the answer is honestly no: the
-# road is a road, and eleven of these fourteen corners are the smallest tile in
-# the set, taken slowly enough that leaning them would buy nothing. Every corner
-# says `0.0` out loud rather than saying nothing, because those have to keep
-# meaning the same thing.
+# Monaco: the shortest circuit and the tightest. Like every shipped circuit, all
+# of its corners explicitly request zero bank. Eleven of these fourteen corners
+# are the smallest tile in the set. Every corner says `0.0` out loud rather than
+# saying nothing, because those have to keep meaning the same thing.
 #
 # The lap steps down the hill in four bends and steps back along the harbour in
 # four more, which is both what Monaco does and the only way a loop with this
@@ -193,9 +189,9 @@ const MONTE_CARLO := [
 # Le Mans: the longest of the three and the one that is mostly straight. Three
 # runs down the Mulsanne, split by chicanes, take up a quarter of the lap on
 # their own, and the second of them goes over a crest at speed. Then Indianapolis
-# -- the biggest sweeper in the set, banked as hard as anything is banked --
-# Arnage, and the Porsche Curves, which are three of the medium corners taken as
-# one continuous change of direction. 1768 m, 18 corners, 3.5 m of climb.
+# -- the biggest sweeper in the set -- Arnage, and the Porsche Curves, which are
+# three of the medium corners taken as one continuous change of direction. All
+# shipped corners are flat. 1768 m, 18 corners, 3.5 m of climb.
 const LA_SARTHE := [
 	["S", "roadStartPositions", 1],
 	["S", "roadStart", 1],
@@ -206,15 +202,15 @@ const LA_SARTHE := [
 	["S", "roadStraightLong", 1],
 	["C", "roadCornerSmall", "left", 0.0],
 	["S", "roadStraight", 1],
-	["C", "roadCornerLarge", "right", 2.5],
+	["C", "roadCornerLarge", "right", 0.0],
 	["S", "roadStraightLong", 1],
 	# The Esses, downhill in reality and simply quick here.
-	["C", "roadCornerLarge", "left", 1.5],
+	["C", "roadCornerLarge", "left", 0.0],
 	["S", "roadStraight", 1],
-	["C", "roadCornerLarge", "right", 1.5],
+	["C", "roadCornerLarge", "right", 0.0],
 	["S", "roadStraightLong", 1],
 	# Tertre Rouge, onto the Mulsanne.
-	["C", "roadCornerLarge", "right", 2.5],
+	["C", "roadCornerLarge", "right", 0.0],
 	["S", "roadStraightLong", 8],
 	# First chicane.
 	["C", "roadCornerSmall", "right", 0.0],
@@ -236,18 +232,18 @@ const LA_SARTHE := [
 	["C", "roadCornerSmall", "right", 0.0],
 	["S", "roadStraightLong", 8],
 	# Indianapolis, then Arnage.
-	["C", "roadCornerLarger", "right", 4.0],
+	["C", "roadCornerLarger", "right", 0.0],
 	["S", "roadStraightLong", 2],
 	["S", "roadStraight", 1],
 	["C", "roadCornerSmall", "right", 0.0],
 	["S", "roadStraightLong", 1],
 	["S", "roadStraight", 1],
 	# The Porsche Curves.
-	["C", "roadCornerLarge", "left", 2.5],
+	["C", "roadCornerLarge", "left", 0.0],
 	["S", "roadStraightLong", 1],
-	["C", "roadCornerLarge", "right", 2.5],
+	["C", "roadCornerLarge", "right", 0.0],
 	["S", "roadStraight", 1],
-	["C", "roadCornerLarge", "left", 2.5],
+	["C", "roadCornerLarge", "left", 0.0],
 	["S", "roadStraightLong", 1],
 	["S", "roadStraight", 1],
 	# The Ford chicane, and the line.

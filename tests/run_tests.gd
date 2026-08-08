@@ -2982,8 +2982,8 @@ func test_par_time_is_plausible_on_the_shipped_circuits() -> void:
 	check_true("the longest circuit takes the longest",
 		times["la_sarthe"] > times["ardennes"]
 		and times["ardennes"] > times["monte_carlo"])
-	# Monte Carlo is "fourteen tight corners, not one banked" and Ardennes is
-	# "fast sweepers" -- so the shorter circuit must also be the slower one per
+	# Monte Carlo is fourteen tight corners and Ardennes has fast sweepers, so the
+	# shorter circuit must also be the slower one per
 	# metre, or the model is measuring length and calling it difficulty.
 	check_true("and the tight circuit is slower per metre",
 		lengths["monte_carlo"] / times["monte_carlo"]
@@ -6134,6 +6134,19 @@ func test_plateau_inside_one_straight_still_works() -> void:
 ##
 # --- banking ---
 
+## Banking remains an editor feature even while the shipped circuits stay flat.
+## Give the geometry tests an explicit authored layout so product content is not
+## also responsible for exercising the underlying system.
+func _banked_fixture() -> Array:
+	var source: Array = load("res://tools/build_track.gd").ARDENNES
+	var fixture := []
+	for segment in source:
+		var authored: Array = segment.duplicate()
+		if authored[0] == "C" and authored[1] != "roadCornerSmall":
+			authored[3] = TrackBuilder.BANK_DEGREES[TrackBuilder.MAX_BANK_LEVEL]
+		fixture.append(authored)
+	return fixture
+
 ## The bank profile the builder hands the rest of the game.
 ##
 ## Checks the shape of it rather than exact numbers: full bank in the corners,
@@ -6142,7 +6155,7 @@ func test_plateau_inside_one_straight_still_works() -> void:
 ## surface the wheels drop off, and it would not be visible in a screenshot.
 func test_corners_are_banked() -> void:
 	var builder := TrackBuilder.new()
-	builder.measure(load("res://tools/build_track.gd").ARDENNES)
+	builder.measure(_banked_fixture())
 	check("a bank angle per centreline point",
 		builder.bank.size(), builder.centreline.size())
 
@@ -6152,8 +6165,7 @@ func test_corners_are_banked() -> void:
 		peak = maxf(peak, absf(b))
 		if absf(b) <= TrackBuilder.BANK_EPSILON:
 			flat += 1
-	# Ardennes' biggest corners are size 3, so they set the peak.
-	check_near("the widest corners reach their full bank",
+	check_near("authored corners reach their full bank",
 		rad_to_deg(peak), TrackBuilder.BANK_DEGREES[3], 0.01)
 	check_true("and nothing exceeds the ceiling",
 		rad_to_deg(peak) <= TrackBuilder.MAX_BANK_DEG + 0.001)
@@ -6164,7 +6176,7 @@ func test_corners_are_banked() -> void:
 
 	# Which way each point is turning, read off the centreline itself rather than
 	# taken from the layout, so the test cannot inherit a sign error from the
-	# thing it is checking. Ardennes turns both ways, so this covers both.
+	# thing it is checking. The fixture turns both ways, so this covers both.
 	var wrong_way := 0
 	var tested := 0
 	for i in range(1, builder.centreline.size() - 1):
@@ -6256,17 +6268,10 @@ func test_banked_collision_leans_into_the_corner() -> void:
 	check_near("and leans towards the inside of the corner",
 		normal.dot(side), -sin(roll), 0.05)
 
-## The banked tile meshes have to survive being packed into a `.tscn` and loaded
-## back, or the shipped circuits drive banked and look flat.
-##
-## Worth its own test because the failure is silent and one-sided: collision is
-## generated from the same profile either way, so the car would corner correctly
-## on a road that had visibly reverted to being level.
-func test_shipped_tracks_keep_their_banked_meshes() -> void:
-	# Ardennes and La Sarthe bank their sweepers and Monte Carlo is deliberately
-	# flat — it is a street circuit — so the shipped circuits between them check
-	# that banking survives being packed *and* that asking for none gets none.
-	var want_banked := {"ardennes": true, "monte_carlo": false, "la_sarthe": true}
+## Every shipped circuit stays laterally flat until the car handles bank
+## transitions reliably. Banking remains covered independently through the
+## player-authored layout and collision tests.
+func test_shipped_tracks_stay_flat() -> void:
 	for info in GameState.TRACKS:
 		var inst: Node3D = load(info["scene"]).instantiate()
 		var visuals: Node3D = inst.get_node("RoadVisuals")
@@ -6278,18 +6283,10 @@ func test_shipped_tracks_keep_their_banked_meshes() -> void:
 				banked += 1
 			steepest = maxf(steepest, slope)
 
-		if not want_banked.get(info["id"], false):
-			# A flat tile's road surface is level to within its own thickness.
-			check("track %s stays flat" % info["id"], banked, 0)
-			check_true("track %s is level across the road (%.2f m)"
-				% [info["id"], steepest], steepest < 0.1)
-			inst.free()
-			continue
-
-		check_true("track %s has banked tiles (%d of %d)"
-			% [info["id"], banked, visuals.get_child_count()], banked >= 4)
-		check_true("track %s banks by a visible amount (%.2f m across the road)"
-			% [info["id"], steepest], steepest > BANKED_TILE_M)
+		# A flat tile's road surface is level to within its own thickness.
+		check("track %s stays flat" % info["id"], banked, 0)
+		check_true("track %s is level across the road (%.2f m)"
+			% [info["id"], steepest], steepest < 0.1)
 		inst.free()
 
 ## Banking is a choice, and "flat" has to be one of the answers.
@@ -6321,10 +6318,9 @@ func test_banking_can_be_turned_off() -> void:
 	check_near("a layout that never mentions banking gets none",
 		rad_to_deg(implied_worst), 0.0, 0.001)
 
-	# Ardennes is the same circuit with its angles written in, so the difference
-	# between the two is only ever what the layout asked for.
+	# A player-authored circuit can still ask for banking explicitly.
 	var asked := TrackBuilder.new()
-	asked.measure(tool_script.ARDENNES)
+	asked.measure(_banked_fixture())
 	var asked_worst := 0.0
 	for b in asked.bank:
 		asked_worst = maxf(asked_worst, absf(b))
@@ -8000,7 +7996,7 @@ func _physics_process(_delta: float) -> bool:
 		test_elevation_requests_are_reduced_not_broken()
 		test_plateau_inside_one_straight_still_works()
 		test_corners_are_banked()
-		test_shipped_tracks_keep_their_banked_meshes()
+		test_shipped_tracks_stay_flat()
 		test_banking_can_be_turned_off()
 		test_corner_banking_is_authored_and_saved()
 		test_slopes_are_eased()

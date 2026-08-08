@@ -514,11 +514,10 @@ one with enough road either side to ease the roll in and out of, while a hairpin
 banked hard is a skate bowl whose tilt arrives in a car length — but they are a
 suggestion in the editor's cycle order, not a value anything applies on its own.
 
-The shipped circuits show both answers, and all three say so out loud:
-**Ardennes** and **La Sarthe** write 2.5° on their medium corners and 4° on their
-sweepers, **Monte Carlo** writes `0.0` on every one of its fourteen and does not
-lean anywhere. That is the honest answer for a street circuit, which is why it is
-the one that carries it.
+Every shipped circuit currently writes `0.0` on every corner and does not lean
+anywhere. This is a product constraint rather than a limitation of the authoring
+model: bank transitions do not yet feel reliable in the car, while custom tracks
+still expose banking so that the handling can be developed and tested against it.
 
 The profile is built by giving each corner its full angle across its own arc and
 easing to nothing over `BANK_TRANSITION` (1.5 units, 21 m) at each end, then
